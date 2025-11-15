@@ -1,22 +1,22 @@
-"""数据库会话管理。"""
+"""数据库会话管理（当前基于内存存储）。"""
 
 from collections.abc import AsyncGenerator
-
-from app.core.config import settings
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
+from contextlib import asynccontextmanager
 
 
-class Base(DeclarativeBase):
-    """所有 ORM 模型的基类。"""
+
+class AsyncSession:
+    """兼容占位的异步 Session。"""
+
+    async def __aenter__(self) -> "AsyncSession":  # pragma: no cover - 简化实现
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:  # type: ignore[override]
+        return None
 
 
-engine = create_async_engine(settings.database_url, echo=settings.debug, future=True)
-SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-
+@asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI 依赖注入使用的异步数据库 Session。"""
+    """FastAPI 依赖注入占位符。"""
 
-    async with SessionLocal() as session:
-        yield session
+    yield AsyncSession()
