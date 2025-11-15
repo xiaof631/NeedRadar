@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from app.db.storage import db
-from app.models import FetchStatus
+from app.models import FetchStatus, RawEntryStatus
 from app.services import raw_entries, rss_fetcher, rss_sources
 
 
@@ -69,10 +69,12 @@ def test_fetch_rss_source_success_and_deduplicate() -> None:
         assert result.fetched_entries == 2
         assert result.new_entries == 2
 
-        entries = raw_entries.list_entries(source_id=source.id)
+        total, entries = raw_entries.list_entries(source_id=source.id)
+        assert total == 2
         assert len(entries) == 2
         assert entries[0].title == "Second Post"
         assert sorted(entries[0].tags) == ["news", "rss"]
+        assert entries[0].status == RawEntryStatus.PENDING
 
         updated_source = rss_sources.get_source(source.id)
         assert updated_source.etag == '"v1"'
@@ -120,7 +122,9 @@ def test_fetch_rss_source_http_failure() -> None:
         assert result.status == FetchStatus.FAILURE
         assert result.new_entries == 0
         assert result.error_message is not None and "502" in result.error_message
-        assert raw_entries.list_entries(source_id=source.id) == []
+        total, entries = raw_entries.list_entries(source_id=source.id)
+        assert total == 0
+        assert entries == []
 
         logs = db.list_fetch_logs(source_id=source.id)
         assert len(logs) == 1
