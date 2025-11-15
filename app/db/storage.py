@@ -3,8 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
+from datetime import datetime
 
-from app.models import FetchLog, FetchStatus, RawEntry, RssSource, SourceStatus
+from app.models import (
+    FetchLog,
+    FetchStatus,
+    RawEntry,
+    RawEntryStatus,
+    RssSource,
+    SourceStatus,
+)
 
 
 class InMemoryDatabase:
@@ -116,10 +124,22 @@ class InMemoryDatabase:
     def create_raw_entry(self, data: dict) -> RawEntry:
         self._raw_entry_seq += 1
         tags = tuple(data.get("tags", ()))
-        entry = RawEntry(id=self._raw_entry_seq, **{**data, "tags": tags})
+        status_value = data.get("status", RawEntryStatus.PENDING)
+        status = RawEntryStatus(status_value)
+        payload = {**data, "tags": tags, "status": status}
+        entry = RawEntry(id=self._raw_entry_seq, **payload)
         self._raw_entries[entry.id] = entry
         self._raw_entry_index[(entry.source_id, entry.guid)] = entry.id
         return entry
+
+    def update_raw_entry(self, entry_id: int, updater: Callable[[RawEntry], None]) -> RawEntry:
+        entry = self._raw_entries[entry_id]
+        updater(entry)
+        entry.touch()
+        return entry
+
+    def get_raw_entry(self, entry_id: int) -> RawEntry | None:
+        return self._raw_entries.get(entry_id)
 
     def get_raw_entry_by_guid(self, source_id: int, guid: str) -> RawEntry | None:
         entry_id = self._raw_entry_index.get((source_id, guid))
@@ -127,11 +147,89 @@ class InMemoryDatabase:
             return None
         return self._raw_entries.get(entry_id)
 
-    def list_raw_entries(self, *, source_id: int | None = None) -> list[RawEntry]:
+    def list_raw_entries(
+        self,
+        *,
+        source_id: int | None = None,
+        status: RawEntryStatus | None = None,
+        search: str | None = None,
+        start_published_at: datetime | None = None,
+        end_published_at: datetime | None = None,
+        skip: int = 0,
+        limit: int | None = None,
+    ) -> list[RawEntry]:
+        filtered = self._filter_raw_entries(
+            source_id=source_id,
+            status=status,
+            search=search,
+            start_published_at=start_published_at,
+            end_published_at=end_published_at,
+        )
+        sliced = filtered[skip : skip + limit if limit is not None else None]
+        return list(sliced)
+
+    def count_raw_entries(
+        self,
+        *,
+        source_id: int | None = None,
+        status: RawEntryStatus | None = None,
+        search: str | None = None,
+        start_published_at: datetime | None = None,
+        end_published_at: datetime | None = None,
+    ) -> int:
+        filtered = self._filter_raw_entries(
+            source_id=source_id,
+            status=status,
+            search=search,
+            start_published_at=start_published_at,
+            end_published_at=end_published_at,
+        )
+        return len(filtered)
+
+    def _filter_raw_entries(
+        self,
+        *,
+        source_id: int | None = None,
+        status: RawEntryStatus | None = None,
+        search: str | None = None,
+        start_published_at: datetime | None = None,
+        end_published_at: datetime | None = None,
+    ) -> list[RawEntry]:
         entries: Iterable[RawEntry] = self._raw_entries.values()
         if source_id is not None:
             entries = [entry for entry in entries if entry.source_id == source_id]
-        return sorted(entries, key=lambda item: item.published_at or item.created_at, reverse=True)
+        if status is not None:
+            entries = [entry for entry in entries if entry.status == status]
+        if search:
+            keyword = search.lower()
+            entries = [
+                entry
+                for entry in entries
+                if keyword in (entry.title or "").lower()
+                or keyword in (entry.summary or "").lower()
+                or keyword in (entry.content or "").lower()
+            ]
+        if start_published_at is not None:
+            entries = [
+                entry
+                for entry in entries
+                if self._entry_datetime(entry) >= start_published_at
+            ]
+        if end_published_at is not None:
+            entries = [
+                entry
+                for entry in entries
+                if self._entry_datetime(entry) <= end_published_at
+            ]
+        return sorted(
+            entries,
+            key=lambda item: item.published_at or item.created_at,
+            reverse=True,
+        )
+
+    @staticmethod
+    def _entry_datetime(entry: RawEntry) -> datetime:
+        return entry.published_at or entry.created_at
 
 
 db = InMemoryDatabase()

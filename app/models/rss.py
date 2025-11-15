@@ -23,6 +23,15 @@ class FetchStatus(str, Enum):
     FAILURE = "failure"
 
 
+class RawEntryStatus(str, Enum):
+    """原始条目的处理状态。"""
+
+    PENDING = "pending"
+    FILTERED = "filtered"
+    PROMOTED = "promoted"
+    IGNORED = "ignored"
+
+
 @dataclass(slots=True)
 class RssSource:
     """RSS 数据源配置。"""
@@ -71,6 +80,7 @@ class RawEntry:
     published_at: datetime | None = None
     author: str | None = None
     tags: Sequence[str] = field(default_factory=tuple)
+    status: RawEntryStatus = RawEntryStatus.PENDING
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
