@@ -1,5 +1,11 @@
 """Pydantic 模型导出。"""
 
+from app.schemas.filter_rules import (
+    FilterRuleCreate,
+    FilterRuleList,
+    FilterRuleRead,
+    FilterRuleUpdate,
+)
 from app.schemas.raw_entries import (
     RawEntryBulkStatusUpdate,
     RawEntryList,
@@ -16,6 +22,10 @@ from app.schemas.rss import (
 )
 
 __all__ = [
+    "FilterRuleCreate",
+    "FilterRuleList",
+    "FilterRuleRead",
+    "FilterRuleUpdate",
     "RawEntryBulkStatusUpdate",
     "RawEntryList",
     "RawEntryRead",

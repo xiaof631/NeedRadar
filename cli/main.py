@@ -6,22 +6,24 @@ import csv
 import json
 from io import StringIO
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.models import RawEntryStatus, SourceStatus
 from app.schemas import RawEntryRead
-from app.services import raw_entries, rss_sources
+from app.services import filter_rules, raw_entries, rss_sources
 
 app = typer.Typer(help="NeedRadar 工具集")
 logger = get_logger(__name__)
 
 rss_app = typer.Typer(help="RSS 源管理")
 entries_app = typer.Typer(help="原始条目管理")
+rules_app = typer.Typer(help="筛选规则管理")
 app.add_typer(rss_app, name="rss")
 app.add_typer(entries_app, name="entries")
+app.add_typer(rules_app, name="rules")
 
 
 @app.command()
@@ -39,6 +41,137 @@ def init_db() -> None:
 
     rss_sources.reset_storage()
     typer.echo("已重置内存数据库")
+
+
+@rules_app.command("list")
+def list_rules(
+    enabled: Annotated[
+        bool | None,
+        typer.Option("--enabled/--disabled", help="根据启用状态过滤"),
+    ] = None,
+    search: Annotated[
+        str | None,
+        typer.Option(help="根据名称或描述搜索"),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option(help="最大返回数量", min=1, max=100),
+    ] = 20,
+) -> None:
+    """列出筛选规则。"""
+
+    total, items = filter_rules.list_rules(enabled=enabled, search=search, limit=limit)
+    if total == 0:
+        typer.echo("暂无筛选规则")
+        raise typer.Exit()
+
+    typer.echo(f"共 {total} 条规则，当前展示 {len(items)} 条：")
+    for rule in items:
+        typer.echo(
+            f"[{rule.id}] {rule.name} - "
+            f"启用: {'是' if rule.enabled else '否'}, 最低得分: {rule.min_score}"
+        )
+
+
+@rules_app.command("create")
+def create_rule(
+    name: Annotated[str, typer.Argument(help="规则名称")],
+    description: Annotated[
+        str | None,
+        typer.Option(help="规则描述"),
+    ] = None,
+    keywords: Annotated[
+        list[str] | None,
+        typer.Option("--keyword", help="匹配关键词，可重复"),
+    ] = None,
+    patterns: Annotated[
+        list[str] | None,
+        typer.Option("--pattern", help="匹配正则表达式，可重复"),
+    ] = None,
+    min_score: Annotated[
+        float,
+        typer.Option(help="最低命中得分阈值", min=0.0, max=1.0),
+    ] = 0.5,
+    enabled: Annotated[
+        bool,
+        typer.Option("--enable/--disable", help="是否启用规则"),
+    ] = True,
+) -> None:
+    """创建新的筛选规则。"""
+
+    rule = filter_rules.create_rule(
+        {
+            "name": name,
+            "description": description,
+            "keywords": keywords or [],
+            "patterns": patterns or [],
+            "min_score": min_score,
+            "enabled": enabled,
+        }
+    )
+    typer.echo(f"已创建筛选规则 #{rule.id}: {rule.name}")
+
+
+@rules_app.command("update")
+def update_rule(
+    rule_id: Annotated[int, typer.Argument(help="筛选规则 ID")],
+    name: Annotated[str | None, typer.Option(help="新的名称")] = None,
+    description: Annotated[str | None, typer.Option(help="新的描述")] = None,
+    keywords: Annotated[
+        list[str] | None,
+        typer.Option("--keyword", help="覆盖关键词列表，可重复"),
+    ] = None,
+    patterns: Annotated[
+        list[str] | None,
+        typer.Option("--pattern", help="覆盖正则列表，可重复"),
+    ] = None,
+    min_score: Annotated[
+        float | None,
+        typer.Option(help="新的最低命中得分阈值", min=0.0, max=1.0),
+    ] = None,
+    enabled: Annotated[
+        bool | None,
+        typer.Option("--enable/--disable", help="是否启用"),
+    ] = None,
+) -> None:
+    """更新已有的筛选规则。"""
+
+    payload: dict[str, Any] = {}
+    for key, value in {
+        "name": name,
+        "description": description,
+        "min_score": min_score,
+        "enabled": enabled,
+    }.items():
+        if value is not None:
+            payload[key] = value
+    if keywords is not None:
+        payload["keywords"] = keywords
+    if patterns is not None:
+        payload["patterns"] = patterns
+
+    if not payload:
+        typer.echo("无需更新任何字段")
+        raise typer.Exit()
+
+    try:
+        rule = filter_rules.update_rule(rule_id, payload)
+    except filter_rules.FilterRuleNotFoundError as exc:
+        raise typer.BadParameter("筛选规则不存在", param_hint="rule_id") from exc
+
+    typer.echo(f"已更新筛选规则 #{rule.id}: {rule.name}")
+
+
+@rules_app.command("delete")
+def delete_rule(rule_id: Annotated[int, typer.Argument(help="筛选规则 ID")]) -> None:
+    """删除筛选规则。"""
+
+    try:
+        filter_rules.delete_rule(rule_id)
+    except filter_rules.FilterRuleNotFoundError as exc:
+        raise typer.BadParameter("筛选规则不存在", param_hint="rule_id") from exc
+
+    typer.echo(f"已删除筛选规则 #{rule_id}")
 
 
 @rss_app.command("list")
