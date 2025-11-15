@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      - NEEDRADAR_DATABASE_URL=sqlite+aiosqlite:///./data/needradar.db
+    volumes:
+      - ./:/app
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: .
+    command: python -m cli.main show-config
+    environment:
+      - NEEDRADAR_DATABASE_URL=sqlite+aiosqlite:///./data/needradar.db
+    volumes:
+      - ./:/app
+      - ./data:/app/data
