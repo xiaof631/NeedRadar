@@ -6,6 +6,8 @@ from collections.abc import Callable, Iterable
 from datetime import datetime
 
 from app.models import (
+    CandidateNeed,
+    CandidateNeedStatus,
     FetchLog,
     FetchStatus,
     FilterRule,
@@ -25,10 +27,12 @@ class InMemoryDatabase:
         self._raw_entries: dict[int, RawEntry] = {}
         self._raw_entry_index: dict[tuple[int, str], int] = {}
         self._filter_rules: dict[int, FilterRule] = {}
+        self._candidate_needs: dict[int, CandidateNeed] = {}
         self._source_seq = 0
         self._fetch_log_seq = 0
         self._raw_entry_seq = 0
         self._filter_rule_seq = 0
+        self._candidate_need_seq = 0
 
     def reset(self) -> None:
         self._sources.clear()
@@ -36,10 +40,12 @@ class InMemoryDatabase:
         self._raw_entries.clear()
         self._raw_entry_index.clear()
         self._filter_rules.clear()
+        self._candidate_needs.clear()
         self._source_seq = 0
         self._fetch_log_seq = 0
         self._raw_entry_seq = 0
         self._filter_rule_seq = 0
+        self._candidate_need_seq = 0
 
     # RSS 源操作
     def create_source(self, data: dict) -> RssSource:
@@ -235,6 +241,86 @@ class InMemoryDatabase:
     @staticmethod
     def _entry_datetime(entry: RawEntry) -> datetime:
         return entry.published_at or entry.created_at
+
+    # 候选需求操作
+    def create_candidate_need(self, data: dict) -> CandidateNeed:
+        self._candidate_need_seq += 1
+        need = CandidateNeed(id=self._candidate_need_seq, **data)
+        self._candidate_needs[need.id] = need
+        return need
+
+    def update_candidate_need(
+        self, need_id: int, updater: Callable[[CandidateNeed], None]
+    ) -> CandidateNeed:
+        need = self._candidate_needs[need_id]
+        updater(need)
+        need.touch()
+        return need
+
+    def delete_candidate_need(self, need_id: int) -> None:
+        self._candidate_needs.pop(need_id, None)
+
+    def get_candidate_need(self, need_id: int) -> CandidateNeed | None:
+        return self._candidate_needs.get(need_id)
+
+    def list_candidate_needs(
+        self,
+        *,
+        statuses: Iterable[CandidateNeedStatus] | None = None,
+        search: str | None = None,
+        raw_entry_id: int | None = None,
+        skip: int = 0,
+        limit: int | None = None,
+    ) -> list[CandidateNeed]:
+        items = self._filter_candidate_needs(
+            statuses=statuses,
+            search=search,
+            raw_entry_id=raw_entry_id,
+        )
+        sliced = items[skip : skip + limit if limit is not None else None]
+        return list(sliced)
+
+    def count_candidate_needs(
+        self,
+        *,
+        statuses: Iterable[CandidateNeedStatus] | None = None,
+        search: str | None = None,
+        raw_entry_id: int | None = None,
+    ) -> int:
+        return len(
+            self._filter_candidate_needs(
+                statuses=statuses,
+                search=search,
+                raw_entry_id=raw_entry_id,
+            )
+        )
+
+    def _filter_candidate_needs(
+        self,
+        *,
+        statuses: Iterable[CandidateNeedStatus] | None = None,
+        search: str | None = None,
+        raw_entry_id: int | None = None,
+    ) -> list[CandidateNeed]:
+        needs: Iterable[CandidateNeed] = self._candidate_needs.values()
+        if statuses:
+            status_set = {status for status in statuses}
+            needs = [need for need in needs if need.status in status_set]
+        if raw_entry_id is not None:
+            needs = [need for need in needs if need.raw_entry_id == raw_entry_id]
+        if search:
+            keyword = search.lower()
+            needs = [
+                need
+                for need in needs
+                if keyword in need.summary.lower()
+                or keyword in (need.problem_statement or "").lower()
+                or keyword in (need.target_users or "").lower()
+                or keyword in (need.value_proposition or "").lower()
+                or keyword in (need.competition or "").lower()
+                or keyword in (need.notes or "").lower()
+            ]
+        return sorted(needs, key=lambda item: item.created_at, reverse=True)
 
     # 筛选规则操作
     def create_filter_rule(self, data: dict) -> FilterRule:
