@@ -8,6 +8,7 @@ from datetime import datetime
 from app.models import (
     FetchLog,
     FetchStatus,
+    FilterRule,
     RawEntry,
     RawEntryStatus,
     RssSource,
@@ -23,18 +24,22 @@ class InMemoryDatabase:
         self._fetch_logs: dict[int, FetchLog] = {}
         self._raw_entries: dict[int, RawEntry] = {}
         self._raw_entry_index: dict[tuple[int, str], int] = {}
+        self._filter_rules: dict[int, FilterRule] = {}
         self._source_seq = 0
         self._fetch_log_seq = 0
         self._raw_entry_seq = 0
+        self._filter_rule_seq = 0
 
     def reset(self) -> None:
         self._sources.clear()
         self._fetch_logs.clear()
         self._raw_entries.clear()
         self._raw_entry_index.clear()
+        self._filter_rules.clear()
         self._source_seq = 0
         self._fetch_log_seq = 0
         self._raw_entry_seq = 0
+        self._filter_rule_seq = 0
 
     # RSS 源操作
     def create_source(self, data: dict) -> RssSource:
@@ -230,6 +235,65 @@ class InMemoryDatabase:
     @staticmethod
     def _entry_datetime(entry: RawEntry) -> datetime:
         return entry.published_at or entry.created_at
+
+    # 筛选规则操作
+    def create_filter_rule(self, data: dict) -> FilterRule:
+        self._filter_rule_seq += 1
+        payload = {
+            **data,
+            "keywords": tuple(data.get("keywords", ())),
+            "patterns": tuple(data.get("patterns", ())),
+        }
+        rule = FilterRule(id=self._filter_rule_seq, **payload)
+        self._filter_rules[rule.id] = rule
+        return rule
+
+    def update_filter_rule(
+        self, rule_id: int, updater: Callable[[FilterRule], None]
+    ) -> FilterRule:
+        rule = self._filter_rules[rule_id]
+        updater(rule)
+        rule.touch()
+        return rule
+
+    def delete_filter_rule(self, rule_id: int) -> None:
+        self._filter_rules.pop(rule_id, None)
+
+    def get_filter_rule(self, rule_id: int) -> FilterRule | None:
+        return self._filter_rules.get(rule_id)
+
+    def list_filter_rules(
+        self,
+        *,
+        enabled: bool | None = None,
+        search: str | None = None,
+        skip: int = 0,
+        limit: int | None = None,
+    ) -> list[FilterRule]:
+        items: Iterable[FilterRule] = self._filter_rules.values()
+        if enabled is not None:
+            items = [item for item in items if item.enabled is enabled]
+        if search:
+            keyword = search.lower()
+            items = [
+                item
+                for item in items
+                if keyword in item.name.lower()
+                or keyword in (item.description or "").lower()
+            ]
+        sorted_items = sorted(items, key=lambda item: item.created_at, reverse=True)
+        sliced = sorted_items[skip : skip + limit if limit is not None else None]
+        return list(sliced)
+
+    def count_filter_rules(
+        self,
+        *,
+        enabled: bool | None = None,
+        search: str | None = None,
+    ) -> int:
+        return len(
+            self.list_filter_rules(enabled=enabled, search=search)
+        )
 
 
 db = InMemoryDatabase()
