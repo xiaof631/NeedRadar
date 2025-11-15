@@ -1,5 +1,3 @@
-"""测试客户端的极简实现。"""
-
 from __future__ import annotations
 
 import asyncio
@@ -7,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .application import FastAPI
+from .exceptions import HTTPException
 
 
 @dataclass
@@ -24,12 +23,32 @@ class TestClient:
     def __init__(self, app: FastAPI) -> None:
         self.app = app
 
+    def __enter__(self) -> "TestClient":
+        self.app.trigger_startup()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.app.trigger_shutdown()
+
     def get(self, path: str, params: dict[str, Any] | None = None) -> Response:
+        return self._request("GET", path, params=params)
+
+    def post(self, path: str, json: Any | None = None) -> Response:
+        return self._request("POST", path, json=json)
+
+    def put(self, path: str, json: Any | None = None) -> Response:
+        return self._request("PUT", path, json=json)
+
+    def delete(self, path: str) -> Response:
+        return self._request("DELETE", path)
+
+    def _request(self, method: str, path: str, *, params: dict[str, Any] | None = None, json: Any | None = None) -> Response:
         try:
-            if params:
-                result = asyncio.run(self.app.dispatch("GET", path, **params))
-            else:
-                result = asyncio.run(self.app.dispatch("GET", path))
+            status_code, payload = asyncio.run(self.app.dispatch(method, path, params=params, json=json))
+        except HTTPException as exc:
+            return Response(status_code=exc.status_code, _json={"detail": exc.detail})
         except LookupError:
             return Response(status_code=404, _json={"detail": "Not Found"})
-        return Response(status_code=200, _json=result)
+        if payload is None:
+            payload = {}
+        return Response(status_code=status_code, _json=payload)

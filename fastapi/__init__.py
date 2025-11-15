@@ -2,5 +2,15 @@
 
 from .application import FastAPI
 from .routing import APIRouter
+from .dependencies import Depends, Query
+from .exceptions import HTTPException
+from .status import status
 
-__all__ = ["FastAPI", "APIRouter"]
+__all__ = [
+    "FastAPI",
+    "APIRouter",
+    "Depends",
+    "Query",
+    "HTTPException",
+    "status",
+]
