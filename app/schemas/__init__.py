@@ -1,5 +1,13 @@
 """Pydantic 模型导出。"""
 
+from app.schemas.candidate_needs import (
+    CandidateNeedCreate,
+    CandidateNeedList,
+    CandidateNeedRead,
+    CandidateNeedStatusEnum,
+    CandidateNeedStatusUpdate,
+    CandidateNeedUpdate,
+)
 from app.schemas.filter_rules import (
     FilterRuleCreate,
     FilterRuleList,
@@ -26,6 +34,12 @@ __all__ = [
     "FilterRuleList",
     "FilterRuleRead",
     "FilterRuleUpdate",
+    "CandidateNeedCreate",
+    "CandidateNeedList",
+    "CandidateNeedRead",
+    "CandidateNeedStatusEnum",
+    "CandidateNeedStatusUpdate",
+    "CandidateNeedUpdate",
     "RawEntryBulkStatusUpdate",
     "RawEntryList",
     "RawEntryRead",

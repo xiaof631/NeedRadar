@@ -1,12 +1,13 @@
 """v1 版本 API 路由。"""
 
-from app.api.v1 import filter_rules, raw_entries, rss_sources
+from app.api.v1 import candidate_needs, filter_rules, raw_entries, rss_sources
 from fastapi import APIRouter
 
 router = APIRouter()
 router.include_router(rss_sources.router)
 router.include_router(raw_entries.router)
 router.include_router(filter_rules.router)
+router.include_router(candidate_needs.router)
 
 
 @router.get("/ping", summary="基础连通性测试")

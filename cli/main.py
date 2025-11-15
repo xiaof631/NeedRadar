@@ -11,9 +11,11 @@ from typing import Annotated, Any
 import typer
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
-from app.models import RawEntryStatus, SourceStatus
-from app.schemas import RawEntryRead
-from app.services import filter_rules, raw_entries, rss_sources
+from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus
+from app.schemas import CandidateNeedRead, RawEntryRead
+from app.services import candidate_needs, filter_rules, raw_entries, rss_sources
+from app.services.candidate_needs import CandidateNeedNotFoundError
+from app.services.raw_entries import RawEntryNotFoundError
 
 app = typer.Typer(help="NeedRadar 工具集")
 logger = get_logger(__name__)
@@ -21,9 +23,11 @@ logger = get_logger(__name__)
 rss_app = typer.Typer(help="RSS 源管理")
 entries_app = typer.Typer(help="原始条目管理")
 rules_app = typer.Typer(help="筛选规则管理")
+candidates_app = typer.Typer(help="候选需求管理")
 app.add_typer(rss_app, name="rss")
 app.add_typer(entries_app, name="entries")
 app.add_typer(rules_app, name="rules")
+app.add_typer(candidates_app, name="candidates")
 
 
 @app.command()
@@ -411,6 +415,219 @@ def export_raw_entries(
     if output is not None:
         output.write_text(content, encoding="utf-8")
         typer.echo(f"已导出 {len(models)} 条记录到 {output}")
+    else:
+        typer.echo(content)
+
+
+@candidates_app.command("list")
+def list_candidate_needs(
+    statuses: Annotated[
+        list[CandidateNeedStatus] | None,
+        typer.Option("--status", help="按状态过滤，可重复", case_sensitive=False),
+    ] = None,
+    search: Annotated[str | None, typer.Option(help="关键字搜索")] = None,
+    raw_entry_id: Annotated[int | None, typer.Option(help="原始条目 ID 过滤")] = None,
+    limit: Annotated[int, typer.Option(help="显示的最大条目数", min=1, max=100)] = 20,
+) -> None:
+    """列出候选需求。"""
+
+    total, items = candidate_needs.list_needs(
+        statuses=statuses,
+        search=search,
+        raw_entry_id=raw_entry_id,
+        limit=limit,
+    )
+    if total == 0:
+        typer.echo("暂无候选需求")
+        raise typer.Exit()
+
+    typer.echo(f"共 {total} 条候选需求，当前展示 {len(items)} 条：")
+    for need in items:
+        typer.echo(
+            f"[{need.id}] {need.summary} (原始条目 #{need.raw_entry_id}, 状态: {need.status.value})"
+        )
+
+
+@candidates_app.command("create")
+def create_candidate_need(
+    raw_entry_id: Annotated[int, typer.Argument(help="关联的原始条目 ID")],
+    summary: Annotated[str, typer.Argument(help="需求摘要")],
+    problem_statement: Annotated[str | None, typer.Option(help="问题描述")] = None,
+    target_users: Annotated[str | None, typer.Option(help="目标用户")] = None,
+    value_proposition: Annotated[str | None, typer.Option(help="价值主张")] = None,
+    competition: Annotated[str | None, typer.Option(help="竞争情况")] = None,
+    confidence: Annotated[
+        float | None,
+        typer.Option(help="信心指数", min=0.0, max=1.0),
+    ] = None,
+    status: Annotated[
+        CandidateNeedStatus,
+        typer.Option("--status", help="初始状态", case_sensitive=False),
+    ] = CandidateNeedStatus.PENDING_REVIEW,
+    notes: Annotated[str | None, typer.Option(help="备注")] = None,
+) -> None:
+    """创建候选需求。"""
+
+    try:
+        need = candidate_needs.create_need(
+            {
+                "raw_entry_id": raw_entry_id,
+                "summary": summary,
+                "problem_statement": problem_statement,
+                "target_users": target_users,
+                "value_proposition": value_proposition,
+                "competition": competition,
+                "confidence": confidence,
+                "status": status,
+                "notes": notes,
+            }
+        )
+    except RawEntryNotFoundError as exc:
+        raise typer.BadParameter("关联的原始条目不存在", param_hint="raw_entry_id") from exc
+
+    typer.echo(f"已创建候选需求 #{need.id}: {need.summary}")
+
+
+@candidates_app.command("update")
+def update_candidate_need(
+    need_id: Annotated[int, typer.Argument(help="候选需求 ID")],
+    summary: Annotated[str | None, typer.Option(help="新的摘要")] = None,
+    problem_statement: Annotated[str | None, typer.Option(help="新的问题描述")] = None,
+    target_users: Annotated[str | None, typer.Option(help="新的目标用户")] = None,
+    value_proposition: Annotated[str | None, typer.Option(help="新的价值主张")] = None,
+    competition: Annotated[str | None, typer.Option(help="新的竞争情况")] = None,
+    confidence: Annotated[
+        float | None,
+        typer.Option(help="新的信心指数", min=0.0, max=1.0),
+    ] = None,
+    status: Annotated[
+        CandidateNeedStatus | None,
+        typer.Option("--status", help="更新状态", case_sensitive=False),
+    ] = None,
+    notes: Annotated[str | None, typer.Option(help="新的备注")] = None,
+    raw_entry_id: Annotated[int | None, typer.Option(help="新的原始条目 ID")] = None,
+) -> None:
+    """更新候选需求信息。"""
+
+    payload: dict[str, Any] = {
+        key: value
+        for key, value in {
+            "summary": summary,
+            "problem_statement": problem_statement,
+            "target_users": target_users,
+            "value_proposition": value_proposition,
+            "competition": competition,
+            "confidence": confidence,
+            "status": status,
+            "notes": notes,
+            "raw_entry_id": raw_entry_id,
+        }.items()
+        if value is not None
+    }
+    if not payload:
+        typer.echo("无需更新任何字段")
+        raise typer.Exit()
+
+    try:
+        need = candidate_needs.update_need(need_id, payload)
+    except CandidateNeedNotFoundError as exc:
+        raise typer.BadParameter("候选需求不存在", param_hint="need_id") from exc
+    except RawEntryNotFoundError as exc:
+        raise typer.BadParameter("关联的原始条目不存在", param_hint="raw_entry_id") from exc
+
+    typer.echo(f"已更新候选需求 #{need.id}")
+
+
+@candidates_app.command("update-status")
+def update_candidate_need_status(
+    need_id: Annotated[int, typer.Argument(help="候选需求 ID")],
+    status: Annotated[CandidateNeedStatus, typer.Argument(help="新的状态", case_sensitive=False)],
+) -> None:
+    """更新候选需求的状态。"""
+
+    try:
+        need = candidate_needs.update_need_status(need_id, status)
+    except CandidateNeedNotFoundError as exc:
+        raise typer.BadParameter("候选需求不存在", param_hint="need_id") from exc
+
+    typer.echo(f"已将候选需求 #{need.id} 状态更新为 {need.status.value}")
+
+
+@candidates_app.command("export")
+def export_candidate_needs(
+    format: Annotated[
+        str,
+        typer.Option("--format", help="导出格式", case_sensitive=False),
+    ] = "json",
+    output: Annotated[Path | None, typer.Option("--output", help="输出文件路径")] = None,
+    statuses: Annotated[
+        list[CandidateNeedStatus] | None,
+        typer.Option("--status", help="按状态过滤，可重复", case_sensitive=False),
+    ] = None,
+    search: Annotated[str | None, typer.Option(help="关键字搜索")] = None,
+    raw_entry_id: Annotated[int | None, typer.Option(help="原始条目 ID 过滤")] = None,
+    limit: Annotated[int | None, typer.Option(help="最大导出数量", min=1, max=1000)] = None,
+) -> None:
+    """导出候选需求。"""
+
+    fmt = format.lower()
+    if fmt not in {"json", "csv"}:
+        raise typer.BadParameter("format 必须为 json 或 csv", param_hint="format")
+
+    needs = candidate_needs.export_needs(
+        statuses=statuses,
+        search=search,
+        raw_entry_id=raw_entry_id,
+        limit=limit,
+    )
+    models = [CandidateNeedRead.model_validate(need) for need in needs]
+
+    if fmt == "json":
+        content = json.dumps(
+            [model.model_dump(mode="json") for model in models],
+            ensure_ascii=False,
+            indent=2,
+        )
+    else:
+        buffer = StringIO()
+        fieldnames = [
+            "id",
+            "raw_entry_id",
+            "summary",
+            "problem_statement",
+            "target_users",
+            "value_proposition",
+            "competition",
+            "confidence",
+            "status",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+        writer.writeheader()
+        for model in models:
+            writer.writerow(
+                {
+                    "id": model.id,
+                    "raw_entry_id": model.raw_entry_id,
+                    "summary": model.summary,
+                    "problem_statement": model.problem_statement or "",
+                    "target_users": model.target_users or "",
+                    "value_proposition": model.value_proposition or "",
+                    "competition": model.competition or "",
+                    "confidence": model.confidence if model.confidence is not None else "",
+                    "status": model.status.value,
+                    "notes": model.notes or "",
+                    "created_at": model.created_at.isoformat(),
+                    "updated_at": model.updated_at.isoformat(),
+                }
+            )
+        content = buffer.getvalue()
+
+    if output is not None:
+        output.write_text(content, encoding="utf-8")
+        typer.echo(f"已导出 {len(models)} 条候选需求到 {output}")
     else:
         typer.echo(content)
 

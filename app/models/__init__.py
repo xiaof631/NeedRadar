@@ -1,5 +1,6 @@
 """应用的 ORM 模型导出。"""
 
+from app.models.candidate_need import CandidateNeed, CandidateNeedStatus
 from app.models.filter_rule import FilterRule
 from app.models.rss import (
     FetchLog,
@@ -11,6 +12,8 @@ from app.models.rss import (
 )
 
 __all__ = [
+    "CandidateNeed",
+    "CandidateNeedStatus",
     "FilterRule",
     "FetchLog",
     "FetchStatus",
