@@ -11,9 +11,9 @@ from typing import Annotated, Any
 import typer
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
-from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus
+from app.models import CandidateNeedStatus, FetchStatus, RawEntryStatus, SourceStatus
 from app.schemas import CandidateNeedRead, RawEntryRead
-from app.services import candidate_needs, filter_rules, raw_entries, rss_sources
+from app.services import candidate_needs, fetch_logs, filter_rules, raw_entries, rss_sources
 from app.services.candidate_needs import CandidateNeedNotFoundError
 from app.services.raw_entries import RawEntryNotFoundError
 
@@ -202,6 +202,33 @@ def list_sources(
             f"(分类: {source.category or '-'}, 状态: {source.status})"
         )
         typer.echo(message)
+
+
+@rss_app.command("logs")
+def list_fetch_logs(
+    source_id: Annotated[int | None, typer.Option(help="按数据源过滤")] = None,
+    skip: Annotated[int, typer.Option(help="跳过的日志数量", min=0)] = 0,
+    limit: Annotated[int, typer.Option(help="显示的最大日志数量", min=1, max=100)] = 20,
+) -> None:
+    """查看 RSS 抓取日志。"""
+
+    total, items = fetch_logs.list_logs(source_id=source_id, skip=skip, limit=limit)
+    if total == 0:
+        typer.echo("暂无抓取日志")
+        raise typer.Exit()
+
+    typer.echo(f"共 {total} 条抓取日志，当前展示 {len(items)} 条：")
+    for log in items:
+        status_label = "成功" if log.status == FetchStatus.SUCCESS else "失败"
+        base = (
+            f"[{log.id}] 源 #{log.source_id} - {status_label}"
+            f" @ {log.fetched_at.isoformat()}"
+        )
+        if log.http_status is not None:
+            base += f" HTTP {log.http_status}"
+        if log.error_message:
+            base += f" - {log.error_message}"
+        typer.echo(base)
 
 
 @rss_app.command("create")

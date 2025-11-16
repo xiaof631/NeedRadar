@@ -22,6 +22,8 @@ from app.schemas.raw_entries import (
     RawEntryStatusUpdate,
 )
 from app.schemas.rss import (
+    FetchLogList,
+    FetchLogRead,
     RssSourceBase,
     RssSourceCreate,
     RssSourceList,
@@ -45,6 +47,8 @@ __all__ = [
     "RawEntryRead",
     "RawEntryStatusEnum",
     "RawEntryStatusUpdate",
+    "FetchLogList",
+    "FetchLogRead",
     "RssSourceBase",
     "RssSourceCreate",
     "RssSourceList",

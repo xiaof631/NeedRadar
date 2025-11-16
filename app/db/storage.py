@@ -125,11 +125,29 @@ class InMemoryDatabase:
         self._fetch_logs[log.id] = log
         return log
 
-    def list_fetch_logs(self, *, source_id: int | None = None) -> list[FetchLog]:
+    def list_fetch_logs(
+        self,
+        *,
+        source_id: int | None = None,
+        skip: int = 0,
+        limit: int | None = None,
+    ) -> list[FetchLog]:
         logs: Iterable[FetchLog] = self._fetch_logs.values()
         if source_id is not None:
             logs = [log for log in logs if log.source_id == source_id]
-        return sorted(logs, key=lambda item: item.fetched_at, reverse=True)
+        sorted_logs = sorted(logs, key=lambda item: item.fetched_at, reverse=True)
+        sliced = sorted_logs[skip : skip + limit if limit is not None else None]
+        return list(sliced)
+
+    def count_fetch_logs(
+        self,
+        *,
+        source_id: int | None = None,
+    ) -> int:
+        logs: Iterable[FetchLog] = self._fetch_logs.values()
+        if source_id is not None:
+            logs = [log for log in logs if log.source_id == source_id]
+        return len(list(logs))
 
     # 原始条目操作
     def create_raw_entry(self, data: dict) -> RawEntry:
