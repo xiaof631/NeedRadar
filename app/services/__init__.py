@@ -2,6 +2,7 @@
 
 from app.services import (
     candidate_needs,
+    dashboard,
     downstream,
     fetch_logs,
     filter_engine,
@@ -15,6 +16,7 @@ from app.services import (
 
 __all__ = [
     "candidate_needs",
+    "dashboard",
     "downstream",
     "fetch_logs",
     "filter_engine",

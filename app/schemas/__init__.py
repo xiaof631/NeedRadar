@@ -8,6 +8,12 @@ from app.schemas.candidate_needs import (
     CandidateNeedStatusUpdate,
     CandidateNeedUpdate,
 )
+from app.schemas.dashboard import (
+    DashboardMetricsRead,
+    FetchLogSummaryRead,
+    SourcesSummaryRead,
+    StatusBreakdownRead,
+)
 from app.schemas.filter_rules import (
     FilterRuleCreate,
     FilterRuleList,
@@ -33,27 +39,31 @@ from app.schemas.rss import (
 )
 
 __all__ = [
-    "FilterRuleCreate",
-    "FilterRuleList",
-    "FilterRuleRead",
-    "FilterRuleUpdate",
     "CandidateNeedCreate",
     "CandidateNeedList",
     "CandidateNeedRead",
     "CandidateNeedStatusEnum",
     "CandidateNeedStatusUpdate",
     "CandidateNeedUpdate",
+    "DashboardMetricsRead",
+    "FetchLogList",
+    "FetchLogRead",
+    "FetchLogSummaryRead",
+    "FilterRuleCreate",
+    "FilterRuleList",
+    "FilterRuleRead",
+    "FilterRuleUpdate",
     "RawEntryBulkStatusUpdate",
     "RawEntryList",
     "RawEntryRead",
     "RawEntryRuleMatch",
     "RawEntryStatusEnum",
     "RawEntryStatusUpdate",
-    "FetchLogList",
-    "FetchLogRead",
     "RssSourceBase",
     "RssSourceCreate",
     "RssSourceList",
     "RssSourceRead",
     "RssSourceUpdate",
+    "SourcesSummaryRead",
+    "StatusBreakdownRead",
 ]
