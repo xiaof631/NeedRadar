@@ -17,6 +17,10 @@ from app.schemas.dashboard import (
     SourcesSummaryRead,
     StatusBreakdownRead,
 )
+from app.schemas.filter_metrics import (
+    FilterPerformanceRead,
+    SourceFilterMetricRead,
+)
 from app.schemas.filter_rules import (
     FilterRuleCreate,
     FilterRuleList,
@@ -55,10 +59,12 @@ __all__ = [
     "FetchLogList",
     "FetchLogRead",
     "FetchLogSummaryRead",
+    "FilterPerformanceRead",
     "FilterRuleCreate",
     "FilterRuleList",
     "FilterRuleRead",
     "FilterRuleUpdate",
+    "SourceFilterMetricRead",
     "RawEntryBulkStatusUpdate",
     "RawEntryList",
     "RawEntryRead",
