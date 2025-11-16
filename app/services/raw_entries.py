@@ -22,6 +22,15 @@ def get_entry_by_guid(source_id: int, guid: str) -> RawEntry | None:
     return db.get_raw_entry_by_guid(source_id, guid)
 
 
+def get_entry(entry_id: int) -> RawEntry:
+    """根据 ID 获取原始条目，若不存在抛出异常。"""
+
+    entry = db.get_raw_entry(entry_id)
+    if entry is None:
+        raise RawEntryNotFoundError
+    return entry
+
+
 class RawEntryNotFoundError(Exception):
     """原始条目不存在。"""
 

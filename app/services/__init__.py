@@ -3,6 +3,7 @@
 from app.services import (
     candidate_needs,
     fetch_logs,
+    filter_engine,
     filter_rules,
     raw_entries,
     rss_fetcher,
@@ -12,6 +13,7 @@ from app.services import (
 __all__ = [
     "candidate_needs",
     "fetch_logs",
+    "filter_engine",
     "filter_rules",
     "raw_entries",
     "rss_fetcher",

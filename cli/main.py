@@ -13,7 +13,14 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.models import CandidateNeedStatus, FetchStatus, RawEntryStatus, SourceStatus
 from app.schemas import CandidateNeedRead, RawEntryRead
-from app.services import candidate_needs, fetch_logs, filter_rules, raw_entries, rss_sources
+from app.services import (
+    candidate_needs,
+    fetch_logs,
+    filter_engine,
+    filter_rules,
+    raw_entries,
+    rss_sources,
+)
 from app.services.candidate_needs import CandidateNeedNotFoundError
 from app.services.raw_entries import RawEntryNotFoundError
 
@@ -330,6 +337,35 @@ def list_raw_entries(
         typer.echo(
             f"[{entry.id}] {entry.title} (来源 #{entry.source_id}, 状态: {entry.status})"
         )
+
+
+@entries_app.command("evaluate")
+def evaluate_raw_entry(
+    entry_id: Annotated[int, typer.Argument(help="原始条目 ID")],
+    min_score: Annotated[
+        float | None,
+        typer.Option("--min-score", help="最低得分阈值", min=0.0, max=1.0),
+    ] = None,
+) -> None:
+    """查看指定条目命中的筛选规则与得分。"""
+
+    try:
+        entry = raw_entries.get_entry(entry_id)
+    except RawEntryNotFoundError as exc:
+        raise typer.BadParameter("原始条目不存在", param_hint="entry_id") from exc
+
+    result = filter_engine.evaluate_entry(entry, min_score=min_score)
+    if result is None:
+        typer.echo("未命中任何启用的筛选规则")
+        raise typer.Exit(code=1)
+
+    typer.echo(
+        f"命中规则 #{result.rule.id} - {result.rule.name}, 得分 {result.score:.2f}"
+    )
+    if result.matched_keywords:
+        typer.echo("关键词命中: " + ", ".join(result.matched_keywords))
+    if result.matched_patterns:
+        typer.echo("正则命中: " + ", ".join(result.matched_patterns))
 
 
 @entries_app.command("update-status")

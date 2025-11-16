@@ -18,6 +18,7 @@ from app.schemas.raw_entries import (
     RawEntryBulkStatusUpdate,
     RawEntryList,
     RawEntryRead,
+    RawEntryRuleMatch,
     RawEntryStatusEnum,
     RawEntryStatusUpdate,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "RawEntryBulkStatusUpdate",
     "RawEntryList",
     "RawEntryRead",
+    "RawEntryRuleMatch",
     "RawEntryStatusEnum",
     "RawEntryStatusUpdate",
     "FetchLogList",
