@@ -18,11 +18,13 @@ from app.services import (
     fetch_logs,
     filter_engine,
     filter_rules,
+    pipeline,
     raw_entries,
     rss_sources,
 )
 from app.services.candidate_needs import CandidateNeedNotFoundError
 from app.services.raw_entries import RawEntryNotFoundError
+from app.services.pipeline import CandidateAlreadyExistsError, EntryNotQualifiedError
 
 app = typer.Typer(help="NeedRadar 工具集")
 logger = get_logger(__name__)
@@ -366,6 +368,37 @@ def evaluate_raw_entry(
         typer.echo("关键词命中: " + ", ".join(result.matched_keywords))
     if result.matched_patterns:
         typer.echo("正则命中: " + ", ".join(result.matched_patterns))
+
+
+@entries_app.command("promote")
+def promote_raw_entry(
+    entry_id: Annotated[int, typer.Argument(help="原始条目 ID")],
+    min_score: Annotated[
+        float | None,
+        typer.Option("--min-score", help="最低得分阈值", min=0.0, max=1.0),
+    ] = None,
+) -> None:
+    """自动筛选条目并生成候选需求。"""
+
+    try:
+        result = pipeline.promote_entry(entry_id, min_score=min_score)
+    except RawEntryNotFoundError as exc:
+        raise typer.BadParameter("原始条目不存在", param_hint="entry_id") from exc
+    except EntryNotQualifiedError:
+        typer.echo("条目未达到筛选阈值，未生成候选需求")
+        raise typer.Exit(code=1)
+    except CandidateAlreadyExistsError as exc:
+        typer.echo(f"条目已存在候选需求 #{exc.need_id}")
+        raise typer.Exit(code=1)
+
+    typer.echo(
+        f"已生成候选需求 #{result.candidate_need.id}，"
+        f"命中规则 #{result.rule_match.rule.id} - {result.rule_match.rule.name}"
+    )
+    typer.echo(
+        f"LLM 信心: {result.structured_need.confidence:.2f}, "
+        f"目标用户: {result.structured_need.target_users or '未识别'}"
+    )
 
 
 @entries_app.command("update-status")

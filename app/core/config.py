@@ -20,6 +20,15 @@ class Settings(BaseSettings):
         default=None,
         description="Alembic 迁移所使用的同步数据库 URL，可覆盖 database_url",
     )
+    llm_provider: str = Field(
+        default="heuristic",
+        description="LLM 客户端提供者标识，默认为启发式实现",
+    )
+    llm_timeout: float = Field(
+        default=8.0,
+        description="LLM 分析超时时间（秒），用于调度层配置",
+        ge=0.1,
+    )
 
     model_config = SettingsConfigDict(env_file=('.env', '.env.local'), env_prefix="NEEDRADAR_")
 
