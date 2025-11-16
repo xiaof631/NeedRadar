@@ -182,3 +182,54 @@ def test_export_raw_entries(client: TestClient) -> None:
     lines = [line for line in csv_body["content"].splitlines() if line]
     assert len(lines) >= 2
     assert lines[0].startswith("id,source_id")
+
+
+def test_raw_entry_content_hash_and_duplicate_detection(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Hash",
+            "url": "https://example.com/hash.xml",
+            "frequency": 1800,
+            "status": SourceStatus.ACTIVE,
+        }
+    )
+    entry = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "hash-1",
+            "title": "NeedRadar Intro",
+            "summary": "All about the same idea",
+            "link": "https://example.com/posts/1",
+            "status": RawEntryStatus.PENDING,
+        }
+    )
+    assert entry.content_hash is not None
+
+    with pytest.raises(raw_entries.RawEntryAlreadyExistsError):
+        raw_entries.create_entry(
+            {
+                "source_id": source.id,
+                "guid": "hash-1",
+                "title": "Duplicated",
+                "summary": "Another text",
+                "link": "https://example.com/posts/1",
+                "status": RawEntryStatus.PENDING,
+            }
+        )
+
+    with pytest.raises(raw_entries.RawEntryAlreadyExistsError):
+        raw_entries.create_entry(
+            {
+                "source_id": source.id,
+                "guid": "hash-2",
+                "title": "NeedRadar Intro",
+                "summary": "All about   the same idea",  # 与原始条目等价
+                "link": "https://example.com/posts/1",
+                "status": RawEntryStatus.PENDING,
+            }
+        )
+
+    response = client.get("/api/v1/raw-entries", params={"limit": 1})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"][0]["content_hash"] == entry.content_hash

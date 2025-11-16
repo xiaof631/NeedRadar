@@ -27,6 +27,7 @@ class InMemoryDatabase:
         self._fetch_logs: dict[int, FetchLog] = {}
         self._raw_entries: dict[int, RawEntry] = {}
         self._raw_entry_index: dict[tuple[int, str], int] = {}
+        self._raw_entry_hash_index: dict[str, int] = {}
         self._filter_rules: dict[int, FilterRule] = {}
         self._candidate_needs: dict[int, CandidateNeed] = {}
         self._candidate_need_logs: dict[int, list[CandidateNeedStatusLog]] = {}
@@ -42,6 +43,7 @@ class InMemoryDatabase:
         self._fetch_logs.clear()
         self._raw_entries.clear()
         self._raw_entry_index.clear()
+        self._raw_entry_hash_index.clear()
         self._filter_rules.clear()
         self._candidate_needs.clear()
         self._candidate_need_logs.clear()
@@ -74,6 +76,8 @@ class InMemoryDatabase:
             if entry.source_id == source_id:
                 self._raw_entries.pop(entry_id)
                 self._raw_entry_index.pop((entry.source_id, entry.guid), None)
+                if entry.content_hash:
+                    self._raw_entry_hash_index.pop(entry.content_hash, None)
 
     def get_source(self, source_id: int) -> RssSource | None:
         return self._sources.get(source_id)
@@ -198,12 +202,20 @@ class InMemoryDatabase:
         entry = RawEntry(id=self._raw_entry_seq, **payload)
         self._raw_entries[entry.id] = entry
         self._raw_entry_index[(entry.source_id, entry.guid)] = entry.id
+        if entry.content_hash:
+            self._raw_entry_hash_index[entry.content_hash] = entry.id
         return entry
 
     def update_raw_entry(self, entry_id: int, updater: Callable[[RawEntry], None]) -> RawEntry:
         entry = self._raw_entries[entry_id]
+        previous_hash = entry.content_hash
         updater(entry)
         entry.touch()
+        if previous_hash != entry.content_hash:
+            if previous_hash:
+                self._raw_entry_hash_index.pop(previous_hash, None)
+            if entry.content_hash:
+                self._raw_entry_hash_index[entry.content_hash] = entry.id
         return entry
 
     def get_raw_entry(self, entry_id: int) -> RawEntry | None:
@@ -211,6 +223,12 @@ class InMemoryDatabase:
 
     def get_raw_entry_by_guid(self, source_id: int, guid: str) -> RawEntry | None:
         entry_id = self._raw_entry_index.get((source_id, guid))
+        if entry_id is None:
+            return None
+        return self._raw_entries.get(entry_id)
+
+    def get_raw_entry_by_hash(self, content_hash: str) -> RawEntry | None:
+        entry_id = self._raw_entry_hash_index.get(content_hash)
         if entry_id is None:
             return None
         return self._raw_entries.get(entry_id)
