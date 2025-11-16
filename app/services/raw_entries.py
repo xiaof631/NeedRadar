@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from app.db.storage import db
 from app.models import RawEntry, RawEntryStatus

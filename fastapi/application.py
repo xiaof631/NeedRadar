@@ -9,7 +9,7 @@ from typing import Any, Annotated, get_args, get_origin
 
 from pydantic import BaseModel
 
-from .dependencies import Depends
+from .dependencies import Depends, HeaderInfo
 from .routing import APIRouter, _normalize_path, _join_paths
 
 Handler = Callable[..., Any]
@@ -23,6 +23,7 @@ class Route:
     handler: Handler
     status_code: int
     response_model: Any | None
+    dependencies: tuple[Depends, ...]
 
 
 class FastAPI:
@@ -64,10 +65,26 @@ class FastAPI:
             elif isinstance(result, Awaitable):
                 await result
 
-    def _create_route(self, method: str, path: str, handler: Handler, *, status_code: int, response_model: Any | None) -> None:
+    def _create_route(
+        self,
+        method: str,
+        path: str,
+        handler: Handler,
+        *,
+        status_code: int,
+        response_model: Any | None,
+        dependencies: tuple[Depends, ...] | None = None,
+    ) -> None:
         normalized = _normalize_path(path)
         method_key = method.upper()
-        route = Route(method_key, normalized, handler, status_code, response_model)
+        route = Route(
+            method_key,
+            normalized,
+            handler,
+            status_code,
+            response_model,
+            tuple(dependencies or ()),
+        )
         self._routes[(method_key, normalized)] = route
         self._routes_list.append(route)
 
@@ -76,7 +93,13 @@ class FastAPI:
             code = status_code if status_code is not None else default_status
 
             def wrapper(func: Handler) -> Handler:
-                self._create_route(method, path, func, status_code=code, response_model=response_model)
+                self._create_route(
+                    method,
+                    path,
+                    func,
+                    status_code=code,
+                    response_model=response_model,
+                )
                 return func
 
             return wrapper
@@ -96,9 +119,16 @@ class FastAPI:
         return self._create_decorator("DELETE", 200)(path, status_code=status_code, response_model=response_model, summary=summary)
 
     def include_router(self, router: APIRouter, prefix: str = "") -> None:
-        for method, path, handler, status_code, response_model in router.iter_routes():
+        for method, path, handler, status_code, response_model, dependencies in router.iter_routes():
             full_path = _join_paths(prefix, path) if prefix else path
-            self._create_route(method, full_path, handler, status_code=status_code, response_model=response_model)
+            self._create_route(
+                method,
+                full_path,
+                handler,
+                status_code=status_code,
+                response_model=response_model,
+                dependencies=dependencies,
+            )
 
     def resolve(self, method: str, path: str) -> tuple[Route | None, dict[str, str]]:
         """查找指定请求的处理函数。"""
@@ -115,7 +145,15 @@ class FastAPI:
                 return candidate, params
         return None, {}
 
-    async def dispatch(self, method: str, path: str, *, params: dict[str, Any] | None = None, json: Any | None = None) -> tuple[int, Any]:
+    async def dispatch(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: Any | None = None,
+        headers: dict[str, Any] | None = None,
+    ) -> tuple[int, Any]:
         """执行请求。"""
 
         route, path_params = self.resolve(method, path)
@@ -124,7 +162,20 @@ class FastAPI:
 
         closers: list[Callable[[], Awaitable[None] | None]] = []
         try:
-            kwargs = await self._build_kwargs(route.handler, params=params or {}, json=json, path_params=path_params, closers=closers)
+            kwargs = await self._build_kwargs(
+                route.handler,
+                params=params or {},
+                json=json,
+                path_params=path_params,
+                headers=headers or {},
+                closers=closers,
+            )
+            await self._run_route_dependencies(
+                route,
+                params=params or {},
+                headers=headers or {},
+                closers=closers,
+            )
             result = await self._call_handler(route.handler, **kwargs)
             payload = self._render_response(result, route.response_model)
             return route.status_code, payload
@@ -162,7 +213,32 @@ class FastAPI:
             if asyncio.iscoroutine(outcome):
                 await outcome
 
-    async def _build_kwargs(self, handler: Handler, *, params: dict[str, Any], json: Any, path_params: dict[str, str], closers: list[Callable[[], Awaitable[None] | None]]) -> dict[str, Any]:
+    async def _run_route_dependencies(
+        self,
+        route: Route,
+        *,
+        params: dict[str, Any],
+        headers: dict[str, Any],
+        closers: list[Callable[[], Awaitable[None] | None]],
+    ) -> None:
+        for dependency in route.dependencies:
+            await self._resolve_dependency(
+                dependency.dependency,
+                params=params,
+                headers=headers,
+                closers=closers,
+            )
+
+    async def _build_kwargs(
+        self,
+        handler: Handler,
+        *,
+        params: dict[str, Any],
+        json: Any,
+        path_params: dict[str, str],
+        headers: dict[str, Any],
+        closers: list[Callable[[], Awaitable[None] | None]],
+    ) -> dict[str, Any]:
         signature = inspect.signature(handler)
         bound: dict[str, Any] = {}
         body_consumed = False
@@ -180,11 +256,21 @@ class FastAPI:
                     metadata = args[1:]
             for meta in metadata:
                 if isinstance(meta, Depends):
-                    bound[name] = await self._resolve_dependency(meta.dependency, closers)
+                    bound[name] = await self._resolve_dependency(
+                        meta.dependency,
+                        params=params,
+                        headers=headers,
+                        closers=closers,
+                    )
                     break
             else:
                 if isinstance(default, Depends):
-                    bound[name] = await self._resolve_dependency(default.dependency, closers)
+                    bound[name] = await self._resolve_dependency(
+                        default.dependency,
+                        params=params,
+                        headers=headers,
+                        closers=closers,
+                    )
                 elif name in path_params:
                     bound[name] = self._convert_parameter(path_params[name], annotation)
                 elif default is inspect._empty and not body_consumed and json is not None:
@@ -192,6 +278,10 @@ class FastAPI:
                     body_consumed = True
                 elif name in params:
                     bound[name] = self._convert_parameter(params[name], annotation)
+                elif isinstance(default, HeaderInfo):
+                    header_key = (default.alias or name).lower()
+                    header_value = headers.get(header_key)
+                    bound[name] = header_value if header_value is not None else default.default
                 elif default is not inspect._empty:
                     bound[name] = default
                 else:
@@ -200,8 +290,23 @@ class FastAPI:
                 bound[name] = self._ensure_model(annotation, bound[name])
         return bound
 
-    async def _resolve_dependency(self, dependency: Callable[..., Any], closers: list[Callable[[], Awaitable[None] | None]]) -> Any:
-        value = dependency()
+    async def _resolve_dependency(
+        self,
+        dependency: Callable[..., Any],
+        *,
+        params: dict[str, Any],
+        headers: dict[str, Any],
+        closers: list[Callable[[], Awaitable[None] | None]],
+    ) -> Any:
+        kwargs = await self._build_kwargs(
+            dependency,
+            params=params,
+            json=None,
+            path_params={},
+            headers=headers,
+            closers=closers,
+        )
+        value = dependency(**kwargs)
         if inspect.isasyncgen(value):
             agen = value
 

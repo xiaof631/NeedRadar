@@ -1,5 +1,8 @@
 """应用配置模块。"""
 
+from __future__ import annotations
+
+from collections.abc import Iterable
 from functools import lru_cache
 from typing import Any
 
@@ -75,6 +78,11 @@ class Settings(BaseSettings):
         le=200,
     )
 
+    api_tokens: tuple[str, ...] = Field(
+        default=(),
+        description="可访问 API 的 Token 列表，默认关闭认证",
+    )
+
     model_config = SettingsConfigDict(env_file=('.env', '.env.local'), env_prefix="NEEDRADAR_")
 
     @property
@@ -92,7 +100,22 @@ class Settings(BaseSettings):
 def get_settings(**overrides: Any) -> Settings:
     """获取应用配置，支持覆写默认值。"""
 
-    return Settings(**overrides)
+    instance = Settings(**overrides)
+    instance.api_tokens = _normalize_api_tokens(instance.api_tokens)
+    return instance
+
+
+def _normalize_api_tokens(value: Any) -> tuple[str, ...]:
+    """将配置值转换为标准的 Token 元组。"""
+
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        tokens = [token.strip() for token in value.split(",") if token.strip()]
+        return tuple(tokens)
+    if isinstance(value, Iterable):
+        return tuple(item for item in value if isinstance(item, str) and item)
+    return ()
 
 
 settings = get_settings()

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
+
+from .dependencies import Depends
 
 Handler = Callable[..., Any]
 
@@ -36,19 +38,37 @@ class RouteInfo:
     handler: Handler
     status_code: int
     response_model: Any | None
+    dependencies: tuple[Depends, ...]
 
 
 class APIRouter:
     """极简 APIRouter。"""
 
-    def __init__(self, *, prefix: str = "", tags: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        prefix: str = "",
+        tags: list[str] | None = None,
+        dependencies: Sequence[Depends] | None = None,
+    ) -> None:
         self.prefix = prefix
         self.tags = tags or []
+        self.dependencies: tuple[Depends, ...] = tuple(dependencies or [])
         self._routes: list[RouteInfo] = []
 
-    def _add_route(self, method: str, path: str, handler: Handler, *, status_code: int, response_model: Any | None) -> None:
+    def _add_route(
+        self,
+        method: str,
+        path: str,
+        handler: Handler,
+        *,
+        status_code: int,
+        response_model: Any | None,
+        dependencies: Sequence[Depends] | None = None,
+    ) -> None:
         full_path = _join_paths(self.prefix, path)
-        self._routes.append(RouteInfo(method, full_path, handler, status_code, response_model))
+        combined = tuple(self.dependencies) + tuple(dependencies or ())
+        self._routes.append(RouteInfo(method, full_path, handler, status_code, response_model, combined))
 
     def _create_decorator(self, method: str, default_status: int) -> Callable[[Handler], Handler]:
         def decorator_factory(path: str, *, status_code: int | None = None, response_model: Any | None = None, summary: str | None = None) -> Callable[[Handler], Handler]:
@@ -74,11 +94,25 @@ class APIRouter:
     def delete(self, path: str, *, status_code: int | None = None, response_model: Any | None = None, summary: str | None = None) -> Callable[[Handler], Handler]:
         return self._create_decorator("DELETE", 200)(path, status_code=status_code, response_model=response_model, summary=summary)
 
-    def include_router(self, router: APIRouter, prefix: str = "") -> None:
-        for method, path, handler, status_code, response_model in router.iter_routes():
+    def include_router(
+        self,
+        router: APIRouter,
+        prefix: str = "",
+        dependencies: Sequence[Depends] | None = None,
+    ) -> None:
+        inherited = tuple(self.dependencies) + tuple(dependencies or ())
+        for method, path, handler, status_code, response_model, route_dependencies in router.iter_routes():
             full_path = _join_paths(prefix, path)
-            self._routes.append(RouteInfo(method, full_path, handler, status_code, response_model))
+            combined = inherited + route_dependencies
+            self._routes.append(RouteInfo(method, full_path, handler, status_code, response_model, combined))
 
-    def iter_routes(self) -> Iterable[tuple[str, str, Handler, int, Any | None]]:
+    def iter_routes(self) -> Iterable[tuple[str, str, Handler, int, Any | None, tuple[Depends, ...]]]:
         for route in self._routes:
-            yield route.method, route.path, route.handler, route.status_code, route.response_model
+            yield (
+                route.method,
+                route.path,
+                route.handler,
+                route.status_code,
+                route.response_model,
+                route.dependencies,
+            )

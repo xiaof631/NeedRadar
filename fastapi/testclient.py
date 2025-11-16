@@ -30,21 +30,47 @@ class TestClient:
     def __exit__(self, exc_type, exc, tb) -> None:
         self.app.trigger_shutdown()
 
-    def get(self, path: str, params: dict[str, Any] | None = None) -> Response:
-        return self._request("GET", path, params=params)
+    def get(
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, Any] | None = None,
+    ) -> Response:
+        return self._request("GET", path, params=params, headers=headers)
 
-    def post(self, path: str, json: Any | None = None) -> Response:
-        return self._request("POST", path, json=json)
+    def post(
+        self,
+        path: str,
+        json: Any | None = None,
+        headers: dict[str, Any] | None = None,
+    ) -> Response:
+        return self._request("POST", path, json=json, headers=headers)
 
-    def put(self, path: str, json: Any | None = None) -> Response:
-        return self._request("PUT", path, json=json)
+    def put(
+        self,
+        path: str,
+        json: Any | None = None,
+        headers: dict[str, Any] | None = None,
+    ) -> Response:
+        return self._request("PUT", path, json=json, headers=headers)
 
-    def delete(self, path: str) -> Response:
-        return self._request("DELETE", path)
+    def delete(self, path: str, headers: dict[str, Any] | None = None) -> Response:
+        return self._request("DELETE", path, headers=headers)
 
-    def _request(self, method: str, path: str, *, params: dict[str, Any] | None = None, json: Any | None = None) -> Response:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        json: Any | None = None,
+        headers: dict[str, Any] | None = None,
+    ) -> Response:
         try:
-            status_code, payload = asyncio.run(self.app.dispatch(method, path, params=params, json=json))
+            normalized_headers = {k.lower(): v for k, v in (headers or {}).items()}
+            status_code, payload = asyncio.run(
+                self.app.dispatch(method, path, params=params, json=json, headers=normalized_headers)
+            )
         except HTTPException as exc:
             return Response(status_code=exc.status_code, _json={"detail": exc.detail})
         except LookupError:
