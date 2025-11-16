@@ -68,6 +68,7 @@ def promote_entry(
             "value_proposition": structured.value_proposition,
             "competition": structured.competition,
             "confidence": structured.confidence,
+            "rule_score": rule_match.score,
         }
     )
     raw_entries.update_entry_status(entry.id, RawEntryStatus.PROMOTED)

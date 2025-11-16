@@ -62,6 +62,7 @@ def test_promote_entry_creates_candidate_and_updates_status() -> None:
     assert result.candidate_need.summary.startswith("分析")
     assert raw_entries.get_entry(entry_id).status == RawEntryStatus.PROMOTED
     assert candidate_needs.get_need_by_raw_entry(entry_id) is not None
+    assert result.candidate_need.rule_score == pytest.approx(result.rule_match.score)
 
 
 def test_promote_entry_requires_min_score_threshold() -> None:

@@ -29,6 +29,7 @@ class CandidateNeed:
     value_proposition: str | None = None
     competition: str | None = None
     confidence: float | None = None
+    rule_score: float | None = None
     status: CandidateNeedStatus = CandidateNeedStatus.PENDING_REVIEW
     notes: str | None = None
     synced_at: datetime | None = None

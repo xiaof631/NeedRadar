@@ -30,6 +30,7 @@ class CandidateNeedRead(BaseModel):
     value_proposition: str | None = None
     competition: str | None = None
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    rule_score: float | None = Field(default=None, ge=0.0, le=1.0)
     status: CandidateNeedStatusEnum
     notes: str | None = None
     synced_at: datetime | None = None
@@ -59,6 +60,7 @@ class CandidateNeedCreate(BaseModel):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     status: CandidateNeedStatusEnum = CandidateNeedStatusEnum.PENDING_REVIEW
     notes: str | None = None
+    rule_score: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class CandidateNeedUpdate(BaseModel):
@@ -73,6 +75,7 @@ class CandidateNeedUpdate(BaseModel):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     status: CandidateNeedStatusEnum | None = None
     notes: str | None = None
+    rule_score: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class CandidateNeedStatusUpdate(BaseModel):

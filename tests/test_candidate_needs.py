@@ -62,6 +62,7 @@ def _seed_candidate_needs() -> tuple[int, list[int]]:
                 "value_proposition": "自动化分析关键信号",
                 "competition": "Spreadsheet",
                 "confidence": 0.7,
+                "rule_score": 0.82,
                 "status": CandidateNeedStatus.PENDING_REVIEW,
                 "notes": "High priority",
             }
@@ -75,6 +76,7 @@ def _seed_candidate_needs() -> tuple[int, list[int]]:
                 "value_proposition": "共享知识库",
                 "competition": "Docs",
                 "confidence": 0.5,
+                "rule_score": 0.45,
                 "status": CandidateNeedStatus.APPROVED,
             }
         ),
@@ -98,6 +100,7 @@ def test_create_and_list_candidate_needs(client: TestClient) -> None:
     created = response.json()
     assert created["status"] == CandidateNeedStatus.IN_DISCOVERY.value
     assert created["raw_entry_id"] == entry_id
+    assert created["rule_score"] is None
 
     invalid = client.post(
         "/api/v1/candidate-needs",
@@ -116,6 +119,7 @@ def test_create_and_list_candidate_needs(client: TestClient) -> None:
     body = list_response.json()
     assert body["total"] == 1
     assert body["items"][0]["status"] == CandidateNeedStatus.APPROVED.value
+    assert body["items"][0]["rule_score"] == pytest.approx(0.45)
 
     search_response = client.get(
         "/api/v1/candidate-needs",
@@ -170,6 +174,7 @@ def test_export_candidate_needs(client: TestClient) -> None:
     data = json_export.json()
     assert data["format"] == "json"
     assert len(data["items"]) == 2
+    assert data["items"][0]["rule_score"] is not None
 
     csv_export = client.get(
         "/api/v1/candidate-needs/export",
@@ -180,7 +185,7 @@ def test_export_candidate_needs(client: TestClient) -> None:
     assert csv_body["format"] == "csv"
     lines = [line for line in csv_body["content"].splitlines() if line]
     assert len(lines) >= 2
-    assert lines[0].startswith("id,raw_entry_id")
+    assert "rule_score" in lines[0]
 
 
 def test_filter_candidate_needs_by_synced_status(client: TestClient) -> None:
