@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
-
 from app.services.dashboard import DashboardMetrics
+from pydantic import BaseModel, ConfigDict
 
 
 class SourcesSummaryRead(BaseModel):
@@ -46,7 +45,7 @@ class DashboardMetricsRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @classmethod
-    def from_metrics(cls, metrics: DashboardMetrics) -> "DashboardMetricsRead":
+    def from_metrics(cls, metrics: DashboardMetrics) -> DashboardMetricsRead:
         """根据服务层数据生成响应模型。"""
 
         return cls(

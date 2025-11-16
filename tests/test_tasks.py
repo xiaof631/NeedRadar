@@ -129,7 +129,9 @@ def test_promote_pending_entries(monkeypatch: pytest.MonkeyPatch) -> None:
     assert results[0].entry.id == entry_pending.id
 
 
-def _seed_candidate_need(status: CandidateNeedStatus = CandidateNeedStatus.APPROVED) -> CandidateNeed:
+def _seed_candidate_need(
+    status: CandidateNeedStatus = CandidateNeedStatus.APPROVED,
+) -> CandidateNeed:
     source = rss_sources.create_source(
         {"name": "Seed", "url": "https://example.com/rss", "frequency": 3600}
     )

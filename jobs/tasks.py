@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Final, Sequence
+from collections.abc import Sequence
+from typing import Final
 
 import httpx
 
 from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus
-from app.services import candidate_needs, downstream, pipeline, raw_entries, rss_fetcher, rss_sources
+from app.services import (
+    candidate_needs,
+    downstream,
+    pipeline,
+    raw_entries,
+    rss_fetcher,
+    rss_sources,
+)
 from app.services.pipeline import (
     CandidateAlreadyExistsError,
     EntryNotQualifiedError,

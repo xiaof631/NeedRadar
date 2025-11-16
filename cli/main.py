@@ -523,6 +523,10 @@ def list_candidate_needs(
     ] = None,
     search: Annotated[str | None, typer.Option(help="关键字搜索")] = None,
     raw_entry_id: Annotated[int | None, typer.Option(help="原始条目 ID 过滤")] = None,
+    synced: Annotated[
+        bool | None,
+        typer.Option("--synced/--unsynced", help="按同步状态过滤"),
+    ] = None,
     limit: Annotated[int, typer.Option(help="显示的最大条目数", min=1, max=100)] = 20,
 ) -> None:
     """列出候选需求。"""
@@ -531,6 +535,7 @@ def list_candidate_needs(
         statuses=statuses,
         search=search,
         raw_entry_id=raw_entry_id,
+        synced=synced,
         limit=limit,
     )
     if total == 0:
@@ -662,6 +667,10 @@ def export_candidate_needs(
     ] = None,
     search: Annotated[str | None, typer.Option(help="关键字搜索")] = None,
     raw_entry_id: Annotated[int | None, typer.Option(help="原始条目 ID 过滤")] = None,
+    synced: Annotated[
+        bool | None,
+        typer.Option("--synced/--unsynced", help="按同步状态过滤"),
+    ] = None,
     limit: Annotated[int | None, typer.Option(help="最大导出数量", min=1, max=1000)] = None,
 ) -> None:
     """导出候选需求。"""
@@ -674,6 +683,7 @@ def export_candidate_needs(
         statuses=statuses,
         search=search,
         raw_entry_id=raw_entry_id,
+        synced=synced,
         limit=limit,
     )
     models = [CandidateNeedRead.model_validate(need) for need in needs]
