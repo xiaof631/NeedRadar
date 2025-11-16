@@ -199,6 +199,28 @@ def test_filter_candidate_needs_by_synced_status(client: TestClient) -> None:
     assert unsynced_body["total"] == 1
     assert all(item["synced_at"] is None for item in unsynced_body["items"])
 
+
+def test_candidate_need_status_logs_api(client: TestClient) -> None:
+    _, need_ids = _seed_candidate_needs()
+
+    update_response = client.put(
+        f"/api/v1/candidate-needs/{need_ids[0]}/status",
+        json={"status": CandidateNeedStatus.APPROVED.value},
+    )
+    assert update_response.status_code == 200
+
+    logs_response = client.get(
+        f"/api/v1/candidate-needs/{need_ids[0]}/status-logs"
+    )
+    assert logs_response.status_code == 200
+    logs = logs_response.json()
+    assert len(logs) >= 2
+    assert logs[0]["to_status"] == CandidateNeedStatus.PENDING_REVIEW.value
+    assert logs[-1]["to_status"] == CandidateNeedStatus.APPROVED.value
+
+    missing = client.get("/api/v1/candidate-needs/999/status-logs")
+    assert missing.status_code == 404
+
     export_response = client.get(
         "/api/v1/candidate-needs/export",
         params={"format": "json", "synced": False},

@@ -674,6 +674,33 @@ def update_candidate_need_status(
     typer.echo(f"已将候选需求 #{need.id} 状态更新为 {need.status.value}")
 
 
+@candidates_app.command("status-logs")
+def show_candidate_need_status_logs(
+    need_id: Annotated[int, typer.Argument(help="候选需求 ID")]
+) -> None:
+    """展示候选需求的状态流转记录。"""
+
+    try:
+        logs = candidate_needs.list_need_status_logs(need_id)
+    except CandidateNeedNotFoundError as exc:
+        raise typer.BadParameter("候选需求不存在", param_hint="need_id") from exc
+
+    if not logs:
+        typer.echo("暂无状态流转记录")
+        raise typer.Exit()
+
+    typer.echo(f"候选需求 #{need_id} 状态流转：")
+    for log in logs:
+        previous = log.from_status.value if log.from_status else "创建"
+        message = (
+            f"[{log.id}] {log.changed_at.isoformat()} "
+            f"{previous} -> {log.to_status.value}"
+        )
+        if log.note:
+            message += f" - {log.note}"
+        typer.echo(message)
+
+
 @candidates_app.command("export")
 def export_candidate_needs(
     format: Annotated[

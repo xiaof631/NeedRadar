@@ -5,6 +5,7 @@ from app.schemas.candidate_needs import (
     CandidateNeedList,
     CandidateNeedRead,
     CandidateNeedStatusEnum,
+    CandidateNeedStatusLogRead,
     CandidateNeedStatusUpdate,
     CandidateNeedUpdate,
 )
@@ -42,6 +43,7 @@ __all__ = [
     "CandidateNeedCreate",
     "CandidateNeedList",
     "CandidateNeedRead",
+    "CandidateNeedStatusLogRead",
     "CandidateNeedStatusEnum",
     "CandidateNeedStatusUpdate",
     "CandidateNeedUpdate",
