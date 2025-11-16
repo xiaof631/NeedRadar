@@ -64,6 +64,12 @@ def get_need(need_id: int) -> CandidateNeed:
     return need
 
 
+def get_need_by_raw_entry(raw_entry_id: int) -> CandidateNeed | None:
+    """根据原始条目 ID 查找候选需求。"""
+
+    return db.get_candidate_need_by_raw_entry(raw_entry_id)
+
+
 def delete_need(need_id: int) -> None:
     """删除候选需求。"""
 

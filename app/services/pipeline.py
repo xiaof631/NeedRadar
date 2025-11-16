@@ -1,0 +1,80 @@
+"""从原始条目生成候选需求的调度流程。"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from app.models import CandidateNeed, RawEntry, RawEntryStatus
+from app.services import candidate_needs, filter_engine, raw_entries
+from app.services.llm_client import LLMClient, StructuredNeed, get_default_llm_client
+
+
+class EntryNotQualifiedError(Exception):
+    """条目未达到筛选要求。"""
+
+
+class CandidateAlreadyExistsError(Exception):
+    """同一条原始内容已存在候选需求。"""
+
+    def __init__(self, need_id: int) -> None:
+        super().__init__(f"candidate need #{need_id} already exists")
+        self.need_id = need_id
+
+
+@dataclass(slots=True)
+class PromotionResult:
+    """记录自动晋升的上下文数据。"""
+
+    entry: RawEntry
+    candidate_need: CandidateNeed
+    rule_match: filter_engine.RuleMatchResult
+    structured_need: StructuredNeed
+
+
+def promote_entry(
+    entry_id: int,
+    *,
+    min_score: float | None = None,
+    llm_client: LLMClient | None = None,
+) -> PromotionResult:
+    """将符合规则的原始条目转化为候选需求。"""
+
+    entry = raw_entries.get_entry(entry_id)
+    rule_match = filter_engine.evaluate_entry(entry, min_score=min_score)
+    if rule_match is None:
+        raise EntryNotQualifiedError
+
+    existing = candidate_needs.get_need_by_raw_entry(entry.id)
+    if existing is not None:
+        raise CandidateAlreadyExistsError(existing.id)
+
+    client = llm_client or get_default_llm_client()
+    structured = client.analyze_entry(entry)
+    summary = structured.summary.strip() if structured.summary else ""
+    if not summary:
+        for candidate in (entry.title, entry.summary, entry.content):
+            if candidate:
+                summary = candidate.strip()
+                break
+    if not summary:
+        summary = "自动生成的候选需求"
+
+    need = candidate_needs.create_need(
+        {
+            "raw_entry_id": entry.id,
+            "summary": summary,
+            "problem_statement": structured.problem_statement,
+            "target_users": structured.target_users,
+            "value_proposition": structured.value_proposition,
+            "competition": structured.competition,
+            "confidence": structured.confidence,
+        }
+    )
+    raw_entries.update_entry_status(entry.id, RawEntryStatus.PROMOTED)
+    refreshed = raw_entries.get_entry(entry.id)
+    return PromotionResult(
+        entry=refreshed,
+        candidate_need=need,
+        rule_match=rule_match,
+        structured_need=structured,
+    )

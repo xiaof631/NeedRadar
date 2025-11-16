@@ -281,6 +281,12 @@ class InMemoryDatabase:
     def get_candidate_need(self, need_id: int) -> CandidateNeed | None:
         return self._candidate_needs.get(need_id)
 
+    def get_candidate_need_by_raw_entry(self, raw_entry_id: int) -> CandidateNeed | None:
+        for need in self._candidate_needs.values():
+            if need.raw_entry_id == raw_entry_id:
+                return need
+        return None
+
     def list_candidate_needs(
         self,
         *,
