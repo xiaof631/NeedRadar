@@ -14,6 +14,7 @@ from app.schemas import (
     CandidateNeedCreate,
     CandidateNeedList,
     CandidateNeedRead,
+    CandidateNeedStatusLogRead,
     CandidateNeedStatusEnum,
     CandidateNeedStatusUpdate,
     CandidateNeedUpdate,
@@ -139,6 +140,19 @@ async def delete_candidate_need(need_id: int) -> None:
         candidate_needs.delete_need(need_id)
     except CandidateNeedNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+
+
+@router.get(
+    "/{need_id}/status-logs",
+    response_model=list[CandidateNeedStatusLogRead],
+    summary="候选需求状态流转日志",
+)
+async def list_candidate_need_status_logs(need_id: int) -> list[CandidateNeedStatusLogRead]:
+    try:
+        logs = candidate_needs.list_need_status_logs(need_id)
+    except CandidateNeedNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+    return [CandidateNeedStatusLogRead.model_validate(item) for item in logs]
 
 
 @router.get("/export", summary="导出候选需求")

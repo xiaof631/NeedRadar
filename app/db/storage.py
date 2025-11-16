@@ -8,6 +8,7 @@ from datetime import datetime
 from app.models import (
     CandidateNeed,
     CandidateNeedStatus,
+    CandidateNeedStatusLog,
     FetchLog,
     FetchStatus,
     FilterRule,
@@ -28,11 +29,13 @@ class InMemoryDatabase:
         self._raw_entry_index: dict[tuple[int, str], int] = {}
         self._filter_rules: dict[int, FilterRule] = {}
         self._candidate_needs: dict[int, CandidateNeed] = {}
+        self._candidate_need_logs: dict[int, list[CandidateNeedStatusLog]] = {}
         self._source_seq = 0
         self._fetch_log_seq = 0
         self._raw_entry_seq = 0
         self._filter_rule_seq = 0
         self._candidate_need_seq = 0
+        self._candidate_need_log_seq = 0
 
     def reset(self) -> None:
         self._sources.clear()
@@ -41,11 +44,13 @@ class InMemoryDatabase:
         self._raw_entry_index.clear()
         self._filter_rules.clear()
         self._candidate_needs.clear()
+        self._candidate_need_logs.clear()
         self._source_seq = 0
         self._fetch_log_seq = 0
         self._raw_entry_seq = 0
         self._filter_rule_seq = 0
         self._candidate_need_seq = 0
+        self._candidate_need_log_seq = 0
 
     # RSS 源操作
     def create_source(self, data: dict) -> RssSource:
@@ -311,6 +316,7 @@ class InMemoryDatabase:
 
     def delete_candidate_need(self, need_id: int) -> None:
         self._candidate_needs.pop(need_id, None)
+        self._candidate_need_logs.pop(need_id, None)
 
     def get_candidate_need(self, need_id: int) -> CandidateNeed | None:
         return self._candidate_needs.get(need_id)
@@ -320,6 +326,29 @@ class InMemoryDatabase:
             if need.raw_entry_id == raw_entry_id:
                 return need
         return None
+
+    def add_candidate_need_log(
+        self,
+        need_id: int,
+        *,
+        from_status: CandidateNeedStatus | None,
+        to_status: CandidateNeedStatus,
+        note: str | None = None,
+    ) -> CandidateNeedStatusLog:
+        self._candidate_need_log_seq += 1
+        log = CandidateNeedStatusLog(
+            id=self._candidate_need_log_seq,
+            need_id=need_id,
+            from_status=from_status,
+            to_status=to_status,
+            note=note,
+        )
+        self._candidate_need_logs.setdefault(need_id, []).append(log)
+        return log
+
+    def list_candidate_need_logs(self, need_id: int) -> list[CandidateNeedStatusLog]:
+        logs = self._candidate_need_logs.get(need_id, ())
+        return sorted(logs, key=lambda item: item.changed_at)
 
     def list_candidate_needs(
         self,

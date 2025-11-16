@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.db.storage import db
-from app.models import CandidateNeed, CandidateNeedStatus
+from app.models import CandidateNeed, CandidateNeedStatus, CandidateNeedStatusLog
 from app.services.raw_entries import RawEntryNotFoundError
 
 
@@ -24,7 +24,9 @@ def create_need(data: dict[str, Any]) -> CandidateNeed:
     """创建候选需求。"""
 
     _ensure_raw_entry_exists(data["raw_entry_id"])
-    return db.create_candidate_need(data)
+    need = db.create_candidate_need(data)
+    _record_status_transition(need.id, None, need.status)
+    return need
 
 
 def update_need(need_id: int, data: dict[str, Any]) -> CandidateNeed:
@@ -35,12 +37,16 @@ def update_need(need_id: int, data: dict[str, Any]) -> CandidateNeed:
         raise CandidateNeedNotFoundError
     if "raw_entry_id" in data:
         _ensure_raw_entry_exists(data["raw_entry_id"])
+    previous_status = need.status
 
     def _apply(model: CandidateNeed) -> None:
         for key, value in data.items():
             setattr(model, key, value)
 
-    return db.update_candidate_need(need_id, _apply)
+    updated = db.update_candidate_need(need_id, _apply)
+    if "status" in data and updated.status != previous_status:
+        _record_status_transition(updated.id, previous_status, updated.status)
+    return updated
 
 
 def update_need_status(need_id: int, status: CandidateNeedStatus) -> CandidateNeed:
@@ -49,11 +55,15 @@ def update_need_status(need_id: int, status: CandidateNeedStatus) -> CandidateNe
     need = db.get_candidate_need(need_id)
     if need is None:
         raise CandidateNeedNotFoundError
+    previous_status = need.status
 
     def _apply(model: CandidateNeed) -> None:
         model.status = status
 
-    return db.update_candidate_need(need_id, _apply)
+    updated = db.update_candidate_need(need_id, _apply)
+    if previous_status != status:
+        _record_status_transition(need_id, previous_status, status)
+    return updated
 
 
 def get_need(need_id: int) -> CandidateNeed:
@@ -77,6 +87,14 @@ def delete_need(need_id: int) -> None:
     if db.get_candidate_need(need_id) is None:
         raise CandidateNeedNotFoundError
     db.delete_candidate_need(need_id)
+
+
+def list_need_status_logs(need_id: int) -> list[CandidateNeedStatusLog]:
+    """返回候选需求的状态流转记录。"""
+
+    if db.get_candidate_need(need_id) is None:
+        raise CandidateNeedNotFoundError
+    return db.list_candidate_need_logs(need_id)
 
 
 def list_needs(
@@ -177,3 +195,17 @@ def reset_storage() -> None:
     """测试辅助函数：清空内存数据。"""
 
     db.reset()
+
+
+def _record_status_transition(
+    need_id: int,
+    from_status: CandidateNeedStatus | None,
+    to_status: CandidateNeedStatus,
+    note: str | None = None,
+) -> CandidateNeedStatusLog:
+    return db.add_candidate_need_log(
+        need_id,
+        from_status=from_status,
+        to_status=to_status,
+        note=note,
+    )

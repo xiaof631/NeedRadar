@@ -40,3 +40,15 @@ class CandidateNeed:
         """更新时间戳。"""
 
         self.updated_at = datetime.now(UTC)
+
+
+@dataclass(slots=True)
+class CandidateNeedStatusLog:
+    """记录候选需求状态的流转历史。"""
+
+    id: int
+    need_id: int
+    from_status: CandidateNeedStatus | None
+    to_status: CandidateNeedStatus
+    note: str | None = None
+    changed_at: datetime = field(default_factory=lambda: datetime.now(UTC))

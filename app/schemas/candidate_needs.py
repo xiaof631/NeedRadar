@@ -81,3 +81,16 @@ class CandidateNeedStatusUpdate(BaseModel):
     status: CandidateNeedStatusEnum
 
 
+class CandidateNeedStatusLogRead(BaseModel):
+    """候选需求状态流转日志。"""
+
+    id: int
+    need_id: int
+    from_status: CandidateNeedStatusEnum | None = None
+    to_status: CandidateNeedStatusEnum
+    note: str | None = None
+    changed_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
