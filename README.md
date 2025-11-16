@@ -54,3 +54,4 @@ cp .env.example .env
 
 - `NEEDRADAR_DATABASE_URL`：异步 SQLAlchemy 连接串，默认使用 SQLite。
 - `NEEDRADAR_ALEMBIC_DATABASE_URL`：可选，同步连接串用于 Alembic 迁移。
+- `NEEDRADAR_API_TOKENS`：可选，逗号分隔的 API Token 列表，配置后所有 `/api` 请求需携带 `X-API-Key` 头或 `api_token` 查询参数。
