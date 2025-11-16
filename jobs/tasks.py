@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Final, Sequence
 
 import httpx
 
-from app.models import RawEntryStatus, SourceStatus
-from app.services import pipeline, raw_entries, rss_fetcher, rss_sources
+from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus
+from app.services import candidate_needs, downstream, pipeline, raw_entries, rss_fetcher, rss_sources
 from app.services.pipeline import (
     CandidateAlreadyExistsError,
     EntryNotQualifiedError,
@@ -61,3 +61,40 @@ def promote_pending_entries(
             continue
         results.append(result)
     return results
+
+
+async def sync_new_candidate_needs(
+    *,
+    webhook_url: str | None,
+    statuses: Sequence[CandidateNeedStatus] | None = None,
+    batch_size: int = 20,
+    client: httpx.AsyncClient | None = None,
+    request_timeout: float = _DEFAULT_TIMEOUT,
+) -> list[downstream.SyncDeliveryResult]:
+    """将尚未同步的候选需求推送至下游 Webhook。"""
+
+    if not webhook_url:
+        return []
+
+    needs = candidate_needs.list_unsynced_needs(statuses=statuses, limit=batch_size)
+    if not needs:
+        return []
+
+    close_client = False
+    if client is None:
+        client = httpx.AsyncClient(timeout=request_timeout)
+        close_client = True
+
+    try:
+        results: list[downstream.SyncDeliveryResult] = []
+        for need in needs:
+            result = await downstream.deliver_need_to_webhook(
+                need,
+                webhook_url=webhook_url,
+                client=client,
+            )
+            results.append(result)
+        return results
+    finally:
+        if close_client:
+            await client.aclose()

@@ -32,6 +32,8 @@ class CandidateNeedRead(BaseModel):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     status: CandidateNeedStatusEnum
     notes: str | None = None
+    synced_at: datetime | None = None
+    sync_error: str | None = None
     created_at: datetime
     updated_at: datetime
 

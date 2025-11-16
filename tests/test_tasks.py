@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+import httpx
 import pytest
 
 from app.db.storage import db
@@ -12,7 +13,7 @@ from app.models import (
     RawEntryStatus,
     SourceStatus,
 )
-from app.services import raw_entries, rss_fetcher, rss_sources
+from app.services import candidate_needs, raw_entries, rss_fetcher, rss_sources
 from app.services.filter_engine import RuleMatchResult
 from app.services.llm_client import StructuredNeed
 from app.services.pipeline import EntryNotQualifiedError, PromotionResult
@@ -126,3 +127,111 @@ def test_promote_pending_entries(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert len(results) == 1
     assert results[0].entry.id == entry_pending.id
+
+
+def _seed_candidate_need(status: CandidateNeedStatus = CandidateNeedStatus.APPROVED) -> CandidateNeed:
+    source = rss_sources.create_source(
+        {"name": "Seed", "url": "https://example.com/rss", "frequency": 3600}
+    )
+    entry = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "seed-guid",
+            "title": "Seed entry",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+    return candidate_needs.create_need(
+        {
+            "raw_entry_id": entry.id,
+            "summary": "Demo need",
+            "status": status,
+        }
+    )
+
+
+class _DummyResponse:
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+
+
+class _DummyClient:
+    def __init__(self, response: _DummyResponse | None = None) -> None:
+        self.response = response or _DummyResponse(200)
+        self.closed = False
+        self.payloads: list[dict] = []
+
+    async def post(self, url: str, json: dict) -> _DummyResponse:
+        self.payloads.append(json)
+        return self.response
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+def test_sync_new_candidate_needs_success() -> None:
+    need = _seed_candidate_need()
+    client = _DummyClient()
+
+    results = asyncio.run(
+        tasks.sync_new_candidate_needs(
+            webhook_url="https://hook.example.com",
+            statuses=(CandidateNeedStatus.APPROVED,),
+            batch_size=5,
+            client=client,
+        )
+    )
+
+    assert len(results) == 1
+    assert results[0].success is True
+    refreshed = candidate_needs.get_need(need.id)
+    assert refreshed.synced_at is not None
+    assert refreshed.sync_error is None
+    assert client.closed is False
+
+
+def test_sync_new_candidate_needs_handles_http_error() -> None:
+    need = _seed_candidate_need()
+
+    class _ErrorClient(_DummyClient):
+        async def post(self, url: str, json: dict) -> _DummyResponse:  # type: ignore[override]
+            raise httpx.HTTPError("network error")
+
+    client = _ErrorClient()
+
+    results = asyncio.run(
+        tasks.sync_new_candidate_needs(
+            webhook_url="https://hook.example.com",
+            statuses=(CandidateNeedStatus.APPROVED,),
+            batch_size=5,
+            client=client,
+        )
+    )
+
+    assert len(results) == 1
+    assert results[0].success is False
+    assert results[0].error is not None
+    refreshed = candidate_needs.get_need(need.id)
+    assert refreshed.synced_at is None
+    assert refreshed.sync_error is not None
+
+
+def test_sync_new_candidate_needs_handles_non_2xx() -> None:
+    need = _seed_candidate_need()
+    client = _DummyClient(response=_DummyResponse(503))
+
+    results = asyncio.run(
+        tasks.sync_new_candidate_needs(
+            webhook_url="https://hook.example.com",
+            statuses=(CandidateNeedStatus.APPROVED,),
+            batch_size=5,
+            client=client,
+        )
+    )
+
+    assert len(results) == 1
+    assert results[0].success is False
+    assert results[0].status_code == 503
+    refreshed = candidate_needs.get_need(need.id)
+    assert refreshed.synced_at is None
+    assert refreshed.sync_error == "HTTP 503"

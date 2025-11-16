@@ -293,6 +293,7 @@ class InMemoryDatabase:
         statuses: Iterable[CandidateNeedStatus] | None = None,
         search: str | None = None,
         raw_entry_id: int | None = None,
+        synced: bool | None = None,
         skip: int = 0,
         limit: int | None = None,
     ) -> list[CandidateNeed]:
@@ -300,6 +301,7 @@ class InMemoryDatabase:
             statuses=statuses,
             search=search,
             raw_entry_id=raw_entry_id,
+            synced=synced,
         )
         sliced = items[skip : skip + limit if limit is not None else None]
         return list(sliced)
@@ -310,12 +312,14 @@ class InMemoryDatabase:
         statuses: Iterable[CandidateNeedStatus] | None = None,
         search: str | None = None,
         raw_entry_id: int | None = None,
+        synced: bool | None = None,
     ) -> int:
         return len(
             self._filter_candidate_needs(
                 statuses=statuses,
                 search=search,
                 raw_entry_id=raw_entry_id,
+                synced=synced,
             )
         )
 
@@ -325,6 +329,7 @@ class InMemoryDatabase:
         statuses: Iterable[CandidateNeedStatus] | None = None,
         search: str | None = None,
         raw_entry_id: int | None = None,
+        synced: bool | None = None,
     ) -> list[CandidateNeed]:
         needs: Iterable[CandidateNeed] = self._candidate_needs.values()
         if statuses:
@@ -332,6 +337,11 @@ class InMemoryDatabase:
             needs = [need for need in needs if need.status in status_set]
         if raw_entry_id is not None:
             needs = [need for need in needs if need.raw_entry_id == raw_entry_id]
+        if synced is not None:
+            if synced:
+                needs = [need for need in needs if need.synced_at is not None]
+            else:
+                needs = [need for need in needs if need.synced_at is None]
         if search:
             keyword = search.lower()
             needs = [

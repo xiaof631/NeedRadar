@@ -31,6 +31,8 @@ class CandidateNeed:
     confidence: float | None = None
     status: CandidateNeedStatus = CandidateNeedStatus.PENDING_REVIEW
     notes: str | None = None
+    synced_at: datetime | None = None
+    sync_error: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
