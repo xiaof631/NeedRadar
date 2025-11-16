@@ -235,3 +235,39 @@ def test_candidate_need_status_logs_api(client: TestClient) -> None:
     assert export_body["format"] == "json"
     assert export_body["items"]
     assert all(item["synced_at"] is None for item in export_body["items"])
+
+
+def test_candidate_need_status_transition_validation(client: TestClient) -> None:
+    _, need_ids = _seed_candidate_needs()
+    target_id = need_ids[0]
+
+    invalid = client.put(
+        f"/api/v1/candidate-needs/{target_id}/status",
+        json={"status": CandidateNeedStatus.COMPLETED.value},
+    )
+    assert invalid.status_code == 400
+    assert "无法流转" in invalid.json()["detail"]
+
+    approve = client.put(
+        f"/api/v1/candidate-needs/{target_id}/status",
+        json={"status": CandidateNeedStatus.APPROVED.value},
+    )
+    assert approve.status_code == 200
+
+    discovery = client.put(
+        f"/api/v1/candidate-needs/{target_id}/status",
+        json={"status": CandidateNeedStatus.IN_DISCOVERY.value},
+    )
+    assert discovery.status_code == 200
+
+    completed = client.put(
+        f"/api/v1/candidate-needs/{target_id}/status",
+        json={"status": CandidateNeedStatus.COMPLETED.value},
+    )
+    assert completed.status_code == 200
+
+    reopen = client.put(
+        f"/api/v1/candidate-needs/{target_id}/status",
+        json={"status": CandidateNeedStatus.PENDING_REVIEW.value},
+    )
+    assert reopen.status_code == 400
