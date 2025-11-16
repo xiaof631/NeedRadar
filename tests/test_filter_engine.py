@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.db.storage import db
 from app.main import app
 from app.models import RawEntryStatus
 from app.services import filter_engine, filter_rules, raw_entries
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)

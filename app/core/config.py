@@ -29,6 +29,28 @@ class Settings(BaseSettings):
         description="LLM 分析超时时间（秒），用于调度层配置",
         ge=0.1,
     )
+    scheduler_fetch_interval_seconds: int = Field(
+        default=900,
+        description="调度器触发 RSS 抓取任务的间隔（秒）",
+        ge=60,
+    )
+    scheduler_promote_interval_seconds: int = Field(
+        default=600,
+        description="调度器触发候选需求晋升任务的间隔（秒）",
+        ge=60,
+    )
+    scheduler_promotion_batch_size: int = Field(
+        default=20,
+        description="每次调度处理的原始条目数量上限",
+        ge=1,
+        le=500,
+    )
+    scheduler_min_rule_score: float | None = Field(
+        default=None,
+        description="调度器触发晋升时应用的最低规则得分阈值",
+        ge=0.0,
+        le=1.0,
+    )
 
     model_config = SettingsConfigDict(env_file=('.env', '.env.local'), env_prefix="NEEDRADAR_")
 

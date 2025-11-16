@@ -23,8 +23,8 @@ from app.services import (
     rss_sources,
 )
 from app.services.candidate_needs import CandidateNeedNotFoundError
-from app.services.raw_entries import RawEntryNotFoundError
 from app.services.pipeline import CandidateAlreadyExistsError, EntryNotQualifiedError
+from app.services.raw_entries import RawEntryNotFoundError
 
 app = typer.Typer(help="NeedRadar 工具集")
 logger = get_logger(__name__)

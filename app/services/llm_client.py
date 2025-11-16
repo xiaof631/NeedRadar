@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Protocol, Sequence
+from typing import Protocol
 
 from app.core.config import get_settings
 from app.models import RawEntry

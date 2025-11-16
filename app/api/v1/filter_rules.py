@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, status
-
 from app.schemas import FilterRuleCreate, FilterRuleList, FilterRuleRead, FilterRuleUpdate
 from app.services import filter_rules
+from fastapi import APIRouter, HTTPException, Query, status
 
 router = APIRouter(prefix="/filter-rules", tags=["Filter Rules"])
 
@@ -23,7 +22,10 @@ async def list_filter_rules(
         enabled=enabled,
         search=search,
     )
-    return FilterRuleList(total=total, items=[FilterRuleRead.model_validate(item) for item in items])
+    return FilterRuleList(
+        total=total,
+        items=[FilterRuleRead.model_validate(item) for item in items],
+    )
 
 
 @router.post(

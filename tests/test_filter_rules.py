@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.main import app
 from app.services import filter_rules
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)
