@@ -112,6 +112,7 @@ def export_needs(
     statuses: Iterable[CandidateNeedStatus] | None = None,
     search: str | None = None,
     raw_entry_id: int | None = None,
+    synced: bool | None = None,
     limit: int | None = None,
 ) -> list[CandidateNeed]:
     """导出候选需求列表。"""
@@ -120,7 +121,7 @@ def export_needs(
         statuses=statuses,
         search=search,
         raw_entry_id=raw_entry_id,
-        synced=None,
+        synced=synced,
         skip=0,
         limit=limit,
     )

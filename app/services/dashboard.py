@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from app.db.storage import db
 from app.models import CandidateNeedStatus, FetchStatus, RawEntryStatus, SourceStatus
+
 """仪表盘所需的聚合指标。"""
 
 

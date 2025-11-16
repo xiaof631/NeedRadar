@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
-
 from app.schemas.dashboard import DashboardMetricsRead
 from app.services import dashboard
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 

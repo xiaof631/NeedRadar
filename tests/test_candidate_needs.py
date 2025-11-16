@@ -181,3 +181,30 @@ def test_export_candidate_needs(client: TestClient) -> None:
     lines = [line for line in csv_body["content"].splitlines() if line]
     assert len(lines) >= 2
     assert lines[0].startswith("id,raw_entry_id")
+
+
+def test_filter_candidate_needs_by_synced_status(client: TestClient) -> None:
+    _, need_ids = _seed_candidate_needs()
+    candidate_needs.mark_need_synced(need_ids[0])
+
+    synced_response = client.get("/api/v1/candidate-needs", params={"synced": True})
+    assert synced_response.status_code == 200
+    synced_body = synced_response.json()
+    assert synced_body["total"] == 1
+    assert all(item["synced_at"] is not None for item in synced_body["items"])
+
+    unsynced_response = client.get("/api/v1/candidate-needs", params={"synced": False})
+    assert unsynced_response.status_code == 200
+    unsynced_body = unsynced_response.json()
+    assert unsynced_body["total"] == 1
+    assert all(item["synced_at"] is None for item in unsynced_body["items"])
+
+    export_response = client.get(
+        "/api/v1/candidate-needs/export",
+        params={"format": "json", "synced": False},
+    )
+    assert export_response.status_code == 200
+    export_body = export_response.json()
+    assert export_body["format"] == "json"
+    assert export_body["items"]
+    assert all(item["synced_at"] is None for item in export_body["items"])

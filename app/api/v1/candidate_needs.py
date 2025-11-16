@@ -35,11 +35,16 @@ async def list_candidate_needs(
     ),
     search: str | None = Query(default=None, description="关键字搜索"),
     raw_entry_id: int | None = Query(default=None, description="关联的原始条目 ID"),
+    synced: bool | None = Query(
+        default=None,
+        description="按同步状态过滤，true 表示已同步，false 表示未同步",
+    ),
 ) -> CandidateNeedList:
     total, items = candidate_needs.list_needs(
         statuses=_convert_statuses(statuses),
         search=search,
         raw_entry_id=raw_entry_id,
+        synced=synced,
         skip=skip,
         limit=limit,
     )
@@ -145,12 +150,17 @@ async def export_candidate_needs(
     ),
     search: str | None = Query(default=None, description="关键字搜索"),
     raw_entry_id: int | None = Query(default=None, description="关联的原始条目 ID"),
+    synced: bool | None = Query(
+        default=None,
+        description="按同步状态过滤，true 表示已同步，false 表示未同步",
+    ),
     limit: int | None = Query(default=None, ge=1, le=1000, description="最大导出数量"),
 ) -> dict:
     needs = candidate_needs.export_needs(
         statuses=_convert_statuses(statuses),
         search=search,
         raw_entry_id=raw_entry_id,
+        synced=synced,
         limit=limit,
     )
 
