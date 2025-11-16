@@ -74,6 +74,7 @@ class RawEntry:
     source_id: int
     guid: str
     title: str
+    content_hash: str | None = None
     summary: str | None = None
     content: str | None = None
     link: str | None = None

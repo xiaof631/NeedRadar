@@ -1,25 +1,56 @@
-"""原始 RSS 条目相关的业务逻辑。"""
+"""原始条目存取与工具函数。"""
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import hashlib
+import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Iterable, Mapping
 
 from app.db.storage import db
 from app.models import RawEntry, RawEntryStatus
 
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+class RawEntryAlreadyExistsError(Exception):
+    """尝试创建重复的原始条目。"""
+
+    def __init__(self, existing_id: int) -> None:
+        super().__init__(f"raw entry #{existing_id} already exists")
+        self.existing_id = existing_id
+
+
+class RawEntryNotFoundError(Exception):
+    """原始条目不存在。"""
+
 
 def create_entry(data: dict[str, Any]) -> RawEntry:
-    """创建原始条目。"""
+    """创建原始条目，自动计算内容指纹并校验唯一性。"""
 
-    return db.create_raw_entry(data)
+    payload = dict(data)
+    payload.setdefault("content_hash", calculate_content_hash(payload))
+    existing = db.get_raw_entry_by_guid(payload["source_id"], payload["guid"])
+    if existing is not None:
+        raise RawEntryAlreadyExistsError(existing.id)
+    content_hash = payload.get("content_hash")
+    if content_hash:
+        duplicated = db.get_raw_entry_by_hash(content_hash)
+        if duplicated is not None:
+            raise RawEntryAlreadyExistsError(duplicated.id)
+    return db.create_raw_entry(payload)
 
 
 def get_entry_by_guid(source_id: int, guid: str) -> RawEntry | None:
     """根据 guid 查询条目。"""
 
     return db.get_raw_entry_by_guid(source_id, guid)
+
+
+def get_entry_by_hash(content_hash: str) -> RawEntry | None:
+    """根据内容指纹查询条目。"""
+
+    return db.get_raw_entry_by_hash(content_hash)
 
 
 def get_entry(entry_id: int) -> RawEntry:
@@ -29,10 +60,6 @@ def get_entry(entry_id: int) -> RawEntry:
     if entry is None:
         raise RawEntryNotFoundError
     return entry
-
-
-class RawEntryNotFoundError(Exception):
-    """原始条目不存在。"""
 
 
 def list_entries(
@@ -114,9 +141,38 @@ def export_entries(
     return items
 
 
+def calculate_content_hash(data: Mapping[str, Any]) -> str | None:
+    """根据关键字段生成内容指纹，便于跨源去重。"""
+
+    components: list[str] = []
+    for field in ("link", "title", "summary", "content"):
+        normalized = _normalize_text(data.get(field))
+        if normalized:
+            components.append(f"{field}:{normalized}")
+    if not components:
+        normalized_guid = _normalize_text(data.get("guid"))
+        if normalized_guid:
+            components.append(f"guid:{normalized_guid}")
+    if not components:
+        return None
+    joined = "|".join(components)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
 def _normalize_datetime(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _normalize_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    collapsed = _WHITESPACE_RE.sub(" ", text)
+    lowered = collapsed.lower().strip()
+    return lowered or None

@@ -24,6 +24,7 @@ class RawEntryRead(BaseModel):
     id: int
     source_id: int
     guid: str
+    content_hash: str | None = None
     title: str
     summary: str | None = None
     content: str | None = None

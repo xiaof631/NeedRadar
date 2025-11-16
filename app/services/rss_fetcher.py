@@ -143,21 +143,22 @@ async def _fetch_with_source(
 
         new_entries = 0
         for entry in parsed_entries:
-            if raw_entries.get_entry_by_guid(source.id, entry.guid) is not None:
+            payload = {
+                "source_id": source.id,
+                "guid": entry.guid,
+                "title": entry.title,
+                "summary": entry.summary,
+                "content": entry.content,
+                "link": entry.link,
+                "published_at": entry.published_at,
+                "author": entry.author,
+                "tags": entry.tags,
+            }
+            payload["content_hash"] = raw_entries.calculate_content_hash(payload)
+            try:
+                raw_entries.create_entry(payload)
+            except raw_entries.RawEntryAlreadyExistsError:
                 continue
-            raw_entries.create_entry(
-                {
-                    "source_id": source.id,
-                    "guid": entry.guid,
-                    "title": entry.title,
-                    "summary": entry.summary,
-                    "content": entry.content,
-                    "link": entry.link,
-                    "published_at": entry.published_at,
-                    "author": entry.author,
-                    "tags": entry.tags,
-                }
-            )
             new_entries += 1
 
         etag = response.headers.get("ETag", source.etag)

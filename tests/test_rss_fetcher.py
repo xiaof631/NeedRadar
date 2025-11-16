@@ -40,6 +40,26 @@ SAMPLE_RSS = """<?xml version=\"1.0\"?>
 </rss>
 """
 
+DUPLICATE_CONTENT_RSS = """<?xml version=\"1.0\"?>
+<rss version=\"2.0\">
+  <channel>
+    <title>Dedup Feed</title>
+    <item>
+      <title>Same Idea</title>
+      <link>https://example.com/idea</link>
+      <guid>idea-1</guid>
+      <description>Build the same tool</description>
+    </item>
+    <item>
+      <title>Same   idea</title>
+      <link>https://example.com/idea</link>
+      <guid>idea-2</guid>
+      <description>Build the same tool</description>
+    </item>
+  </channel>
+</rss>
+"""
+
 
 def test_fetch_rss_source_success_and_deduplicate() -> None:
     async def _run() -> None:
@@ -158,5 +178,33 @@ def test_fetch_rss_source_parse_failure() -> None:
         assert len(logs) == 1
         assert logs[0].status == FetchStatus.FAILURE
         assert logs[0].http_status == 200
+
+    asyncio.run(_run())
+
+
+def test_fetch_rss_deduplicates_by_content_hash() -> None:
+    async def _run() -> None:
+        source = rss_sources.create_source(
+            {
+                "name": "Dedup",
+                "url": "https://example.com/dedup",
+                "frequency": 3600,
+            }
+        )
+
+        def handler(_: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, text=DUPLICATE_CONTENT_RSS)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert result.status == FetchStatus.SUCCESS
+        assert result.fetched_entries == 2
+        assert result.new_entries == 1
+
+        total, entries = raw_entries.list_entries(source_id=source.id)
+        assert total == 1
+        assert len(entries) == 1
+        assert entries[0].guid in {"idea-1", "idea-2"}
 
     asyncio.run(_run())
