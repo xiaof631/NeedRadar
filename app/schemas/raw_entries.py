@@ -45,6 +45,16 @@ class RawEntryList(BaseModel):
     items: list[RawEntryRead]
 
 
+class RawEntryRuleMatch(BaseModel):
+    """描述条目与筛选规则匹配结果。"""
+
+    rule_id: int
+    rule_name: str
+    score: float = Field(ge=0.0, le=1.0)
+    matched_keywords: list[str] = Field(default_factory=list)
+    matched_patterns: list[str] = Field(default_factory=list)
+
+
 class RawEntryStatusUpdate(BaseModel):
     """单条状态更新请求模型。"""
 

@@ -11,10 +11,11 @@ from app.schemas import (
     RawEntryBulkStatusUpdate,
     RawEntryList,
     RawEntryRead,
+    RawEntryRuleMatch,
     RawEntryStatusEnum,
     RawEntryStatusUpdate,
 )
-from app.services import raw_entries
+from app.services import filter_engine, raw_entries
 from fastapi import APIRouter, HTTPException, Query, status
 
 router = APIRouter(prefix="/raw-entries", tags=["Raw Entries"])
@@ -40,6 +41,38 @@ async def list_raw_entries(
         limit=limit,
     )
     return RawEntryList(total=total, items=[RawEntryRead.model_validate(item) for item in items])
+
+
+@router.post(
+    "/{entry_id}/evaluate",
+    response_model=RawEntryRuleMatch,
+    summary="评估条目命中规则情况",
+)
+async def evaluate_raw_entry(
+    entry_id: int,
+    min_score: float | None = Query(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="自定义最低得分阈值",
+    ),
+) -> RawEntryRuleMatch:
+    try:
+        entry = raw_entries.get_entry(entry_id)
+    except raw_entries.RawEntryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="原始条目不存在") from exc
+
+    result = filter_engine.evaluate_entry(entry, min_score=min_score)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未命中任何筛选规则")
+
+    return RawEntryRuleMatch(
+        rule_id=result.rule.id,
+        rule_name=result.rule.name,
+        score=result.score,
+        matched_keywords=list(result.matched_keywords),
+        matched_patterns=list(result.matched_patterns),
+    )
 
 
 @router.put("/{entry_id}/status", response_model=RawEntryRead, summary="更新原始条目状态")
