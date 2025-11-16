@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -103,6 +103,32 @@ def test_alert_for_unsynced_candidate_needs() -> None:
     unsynced_alerts = [alert for alert in generated if alert.code == "unsynced_candidate_needs"]
     assert unsynced_alerts
     assert unsynced_alerts[0].details["unsynced"] == 3
+
+
+def test_alert_for_stale_sources() -> None:
+    source_id = _seed_source()
+    rss_sources.update_source(
+        source_id,
+        {"last_fetched_at": datetime.now(UTC) - timedelta(hours=5)},
+    )
+
+    generated = alerts.generate_system_alerts(stale_source_threshold_minutes=60)
+
+    stale_alerts = [alert for alert in generated if alert.code == "rss_sources_stale"]
+    assert stale_alerts
+    payload = stale_alerts[0].details
+    assert payload["threshold_minutes"] == 60
+    assert payload["stale_sources"][0]["source_id"] == source_id
+
+
+def test_stale_sources_alert_critical_when_never_fetched() -> None:
+    _seed_source()
+
+    generated = alerts.generate_system_alerts(stale_source_threshold_minutes=60)
+
+    stale_alerts = [alert for alert in generated if alert.code == "rss_sources_stale"]
+    assert stale_alerts
+    assert stale_alerts[0].severity == alerts.AlertSeverity.CRITICAL
 
 
 def test_dashboard_alerts_api(client: TestClient) -> None:
