@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from app.db.storage import db
@@ -88,3 +90,43 @@ def test_filter_fetch_logs_by_source_and_pagination(client: TestClient) -> None:
     assert len(next_body["items"]) == 1
     assert next_body["items"][0]["id"] != body["items"][0]["id"]
     assert next_body["items"][0]["id"] == log1.id
+
+
+def test_filter_fetch_logs_by_status_and_time_range(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Filter", 
+            "url": "https://example.com/filter.xml", 
+            "frequency": 3600,
+        }
+    )
+
+    base_time = datetime.now(UTC)
+    _old_log = db.add_fetch_log(source.id, status=FetchStatus.SUCCESS, http_status=200)
+    _old_log.fetched_at = base_time - timedelta(hours=3)
+    failure_log = db.add_fetch_log(source.id, status=FetchStatus.FAILURE, http_status=500)
+    failure_log.fetched_at = base_time - timedelta(hours=1)
+    latest_log = db.add_fetch_log(source.id, status=FetchStatus.SUCCESS, http_status=200)
+    latest_log.fetched_at = base_time
+
+    status_response = client.get(
+        "/api/v1/fetch-logs",
+        params={"status": FetchStatus.FAILURE.value},
+    )
+    assert status_response.status_code == 200
+    status_body = status_response.json()
+    assert status_body["total"] == 1
+    assert status_body["items"][0]["id"] == failure_log.id
+
+    time_response = client.get(
+        "/api/v1/fetch-logs",
+        params={
+            "start_fetched_at": (base_time - timedelta(hours=2)).isoformat(),
+            "end_fetched_at": base_time.isoformat(),
+        },
+    )
+    assert time_response.status_code == 200
+    time_body = time_response.json()
+    assert time_body["total"] == 2
+    returned_ids = {item["id"] for item in time_body["items"]}
+    assert returned_ids == {failure_log.id, latest_log.id}

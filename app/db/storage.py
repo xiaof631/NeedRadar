@@ -129,12 +129,18 @@ class InMemoryDatabase:
         self,
         *,
         source_id: int | None = None,
+        status: FetchStatus | None = None,
+        start_fetched_at: datetime | None = None,
+        end_fetched_at: datetime | None = None,
         skip: int = 0,
         limit: int | None = None,
     ) -> list[FetchLog]:
-        logs: Iterable[FetchLog] = self._fetch_logs.values()
-        if source_id is not None:
-            logs = [log for log in logs if log.source_id == source_id]
+        logs = self._filter_fetch_logs(
+            source_id=source_id,
+            status=status,
+            start_fetched_at=start_fetched_at,
+            end_fetched_at=end_fetched_at,
+        )
         sorted_logs = sorted(logs, key=lambda item: item.fetched_at, reverse=True)
         sliced = sorted_logs[skip : skip + limit if limit is not None else None]
         return list(sliced)
@@ -143,11 +149,39 @@ class InMemoryDatabase:
         self,
         *,
         source_id: int | None = None,
+        status: FetchStatus | None = None,
+        start_fetched_at: datetime | None = None,
+        end_fetched_at: datetime | None = None,
     ) -> int:
+        logs = self._filter_fetch_logs(
+            source_id=source_id,
+            status=status,
+            start_fetched_at=start_fetched_at,
+            end_fetched_at=end_fetched_at,
+        )
+        return len(logs)
+
+    def _filter_fetch_logs(
+        self,
+        *,
+        source_id: int | None = None,
+        status: FetchStatus | None = None,
+        start_fetched_at: datetime | None = None,
+        end_fetched_at: datetime | None = None,
+    ) -> list[FetchLog]:
         logs: Iterable[FetchLog] = self._fetch_logs.values()
-        if source_id is not None:
-            logs = [log for log in logs if log.source_id == source_id]
-        return len(list(logs))
+        filtered: list[FetchLog] = []
+        for log in logs:
+            if source_id is not None and log.source_id != source_id:
+                continue
+            if status is not None and log.status != status:
+                continue
+            if start_fetched_at is not None and log.fetched_at < start_fetched_at:
+                continue
+            if end_fetched_at is not None and log.fetched_at > end_fetched_at:
+                continue
+            filtered.append(log)
+        return filtered
 
     # 原始条目操作
     def create_raw_entry(self, data: dict) -> RawEntry:

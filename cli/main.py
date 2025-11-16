@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+from datetime import datetime
 from io import StringIO
 from pathlib import Path
 from typing import Annotated, Any
@@ -216,12 +217,31 @@ def list_sources(
 @rss_app.command("logs")
 def list_fetch_logs(
     source_id: Annotated[int | None, typer.Option(help="按数据源过滤")] = None,
+    status: Annotated[
+        FetchStatus | None,
+        typer.Option("--status", help="根据抓取状态过滤", case_sensitive=False),
+    ] = None,
+    start_fetched_at: Annotated[
+        datetime | None,
+        typer.Option("--start", help="起始抓取时间 (ISO-8601)"),
+    ] = None,
+    end_fetched_at: Annotated[
+        datetime | None,
+        typer.Option("--end", help="结束抓取时间 (ISO-8601)"),
+    ] = None,
     skip: Annotated[int, typer.Option(help="跳过的日志数量", min=0)] = 0,
     limit: Annotated[int, typer.Option(help="显示的最大日志数量", min=1, max=100)] = 20,
 ) -> None:
     """查看 RSS 抓取日志。"""
 
-    total, items = fetch_logs.list_logs(source_id=source_id, skip=skip, limit=limit)
+    total, items = fetch_logs.list_logs(
+        source_id=source_id,
+        status=status,
+        start_fetched_at=start_fetched_at,
+        end_fetched_at=end_fetched_at,
+        skip=skip,
+        limit=limit,
+    )
     if total == 0:
         typer.echo("暂无抓取日志")
         raise typer.Exit()
