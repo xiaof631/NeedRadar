@@ -1,6 +1,7 @@
 """服务层模块。"""
 
 from app.services import (
+    alerts,
     candidate_needs,
     dashboard,
     downstream,
@@ -15,6 +16,7 @@ from app.services import (
 )
 
 __all__ = [
+    "alerts",
     "candidate_needs",
     "dashboard",
     "downstream",

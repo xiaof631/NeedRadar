@@ -10,6 +10,8 @@ from app.schemas.candidate_needs import (
     CandidateNeedUpdate,
 )
 from app.schemas.dashboard import (
+    AlertRead,
+    AlertSeverityEnum,
     DashboardMetricsRead,
     FetchLogSummaryRead,
     SourcesSummaryRead,
@@ -47,6 +49,8 @@ __all__ = [
     "CandidateNeedStatusEnum",
     "CandidateNeedStatusUpdate",
     "CandidateNeedUpdate",
+    "AlertRead",
+    "AlertSeverityEnum",
     "DashboardMetricsRead",
     "FetchLogList",
     "FetchLogRead",

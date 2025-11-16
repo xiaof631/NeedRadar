@@ -2,8 +2,40 @@
 
 from __future__ import annotations
 
+from enum import Enum
+from typing import Any
+
+from app.services.alerts import Alert, AlertSeverity
 from app.services.dashboard import DashboardMetrics
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class AlertSeverityEnum(str, Enum):
+    """告警严重等级。"""
+
+    INFO = AlertSeverity.INFO.value
+    WARNING = AlertSeverity.WARNING.value
+    CRITICAL = AlertSeverity.CRITICAL.value
+
+
+class AlertRead(BaseModel):
+    """系统告警的响应模型。"""
+
+    code: str
+    message: str
+    severity: AlertSeverityEnum
+    details: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_alert(cls, alert: Alert) -> AlertRead:
+        return cls(
+            code=alert.code,
+            message=alert.message,
+            severity=AlertSeverityEnum(alert.severity.value),
+            details=dict(alert.details),
+        )
 
 
 class SourcesSummaryRead(BaseModel):
