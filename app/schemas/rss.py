@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from app.models.rss import FetchStatus, SourceStatus
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, PositiveInt
-
-from app.models.rss import SourceStatus
 
 
 class RssSourceBase(BaseModel):
@@ -51,4 +50,24 @@ class RssSourceList(BaseModel):
 
     total: int
     items: list[RssSourceRead]
+
+
+class FetchLogRead(BaseModel):
+    """RSS 抓取日志输出模型。"""
+
+    id: int
+    source_id: int
+    fetched_at: datetime
+    status: FetchStatus
+    http_status: int | None = None
+    error_message: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FetchLogList(BaseModel):
+    """抓取日志列表响应。"""
+
+    total: int
+    items: list[FetchLogRead]
 
