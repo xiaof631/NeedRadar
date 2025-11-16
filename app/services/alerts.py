@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
 from app.db.storage import db
-from app.models import FetchStatus, RawEntryStatus, SourceStatus
+from app.models import FetchStatus, RawEntryStatus, RssSource, SourceStatus
 
 
 class AlertSeverity(str, Enum):
@@ -34,6 +35,7 @@ def generate_system_alerts(
     fetch_log_window: int = 50,
     pending_entries_threshold: int = 100,
     unsynced_needs_threshold: int = 50,
+    stale_source_threshold_minutes: int = 180,
 ) -> list[Alert]:
     """根据当前数据生成系统告警。"""
 
@@ -46,6 +48,7 @@ def generate_system_alerts(
                 ratio_threshold=fetch_failure_ratio_threshold,
                 window=fetch_log_window,
             ),
+            _check_stale_sources(threshold_minutes=stale_source_threshold_minutes),
             _check_pending_entries(threshold=pending_entries_threshold),
             _check_unsynced_needs(threshold=unsynced_needs_threshold),
         )
@@ -92,6 +95,56 @@ def _check_fetch_failures(
             "window": len(logs),
             "failures": failures,
             "failure_ratio": round(ratio, 2),
+        },
+    )
+
+
+def _check_stale_sources(*, threshold_minutes: int) -> Alert | None:
+    if threshold_minutes <= 0:
+        return None
+
+    active_sources = [
+        source for source in db.list_sources() if source.status == SourceStatus.ACTIVE
+    ]
+    if not active_sources:
+        return None
+
+    now = datetime.now(UTC)
+    stale_sources: list[tuple[RssSource, float | None]] = []
+    for source in active_sources:
+        last_fetched = source.last_fetched_at
+        if last_fetched is None:
+            stale_sources.append((source, None))
+            continue
+        if last_fetched.tzinfo is None:
+            last_fetched = last_fetched.replace(tzinfo=UTC)
+        age_minutes = (now - last_fetched).total_seconds() / 60
+        if age_minutes >= threshold_minutes:
+            stale_sources.append((source, age_minutes))
+
+    if not stale_sources:
+        return None
+
+    severity = AlertSeverity.WARNING
+    if any(age is None or age >= threshold_minutes * 2 for _, age in stale_sources):
+        severity = AlertSeverity.CRITICAL
+
+    return Alert(
+        code="rss_sources_stale",
+        message="部分 RSS 源长时间未被抓取",
+        severity=severity,
+        details={
+            "threshold_minutes": threshold_minutes,
+            "stale_sources": [
+                {
+                    "source_id": source.id,
+                    "name": source.name,
+                    "minutes_since_fetch": None
+                    if age is None
+                    else round(age, 1),
+                }
+                for source, age in stale_sources
+            ],
         },
     )
 
