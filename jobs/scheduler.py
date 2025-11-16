@@ -10,6 +10,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.models import CandidateNeedStatus
 from jobs import tasks
 
 logger = get_logger(__name__)
@@ -53,6 +54,36 @@ def _run_promote_job(
     logger.info("scheduler.promote.completed", promoted=len(results))
 
 
+async def _run_sync_job(
+    *,
+    webhook_url: str,
+    statuses: tuple[CandidateNeedStatus, ...],
+    batch_size: int,
+) -> None:
+    """调度候选需求同步任务。"""
+
+    try:
+        results = await tasks.sync_new_candidate_needs(
+            webhook_url=webhook_url,
+            statuses=statuses,
+            batch_size=batch_size,
+        )
+    except Exception:  # pragma: no cover - 调度器异常记录
+        logger.exception("scheduler.sync.failed")
+        return
+
+    if not results:
+        return
+
+    delivered = sum(1 for result in results if result.success)
+    failed = len(results) - delivered
+    logger.info(
+        "scheduler.sync.completed",
+        delivered=delivered,
+        failed=failed,
+    )
+
+
 async def main() -> None:
     """启动调度器直至收到终止信号。"""
 
@@ -77,11 +108,27 @@ async def main() -> None:
         max_instances=1,
         coalesce=True,
     )
+    if settings.downstream_webhook_url:
+        scheduler.add_job(
+            _run_sync_job,
+            trigger=IntervalTrigger(seconds=settings.scheduler_downstream_interval_seconds),
+            id="sync-downstream",
+            kwargs={
+                "webhook_url": settings.downstream_webhook_url,
+                "statuses": settings.downstream_sync_statuses,
+                "batch_size": settings.downstream_sync_batch_size,
+            },
+            max_instances=1,
+            coalesce=True,
+        )
     scheduler.start()
     logger.info(
         "scheduler.started",
         fetch_interval=settings.scheduler_fetch_interval_seconds,
         promote_interval=settings.scheduler_promote_interval_seconds,
+        downstream_interval=settings.scheduler_downstream_interval_seconds
+        if settings.downstream_webhook_url
+        else None,
     )
 
     stop_event = asyncio.Event()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Any
 
 from app.db.storage import db
@@ -83,6 +84,7 @@ def list_needs(
     statuses: Iterable[CandidateNeedStatus] | None = None,
     search: str | None = None,
     raw_entry_id: int | None = None,
+    synced: bool | None = None,
     skip: int = 0,
     limit: int | None = None,
 ) -> tuple[int, list[CandidateNeed]]:
@@ -92,6 +94,7 @@ def list_needs(
         statuses=statuses,
         search=search,
         raw_entry_id=raw_entry_id,
+        synced=synced,
         skip=skip,
         limit=limit,
     )
@@ -99,6 +102,7 @@ def list_needs(
         statuses=statuses,
         search=search,
         raw_entry_id=raw_entry_id,
+        synced=synced,
     )
     return total, items
 
@@ -116,10 +120,56 @@ def export_needs(
         statuses=statuses,
         search=search,
         raw_entry_id=raw_entry_id,
+        synced=None,
         skip=0,
         limit=limit,
     )
     return items
+
+
+def list_unsynced_needs(
+    *,
+    statuses: Iterable[CandidateNeedStatus] | None = None,
+    limit: int | None = None,
+) -> list[CandidateNeed]:
+    """返回尚未推送至下游的候选需求。"""
+
+    _, items = list_needs(
+        statuses=statuses,
+        synced=False,
+        limit=limit,
+    )
+    return items
+
+
+def mark_need_synced(need_id: int) -> CandidateNeed:
+    """记录候选需求已成功同步。"""
+
+    need = db.get_candidate_need(need_id)
+    if need is None:
+        raise CandidateNeedNotFoundError
+
+    timestamp = datetime.now(UTC)
+
+    def _apply(model: CandidateNeed) -> None:
+        model.synced_at = timestamp
+        model.sync_error = None
+
+    return db.update_candidate_need(need_id, _apply)
+
+
+def mark_need_sync_failed(need_id: int, error: str | None = None) -> CandidateNeed:
+    """记录候选需求同步失败的原因。"""
+
+    need = db.get_candidate_need(need_id)
+    if need is None:
+        raise CandidateNeedNotFoundError
+
+    def _apply(model: CandidateNeed) -> None:
+        model.sync_error = error
+        model.synced_at = None
+
+    return db.update_candidate_need(need_id, _apply)
 
 
 def reset_storage() -> None:

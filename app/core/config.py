@@ -6,6 +6,8 @@ from typing import Any
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.models import CandidateNeedStatus
+
 
 class Settings(BaseSettings):
     """应用的核心配置。"""
@@ -50,6 +52,28 @@ class Settings(BaseSettings):
         description="调度器触发晋升时应用的最低规则得分阈值",
         ge=0.0,
         le=1.0,
+    )
+    scheduler_downstream_interval_seconds: int = Field(
+        default=1800,
+        description="调度器触发下游同步的间隔（秒）",
+        ge=60,
+    )
+    downstream_webhook_url: str | None = Field(
+        default=None,
+        description="候选需求同步的 Webhook 地址，为空则不执行",
+    )
+    downstream_sync_statuses: tuple[CandidateNeedStatus, ...] = Field(
+        default=(
+            CandidateNeedStatus.APPROVED,
+            CandidateNeedStatus.IN_DISCOVERY,
+        ),
+        description="需要推送至下游的候选需求状态",
+    )
+    downstream_sync_batch_size: int = Field(
+        default=20,
+        description="单次下游同步的最大候选需求数量",
+        ge=1,
+        le=200,
     )
 
     model_config = SettingsConfigDict(env_file=('.env', '.env.local'), env_prefix="NEEDRADAR_")
