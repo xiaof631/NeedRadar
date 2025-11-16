@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, status
-
 from app.models import SourceStatus
 from app.schemas import RssSourceCreate, RssSourceList, RssSourceRead, RssSourceUpdate
 from app.services import rss_sources
+from fastapi import APIRouter, HTTPException, Query, status
 
 router = APIRouter(prefix="/rss-sources", tags=["RSS Sources"])
 
@@ -20,12 +19,24 @@ async def list_rss_sources(
     search: str | None = Query(default=None, description="名称模糊搜索"),
 ) -> RssSourceList:
     total, items = rss_sources.list_sources(
-        skip=skip, limit=limit, status=status, category=category, search=search
+        skip=skip,
+        limit=limit,
+        status=status,
+        category=category,
+        search=search,
     )
-    return RssSourceList(total=total, items=[RssSourceRead.model_validate(item) for item in items])
+    return RssSourceList(
+        total=total,
+        items=[RssSourceRead.model_validate(item) for item in items],
+    )
 
 
-@router.post("/", response_model=RssSourceRead, status_code=status.HTTP_201_CREATED, summary="创建 RSS 源")
+@router.post(
+    "/",
+    response_model=RssSourceRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="创建 RSS 源",
+)
 async def create_rss_source(payload: RssSourceCreate) -> RssSourceRead:
     try:
         source = rss_sources.create_source(payload.model_dump())

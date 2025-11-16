@@ -4,7 +4,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 
-
 class AsyncSession:
     """兼容占位的异步 Session。"""
 

@@ -14,6 +14,7 @@ dependencies = [
     "structlog",
     "python-dotenv",
     "httpx",
+    "apscheduler",
 ]
 
 [project.optional-dependencies]
@@ -29,11 +30,19 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["app*", "cli*"]
+include = ["app*", "cli*", "jobs*"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = [
+    "fastapi",
+    "pydantic",
+    "pydantic_settings",
+    "sqlalchemy",
+    "structlog",
+    "typer",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
