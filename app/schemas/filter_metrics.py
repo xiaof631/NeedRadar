@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
-
 from app.services.filter_metrics import FilterPerformance, SourceFilterStats
+from pydantic import BaseModel, Field
 
 
 class SourceFilterMetricRead(BaseModel):
@@ -20,7 +19,7 @@ class SourceFilterMetricRead(BaseModel):
     promotion_rate: float = Field(description="该源的转化率")
 
     @classmethod
-    def from_domain(cls, stats: SourceFilterStats) -> "SourceFilterMetricRead":
+    def from_domain(cls, stats: SourceFilterStats) -> SourceFilterMetricRead:
         return cls(
             source_id=stats.source_id,
             source_name=stats.source_name,
@@ -53,7 +52,7 @@ class FilterPerformanceRead(BaseModel):
     )
 
     @classmethod
-    def from_domain(cls, data: FilterPerformance) -> "FilterPerformanceRead":
+    def from_domain(cls, data: FilterPerformance) -> FilterPerformanceRead:
         return cls(
             total_entries=data.total_entries,
             pending_entries=data.pending_entries,

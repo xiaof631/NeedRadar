@@ -23,7 +23,10 @@ from app.services import (
     raw_entries,
     rss_sources,
 )
-from app.services.candidate_needs import CandidateNeedNotFoundError
+from app.services.candidate_needs import (
+    CandidateNeedNotFoundError,
+    InvalidStatusTransitionError,
+)
 from app.services.pipeline import CandidateAlreadyExistsError, EntryNotQualifiedError
 from app.services.raw_entries import RawEntryNotFoundError
 
@@ -655,6 +658,8 @@ def update_candidate_need(
         raise typer.BadParameter("候选需求不存在", param_hint="need_id") from exc
     except RawEntryNotFoundError as exc:
         raise typer.BadParameter("关联的原始条目不存在", param_hint="raw_entry_id") from exc
+    except InvalidStatusTransitionError as exc:
+        raise typer.BadParameter(str(exc), param_hint="status") from exc
 
     typer.echo(f"已更新候选需求 #{need.id}")
 
@@ -670,6 +675,8 @@ def update_candidate_need_status(
         need = candidate_needs.update_need_status(need_id, status)
     except CandidateNeedNotFoundError as exc:
         raise typer.BadParameter("候选需求不存在", param_hint="need_id") from exc
+    except InvalidStatusTransitionError as exc:
+        raise typer.BadParameter(str(exc), param_hint="status") from exc
 
     typer.echo(f"已将候选需求 #{need.id} 状态更新为 {need.status.value}")
 

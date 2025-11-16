@@ -15,9 +15,57 @@ class CandidateNeedNotFoundError(Exception):
     """候选需求不存在。"""
 
 
+class InvalidStatusTransitionError(Exception):
+    """状态流转不符合预设的状态机。"""
+
+    def __init__(
+        self,
+        current_status: CandidateNeedStatus,
+        target_status: CandidateNeedStatus,
+    ) -> None:
+        self.current_status = current_status
+        self.target_status = target_status
+        message = (
+            f"状态 {current_status.value} 无法流转至 {target_status.value}"
+        )
+        super().__init__(message)
+
+
+_ALLOWED_STATUS_TRANSITIONS: dict[CandidateNeedStatus, tuple[CandidateNeedStatus, ...]] = {
+    CandidateNeedStatus.PENDING_REVIEW: (
+        CandidateNeedStatus.APPROVED,
+        CandidateNeedStatus.REJECTED,
+    ),
+    CandidateNeedStatus.APPROVED: (
+        CandidateNeedStatus.IN_DISCOVERY,
+        CandidateNeedStatus.REJECTED,
+    ),
+    CandidateNeedStatus.REJECTED: (
+        CandidateNeedStatus.PENDING_REVIEW,
+    ),
+    CandidateNeedStatus.IN_DISCOVERY: (
+        CandidateNeedStatus.COMPLETED,
+        CandidateNeedStatus.REJECTED,
+    ),
+    CandidateNeedStatus.COMPLETED: (
+        CandidateNeedStatus.IN_DISCOVERY,
+    ),
+}
+
+
 def _ensure_raw_entry_exists(raw_entry_id: int) -> None:
     if db.get_raw_entry(raw_entry_id) is None:
         raise RawEntryNotFoundError
+
+
+def _validate_status_transition(
+    current: CandidateNeedStatus, target: CandidateNeedStatus
+) -> None:
+    if current == target:
+        return
+    allowed = _ALLOWED_STATUS_TRANSITIONS.get(current, tuple())
+    if target not in allowed:
+        raise InvalidStatusTransitionError(current, target)
 
 
 def create_need(data: dict[str, Any]) -> CandidateNeed:
@@ -39,6 +87,9 @@ def update_need(need_id: int, data: dict[str, Any]) -> CandidateNeed:
         _ensure_raw_entry_exists(data["raw_entry_id"])
     previous_status = need.status
 
+    if "status" in data and data["status"] is not None:
+        _validate_status_transition(previous_status, data["status"])
+
     def _apply(model: CandidateNeed) -> None:
         for key, value in data.items():
             setattr(model, key, value)
@@ -56,6 +107,7 @@ def update_need_status(need_id: int, status: CandidateNeedStatus) -> CandidateNe
     if need is None:
         raise CandidateNeedNotFoundError
     previous_status = need.status
+    _validate_status_transition(previous_status, status)
 
     def _apply(model: CandidateNeed) -> None:
         model.status = status

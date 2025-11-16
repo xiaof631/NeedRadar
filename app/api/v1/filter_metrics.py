@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
-
 from app.schemas import FilterPerformanceRead
 from app.services import filter_metrics
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/filter-metrics", tags=["Filter Metrics"])
 

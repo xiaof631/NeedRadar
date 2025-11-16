@@ -20,7 +20,10 @@ from app.schemas import (
     CandidateNeedUpdate,
 )
 from app.services import candidate_needs
-from app.services.candidate_needs import CandidateNeedNotFoundError
+from app.services.candidate_needs import (
+    CandidateNeedNotFoundError,
+    InvalidStatusTransitionError,
+)
 from app.services.raw_entries import RawEntryNotFoundError
 
 router = APIRouter(prefix="/candidate-needs", tags=["Candidate Needs"])
@@ -112,6 +115,11 @@ async def update_candidate_need(need_id: int, payload: CandidateNeedUpdate) -> C
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="关联的原始条目不存在",
         ) from exc
+    except InvalidStatusTransitionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     return CandidateNeedRead.model_validate(need)
 
 
@@ -127,6 +135,11 @@ async def update_candidate_need_status(
         need = candidate_needs.update_need_status(need_id, _convert_status(payload.status))
     except CandidateNeedNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+    except InvalidStatusTransitionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     return CandidateNeedRead.model_validate(need)
 
 
