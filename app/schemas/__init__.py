@@ -3,6 +3,7 @@
 from app.schemas.candidate_needs import (
     CandidateNeedExportJobCreate,
     CandidateNeedExportJobRead,
+    CandidateNeedExportJobList,
     CandidateNeedCreate,
     CandidateNeedList,
     CandidateNeedRead,
@@ -52,6 +53,7 @@ from app.schemas.rss import (
 __all__ = [
     "CandidateNeedExportJobCreate",
     "CandidateNeedExportJobRead",
+    "CandidateNeedExportJobList",
     "CandidateNeedCreate",
     "CandidateNeedList",
     "CandidateNeedRead",

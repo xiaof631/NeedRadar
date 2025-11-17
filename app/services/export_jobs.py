@@ -62,6 +62,18 @@ def get_export_job(job_id: int) -> ExportJob:
     return job
 
 
+def list_candidate_export_jobs(
+    *, status: ExportJobStatus | None = None, limit: int | None = None
+) -> list[ExportJob]:
+    """列出候选需求导出任务。"""
+
+    return db.list_export_jobs(
+        job_type=_CANDIDATE_JOB_TYPE,
+        status=status,
+        limit=limit,
+    )
+
+
 def run_candidate_export_job(job_id: int) -> ExportJob:
     """执行导出任务并将结果写入文件。"""
 

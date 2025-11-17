@@ -257,6 +257,53 @@ def test_export_task_lifecycle(client: TestClient, export_dir: Path) -> None:
     assert all(item["synced_at"] is None for item in unsynced_body["items"])
 
 
+def test_list_export_tasks_endpoint(
+    client: TestClient, export_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed_candidate_needs()
+
+    first = client.post(
+        "/api/v1/candidate-needs/export-tasks",
+        json={"format": "csv", "limit": 5},
+    )
+    assert first.status_code == 202
+    completed_id = first.json()["id"]
+    export_jobs.run_candidate_export_job(completed_id)
+
+    original_enqueue = task_queue.enqueue_export_job
+
+    def _noop(job_id: int) -> None:  # pragma: no cover - 测试替身
+        return None
+
+    monkeypatch.setattr(task_queue, "enqueue_export_job", _noop)
+    second = client.post(
+        "/api/v1/candidate-needs/export-tasks",
+        json={"format": "json", "limit": 1},
+    )
+    assert second.status_code == 202
+    monkeypatch.setattr(task_queue, "enqueue_export_job", original_enqueue)
+
+    listing = client.get(
+        "/api/v1/candidate-needs/export-tasks",
+        params={"limit": 10},
+    )
+    assert listing.status_code == 200
+    body = listing.json()
+    assert body["total"] == 2
+    statuses = {item["status"] for item in body["items"]}
+    assert ExportJobStatus.COMPLETED.value in statuses
+    assert ExportJobStatus.PENDING.value in statuses
+
+    filtered = client.get(
+        "/api/v1/candidate-needs/export-tasks",
+        params={"status": ExportJobStatus.COMPLETED.value},
+    )
+    assert filtered.status_code == 200
+    filtered_body = filtered.json()
+    assert filtered_body["total"] == 1
+    assert filtered_body["items"][0]["status"] == ExportJobStatus.COMPLETED.value
+
+
 def test_candidate_need_status_logs_api(client: TestClient) -> None:
     _, need_ids = _seed_candidate_needs()
 

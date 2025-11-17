@@ -22,6 +22,81 @@
     "refresh": "刷新",
     "search": "搜索",
     "create": "新建",
-    "export": "导出"
+    "export": "导出",
+    "cancel": "取消",
+    "confirm": "确定"
+  },
+  "feedback": {
+    "genericError": "请求失败，请稍后再试"
+  },
+  "candidates": {
+    "title": "候选需求工作台",
+    "subtitle": "统一管理评审状态、同步进度与导出任务",
+    "filters": {
+      "search": "关键字",
+      "status": "状态",
+      "synced": "同步状态",
+      "searchPlaceholder": "输入摘要、问题或备注以筛选",
+      "statusOptions": {
+        "all": "全部"
+      },
+      "syncedOptions": {
+        "all": "全部",
+        "synced": "已同步",
+        "unsynced": "未同步"
+      }
+    },
+    "statusLabels": {
+      "pending_review": "待评审",
+      "approved": "已通过",
+      "rejected": "已拒绝",
+      "in_discovery": "探索中",
+      "completed": "已完成"
+    },
+    "syncState": {
+      "synced": "已同步",
+      "pending": "待同步",
+      "failed": "同步失败"
+    },
+    "table": {
+      "summary": "摘要",
+      "status": "状态",
+      "ruleScore": "规则得分",
+      "confidence": "信心",
+      "synced": "同步",
+      "updated": "更新时间",
+      "empty": "暂无候选需求"
+    },
+    "export": {
+      "sectionTitle": "导出任务",
+      "dialogTitle": "创建导出任务",
+      "empty": "暂无导出任务",
+      "fields": {
+        "format": "导出格式",
+        "status": "状态过滤",
+        "synced": "同步过滤",
+        "limit": "最大数量"
+      },
+      "tips": {
+        "limit": "默认一次导出 500 条，可按需调整"
+      },
+      "jobToast": "已创建导出任务 #{id}"
+    },
+    "jobs": {
+      "columns": {
+        "id": "任务 ID",
+        "format": "格式",
+        "status": "状态",
+        "records": "记录数",
+        "finishedAt": "完成时间",
+        "download": "下载链接"
+      },
+      "status": {
+        "pending": "排队中",
+        "running": "执行中",
+        "failed": "失败",
+        "completed": "已完成"
+      }
+    }
   }
 }

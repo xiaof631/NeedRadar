@@ -22,6 +22,81 @@
     "refresh": "Refresh",
     "search": "Search",
     "create": "Create",
-    "export": "Export"
+    "export": "Export",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "feedback": {
+    "genericError": "Something went wrong, please try again"
+  },
+  "candidates": {
+    "title": "Candidate Needs",
+    "subtitle": "Track review status, sync progress and export jobs",
+    "filters": {
+      "search": "Keyword",
+      "status": "Status",
+      "synced": "Sync state",
+      "searchPlaceholder": "Type to filter by summary, problem or note",
+      "statusOptions": {
+        "all": "All"
+      },
+      "syncedOptions": {
+        "all": "All",
+        "synced": "Synced",
+        "unsynced": "Not synced"
+      }
+    },
+    "statusLabels": {
+      "pending_review": "Pending review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "in_discovery": "In discovery",
+      "completed": "Completed"
+    },
+    "syncState": {
+      "synced": "Synced",
+      "pending": "Waiting",
+      "failed": "Sync failed"
+    },
+    "table": {
+      "summary": "Summary",
+      "status": "Status",
+      "ruleScore": "Rule score",
+      "confidence": "Confidence",
+      "synced": "Sync",
+      "updated": "Updated at",
+      "empty": "No candidate needs"
+    },
+    "export": {
+      "sectionTitle": "Export jobs",
+      "dialogTitle": "Create export job",
+      "empty": "No export jobs",
+      "fields": {
+        "format": "Format",
+        "status": "Status filter",
+        "synced": "Sync filter",
+        "limit": "Max items"
+      },
+      "tips": {
+        "limit": "Default export size is 500 items"
+      },
+      "jobToast": "Export job #{id} created"
+    },
+    "jobs": {
+      "columns": {
+        "id": "Job ID",
+        "format": "Format",
+        "status": "Status",
+        "records": "Records",
+        "finishedAt": "Finished at",
+        "download": "Download"
+      },
+      "status": {
+        "pending": "Pending",
+        "running": "Running",
+        "failed": "Failed",
+        "completed": "Completed"
+      }
+    }
   }
 }

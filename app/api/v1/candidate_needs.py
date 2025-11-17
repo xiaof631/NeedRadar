@@ -9,10 +9,11 @@ from io import StringIO
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.models import CandidateNeedStatus
+from app.models import CandidateNeedStatus, ExportJobStatus
 from app.schemas import (
     CandidateNeedExportJobCreate,
     CandidateNeedExportJobRead,
+    CandidateNeedExportJobList,
     CandidateNeedCreate,
     CandidateNeedList,
     CandidateNeedRead,
@@ -256,6 +257,25 @@ async def export_candidate_needs(
             }
         )
     return {"format": "csv", "content": buffer.getvalue()}
+
+
+@router.get(
+    "/export-tasks",
+    response_model=CandidateNeedExportJobList,
+    summary="导出任务列表",
+)
+async def list_candidate_need_export_tasks(
+    status: ExportJobStatus | None = Query(
+        default=None,
+        description="按任务状态过滤",
+    ),
+    limit: int = Query(default=20, ge=1, le=200, description="最大返回数量"),
+) -> CandidateNeedExportJobList:
+    jobs = export_jobs.list_candidate_export_jobs(status=status, limit=limit)
+    return CandidateNeedExportJobList(
+        total=len(jobs),
+        items=[CandidateNeedExportJobRead.model_validate(item) for item in jobs],
+    )
 
 
 @router.post(

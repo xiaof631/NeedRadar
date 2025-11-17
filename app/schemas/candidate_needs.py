@@ -152,3 +152,10 @@ class CandidateNeedExportJobRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CandidateNeedExportJobList(BaseModel):
+    """导出任务列表。"""
+
+    total: int
+    items: list[CandidateNeedExportJobRead]
+
+
