@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from app.core import metrics
 from app.models import CandidateNeed
 from app.schemas import CandidateNeedRead
 from app.services import candidate_needs
@@ -34,6 +35,7 @@ async def deliver_need_to_webhook(
         response = await client.post(webhook_url, json=payload)
     except httpx.HTTPError as exc:
         candidate_needs.mark_need_sync_failed(need.id, str(exc))
+        metrics.record_downstream_delivery("network-error")
         return SyncDeliveryResult(
             need_id=need.id,
             success=False,
@@ -43,6 +45,7 @@ async def deliver_need_to_webhook(
 
     if 200 <= response.status_code < 300:
         candidate_needs.mark_need_synced(need.id)
+        metrics.record_downstream_delivery("success")
         return SyncDeliveryResult(
             need_id=need.id,
             success=True,
@@ -52,6 +55,7 @@ async def deliver_need_to_webhook(
 
     message = f"HTTP {response.status_code}"
     candidate_needs.mark_need_sync_failed(need.id, message)
+    metrics.record_downstream_delivery("http-error")
     return SyncDeliveryResult(
         need_id=need.id,
         success=False,

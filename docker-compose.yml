@@ -1,22 +1,78 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: needradar
+      POSTGRES_PASSWORD: needradar
+      POSTGRES_DB: needradar
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+
   api:
     build: .
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - postgres
+      - redis
     environment:
-      - NEEDRADAR_DATABASE_URL=sqlite+aiosqlite:///./data/needradar.db
+      - NEEDRADAR_DATABASE_URL=postgresql+asyncpg://needradar:needradar@postgres:5432/needradar
+      - NEEDRADAR_ALEMBIC_DATABASE_URL=postgresql+psycopg://needradar:needradar@postgres:5432/needradar
+      - NEEDRADAR_CELERY_BROKER_URL=redis://redis:6379/0
+      - NEEDRADAR_CELERY_RESULT_BACKEND=redis://redis:6379/1
     volumes:
       - ./:/app
-      - ./data:/app/data
     ports:
       - "8000:8000"
 
   worker:
     build: .
-    command: python -m cli.main show-config
+    command: celery -A jobs.celery_app worker --loglevel=info
+    depends_on:
+      - postgres
+      - redis
     environment:
-      - NEEDRADAR_DATABASE_URL=sqlite+aiosqlite:///./data/needradar.db
+      - NEEDRADAR_DATABASE_URL=postgresql+asyncpg://needradar:needradar@postgres:5432/needradar
+      - NEEDRADAR_ALEMBIC_DATABASE_URL=postgresql+psycopg://needradar:needradar@postgres:5432/needradar
+      - NEEDRADAR_CELERY_BROKER_URL=redis://redis:6379/0
+      - NEEDRADAR_CELERY_RESULT_BACKEND=redis://redis:6379/1
     volumes:
       - ./:/app
-      - ./data:/app/data
+
+  scheduler:
+    build: .
+    command: celery -A jobs.celery_app beat --loglevel=info
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - NEEDRADAR_DATABASE_URL=postgresql+asyncpg://needradar:needradar@postgres:5432/needradar
+      - NEEDRADAR_ALEMBIC_DATABASE_URL=postgresql+psycopg://needradar:needradar@postgres:5432/needradar
+      - NEEDRADAR_CELERY_BROKER_URL=redis://redis:6379/0
+      - NEEDRADAR_CELERY_RESULT_BACKEND=redis://redis:6379/1
+    volumes:
+      - ./:/app
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    depends_on:
+      - api
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+volumes:
+  postgres-data:
+  redis-data:

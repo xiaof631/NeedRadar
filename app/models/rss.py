@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
 
 
 class SourceStatus(str, Enum):
@@ -64,6 +65,17 @@ class FetchLog:
     status: FetchStatus = FetchStatus.SUCCESS
     http_status: int | None = None
     error_message: str | None = None
+    _on_change: Callable[[FetchLog, str, Any], None] | None = field(
+        default=None, repr=False, compare=False
+    )
+
+    def __setattr__(self, name: str, value: Any) -> None:  # pragma: no cover - 简单代理
+        object.__setattr__(self, name, value)
+        if name == "_on_change":
+            return
+        callback = getattr(self, "_on_change", None)
+        if callback is not None:
+            callback(self, name, value)
 
 
 @dataclass(slots=True)

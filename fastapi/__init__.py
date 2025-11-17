@@ -3,6 +3,7 @@
 from .application import FastAPI
 from .dependencies import Depends, Header, Query
 from .exceptions import HTTPException
+from .responses import Response
 from .routing import APIRouter
 from .status import status
 
@@ -13,5 +14,6 @@ __all__ = [
     "Header",
     "Query",
     "HTTPException",
+    "Response",
     "status",
 ]

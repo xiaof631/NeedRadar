@@ -1,0 +1,27 @@
+{
+  "nav": {
+    "dashboard": "仪表盘",
+    "sources": "RSS 源管理",
+    "entries": "原始内容",
+    "filter": "筛选监控",
+    "candidates": "候选需求",
+    "alerts": "系统告警"
+  },
+  "dashboard": {
+    "welcome": "NeedRadar 监控概览",
+    "metrics": {
+      "sources": "激活源数",
+      "entries": "今日新增条目",
+      "candidates": "候选需求",
+      "alerts": "告警"
+    },
+    "recentAlerts": "最新告警",
+    "empty": "暂无数据，稍后再试"
+  },
+  "actions": {
+    "refresh": "刷新",
+    "search": "搜索",
+    "create": "新建",
+    "export": "导出"
+  }
+}

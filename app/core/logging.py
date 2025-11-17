@@ -5,15 +5,18 @@ from typing import Any
 
 import structlog
 
+_SENSITIVE_KEYS = ("token", "secret", "password", "key", "authorization")
+
 
 def configure_logging(level: int = logging.INFO) -> None:
     """初始化 structlog 与标准库日志。"""
 
     timestamper = structlog.processors.TimeStamper(fmt="iso")
-    shared_processors: list[structlog.types.Processor] = [
+    shared_processors = [
         structlog.stdlib.add_log_level,
         structlog.stdlib.add_logger_name,
         timestamper,
+        _mask_sensitive_values,
     ]
 
     structlog.configure(
@@ -34,3 +37,17 @@ def get_logger(name: str, **initial_values: Any) -> structlog.stdlib.BoundLogger
     """获取绑定初始上下文的 logger。"""
 
     return structlog.get_logger(name).bind(**initial_values)
+
+
+def _mask_sensitive_values(
+    _: Any,
+    __: str,
+    event_dict: dict[str, Any],
+) -> dict[str, Any]:
+    """对日志中的敏感字段进行脱敏。"""
+
+    for key in tuple(event_dict.keys()):
+        lowered = key.lower()
+        if any(marker in lowered for marker in _SENSITIVE_KEYS):
+            event_dict[key] = "***redacted***"
+    return event_dict

@@ -9,12 +9,20 @@ dependencies = [
     "uvicorn[standard]",
     "sqlalchemy>=2.0",
     "alembic",
+    "aiosqlite",
+    "asyncpg",
+    "psycopg[binary]",
     "pydantic-settings",
     "typer[all]",
     "structlog",
     "python-dotenv",
     "httpx",
     "apscheduler",
+    "celery[redis]",
+    "prometheus-client",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
+    "opentelemetry-instrumentation-fastapi",
 ]
 
 [project.optional-dependencies]
@@ -22,7 +30,7 @@ dev = [
     "ruff",
     "pytest",
     "pytest-asyncio",
-    "pytest-cov",
+    "mypy",
 ]
 
 [build-system]
@@ -46,6 +54,41 @@ extend-exclude = [
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_configs = true
+exclude = "(fastapi|pydantic|pydantic_settings|sqlalchemy|structlog|typer)/"
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "fastapi",
+    "fastapi.*",
+    "pydantic",
+    "pydantic.*",
+    "pydantic_settings",
+    "pydantic_settings.*",
+    "sqlalchemy",
+    "sqlalchemy.*",
+    "structlog",
+    "structlog.*",
+    "typer",
+    "typer.*",
+    "apscheduler",
+    "apscheduler.*",
+    "app.api.*",
+    "app.schemas",
+    "app.schemas.*",
+    "app.core.config",
+    "app.core.logging",
+    "jobs.scheduler",
+    "jobs.scheduler.*",
+    "cli",
+    "cli.*",
+]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 addopts = "--strict-markers --disable-warnings"

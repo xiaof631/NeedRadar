@@ -1,0 +1,312 @@
+{
+  "threshold": 75.0,
+  "coverage": 81.78,
+  "files": [
+    {
+      "path": "app/api/deps.py",
+      "executed_lines": 13,
+      "total_lines": 14,
+      "coverage": 92.86
+    },
+    {
+      "path": "app/api/routes.py",
+      "executed_lines": 6,
+      "total_lines": 6,
+      "coverage": 100.0
+    },
+    {
+      "path": "app/api/v1/__init__.py",
+      "executed_lines": 0,
+      "total_lines": 14,
+      "coverage": 0.0
+    },
+    {
+      "path": "app/api/v1/candidate_needs.py",
+      "executed_lines": 65,
+      "total_lines": 77,
+      "coverage": 84.42
+    },
+    {
+      "path": "app/api/v1/dashboard.py",
+      "executed_lines": 13,
+      "total_lines": 15,
+      "coverage": 86.67
+    },
+    {
+      "path": "app/api/v1/fetch_logs.py",
+      "executed_lines": 17,
+      "total_lines": 19,
+      "coverage": 89.47
+    },
+    {
+      "path": "app/api/v1/filter_metrics.py",
+      "executed_lines": 9,
+      "total_lines": 10,
+      "coverage": 90.0
+    },
+    {
+      "path": "app/api/v1/filter_rules.py",
+      "executed_lines": 25,
+      "total_lines": 27,
+      "coverage": 92.59
+    },
+    {
+      "path": "app/api/v1/raw_entries.py",
+      "executed_lines": 57,
+      "total_lines": 62,
+      "coverage": 91.94
+    },
+    {
+      "path": "app/api/v1/rss_sources.py",
+      "executed_lines": 27,
+      "total_lines": 31,
+      "coverage": 87.1
+    },
+    {
+      "path": "app/core/config.py",
+      "executed_lines": 56,
+      "total_lines": 63,
+      "coverage": 88.89
+    },
+    {
+      "path": "app/core/logging.py",
+      "executed_lines": 0,
+      "total_lines": 21,
+      "coverage": 0.0
+    },
+    {
+      "path": "app/core/metrics.py",
+      "executed_lines": 49,
+      "total_lines": 57,
+      "coverage": 85.96
+    },
+    {
+      "path": "app/core/simple_prometheus.py",
+      "executed_lines": 134,
+      "total_lines": 148,
+      "coverage": 90.54
+    },
+    {
+      "path": "app/core/telemetry.py",
+      "executed_lines": 31,
+      "total_lines": 55,
+      "coverage": 56.36
+    },
+    {
+      "path": "app/db/base.py",
+      "executed_lines": 0,
+      "total_lines": 6,
+      "coverage": 0.0
+    },
+    {
+      "path": "app/db/entities.py",
+      "executed_lines": 86,
+      "total_lines": 86,
+      "coverage": 100.0
+    },
+    {
+      "path": "app/db/session.py",
+      "executed_lines": 0,
+      "total_lines": 33,
+      "coverage": 0.0
+    },
+    {
+      "path": "app/db/storage.py",
+      "executed_lines": 377,
+      "total_lines": 398,
+      "coverage": 94.72
+    },
+    {
+      "path": "app/main.py",
+      "executed_lines": 0,
+      "total_lines": 16,
+      "coverage": 0.0
+    },
+    {
+      "path": "app/models/__init__.py",
+      "executed_lines": 0,
+      "total_lines": 5,
+      "coverage": 0.0
+    },
+    {
+      "path": "app/models/candidate_need.py",
+      "executed_lines": 38,
+      "total_lines": 40,
+      "coverage": 95.0
+    },
+    {
+      "path": "app/models/filter_rule.py",
+      "executed_lines": 17,
+      "total_lines": 19,
+      "coverage": 89.47
+    },
+    {
+      "path": "app/models/rss.py",
+      "executed_lines": 69,
+      "total_lines": 72,
+      "coverage": 95.83
+    },
+    {
+      "path": "app/schemas/__init__.py",
+      "executed_lines": 0,
+      "total_lines": 8,
+      "coverage": 0.0
+    },
+    {
+      "path": "app/schemas/candidate_needs.py",
+      "executed_lines": 71,
+      "total_lines": 71,
+      "coverage": 100.0
+    },
+    {
+      "path": "app/schemas/dashboard.py",
+      "executed_lines": 46,
+      "total_lines": 47,
+      "coverage": 97.87
+    },
+    {
+      "path": "app/schemas/filter_metrics.py",
+      "executed_lines": 29,
+      "total_lines": 29,
+      "coverage": 100.0
+    },
+    {
+      "path": "app/schemas/filter_rules.py",
+      "executed_lines": 33,
+      "total_lines": 33,
+      "coverage": 100.0
+    },
+    {
+      "path": "app/schemas/raw_entries.py",
+      "executed_lines": 47,
+      "total_lines": 47,
+      "coverage": 100.0
+    },
+    {
+      "path": "app/schemas/rss.py",
+      "executed_lines": 46,
+      "total_lines": 46,
+      "coverage": 100.0
+    },
+    {
+      "path": "app/services/__init__.py",
+      "executed_lines": 0,
+      "total_lines": 3,
+      "coverage": 0.0
+    },
+    {
+      "path": "app/services/alerts.py",
+      "executed_lines": 72,
+      "total_lines": 78,
+      "coverage": 92.31
+    },
+    {
+      "path": "app/services/candidate_needs.py",
+      "executed_lines": 96,
+      "total_lines": 119,
+      "coverage": 80.67
+    },
+    {
+      "path": "app/services/dashboard.py",
+      "executed_lines": 55,
+      "total_lines": 56,
+      "coverage": 98.21
+    },
+    {
+      "path": "app/services/downstream.py",
+      "executed_lines": 29,
+      "total_lines": 30,
+      "coverage": 96.67
+    },
+    {
+      "path": "app/services/fetch_logs.py",
+      "executed_lines": 10,
+      "total_lines": 13,
+      "coverage": 76.92
+    },
+    {
+      "path": "app/services/filter_engine.py",
+      "executed_lines": 69,
+      "total_lines": 77,
+      "coverage": 89.61
+    },
+    {
+      "path": "app/services/filter_metrics.py",
+      "executed_lines": 54,
+      "total_lines": 57,
+      "coverage": 94.74
+    },
+    {
+      "path": "app/services/filter_rules.py",
+      "executed_lines": 41,
+      "total_lines": 49,
+      "coverage": 83.67
+    },
+    {
+      "path": "app/services/llm_client.py",
+      "executed_lines": 93,
+      "total_lines": 103,
+      "coverage": 90.29
+    },
+    {
+      "path": "app/services/pipeline.py",
+      "executed_lines": 38,
+      "total_lines": 44,
+      "coverage": 86.36
+    },
+    {
+      "path": "app/services/raw_entries.py",
+      "executed_lines": 79,
+      "total_lines": 97,
+      "coverage": 81.44
+    },
+    {
+      "path": "app/services/rss_fetcher.py",
+      "executed_lines": 139,
+      "total_lines": 178,
+      "coverage": 78.09
+    },
+    {
+      "path": "app/services/rss_sources.py",
+      "executed_lines": 46,
+      "total_lines": 53,
+      "coverage": 86.79
+    },
+    {
+      "path": "jobs/__init__.py",
+      "executed_lines": 0,
+      "total_lines": 1,
+      "coverage": 0.0
+    },
+    {
+      "path": "jobs/celery_app.py",
+      "executed_lines": 15,
+      "total_lines": 16,
+      "coverage": 93.75
+    },
+    {
+      "path": "jobs/scheduler.py",
+      "executed_lines": 0,
+      "total_lines": 54,
+      "coverage": 0.0
+    },
+    {
+      "path": "jobs/simple_celery.py",
+      "executed_lines": 28,
+      "total_lines": 33,
+      "coverage": 84.85
+    },
+    {
+      "path": "jobs/task_queue.py",
+      "executed_lines": 59,
+      "total_lines": 102,
+      "coverage": 57.84
+    },
+    {
+      "path": "jobs/tasks.py",
+      "executed_lines": 0,
+      "total_lines": 55,
+      "coverage": 0.0
+    }
+  ]
+}

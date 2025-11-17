@@ -1,0 +1,27 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "sources": "Sources",
+    "entries": "Raw Entries",
+    "filter": "Filter Monitor",
+    "candidates": "Candidate Needs",
+    "alerts": "Alerts"
+  },
+  "dashboard": {
+    "welcome": "NeedRadar Overview",
+    "metrics": {
+      "sources": "Active Sources",
+      "entries": "New Entries",
+      "candidates": "Candidates",
+      "alerts": "Alerts"
+    },
+    "recentAlerts": "Recent Alerts",
+    "empty": "No data available"
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "search": "Search",
+    "create": "Create",
+    "export": "Export"
+  }
+}
