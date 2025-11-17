@@ -5,14 +5,15 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence, Tuple
 
+from app.core import metrics
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.storage import db
-from app.models import CandidateNeedStatus, ExportJob, ExportJobStatus
+from app.models import CandidateNeedStatus, ExportJob, ExportJobStatus, SyncChannel
 from app.schemas import CandidateNeedRead
-from app.services import candidate_needs
+from app.services import candidate_needs, sync_audit
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -90,24 +91,27 @@ def run_candidate_export_job(job_id: int) -> ExportJob:
 
     job = db.update_export_job(job_id, _mark_running)
     try:
-        rendered = _render_candidates(job)
+        rendered, models = _render_candidates(job)
     except Exception as exc:  # pragma: no cover - 兜底
         logger.exception("export-job.render.failed", job_id=job_id)
         job = db.update_export_job(
             job_id,
             lambda model: _mark_failed(model, str(exc)),
         )
+        metrics.record_export_job_result(ExportJobStatus.FAILED.value)
         return job
 
     output_path = _write_export_file(job, rendered)
     job = db.update_export_job(
         job_id,
-        lambda model: _mark_completed(model, output_path, rendered["count"]),
+        lambda model: _mark_completed(model, output_path, len(models)),
     )
+    _log_export_success(job, models)
+    metrics.record_export_job_result(ExportJobStatus.COMPLETED.value)
     return job
 
 
-def _render_candidates(job: ExportJob) -> dict[str, Any]:
+def _render_candidates(job: ExportJob) -> Tuple[dict[str, Any], list[CandidateNeedRead]]:
     filters = job.filters or {}
     statuses = filters.get("statuses")
     parsed_statuses = None
@@ -131,7 +135,7 @@ def _render_candidates(job: ExportJob) -> dict[str, Any]:
                 model.synced_at.isoformat() if model.synced_at else None
             )
             content.append(payload)
-        return {"format": "json", "content": content, "count": len(models)}
+        return {"format": "json", "content": content}, models
     buffer = [
         [
             "id",
@@ -167,7 +171,7 @@ def _render_candidates(job: ExportJob) -> dict[str, Any]:
                 model.updated_at.isoformat(),
             ]
         )
-    return {"format": "csv", "content": buffer, "count": len(models)}
+    return {"format": "csv", "content": buffer}, models
 
 
 def _write_export_file(job: ExportJob, rendered: dict[str, Any]) -> str:
@@ -191,6 +195,26 @@ def _write_export_file(job: ExportJob, rendered: dict[str, Any]) -> str:
             for row in rendered["content"]:
                 writer.writerow(row)
     return str(path)
+
+
+def _log_export_success(job: ExportJob, models: Sequence[CandidateNeedRead]) -> None:
+    """为导出任务记录审计日志。"""
+
+    if not models:
+        return
+    metadata = {
+        "job_id": job.id,
+        "format": job.format,
+        "file_path": job.file_path,
+    }
+    for model in models:
+        sync_audit.log_sync_attempt(
+            model.id,
+            channel=SyncChannel.EXPORT,
+            status="success",
+            attempt=job.attempt_count,
+            metadata=metadata,
+        )
 
 
 def _mark_failed(model: ExportJob, message: str) -> None:

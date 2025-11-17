@@ -10,29 +10,48 @@
       </el-button>
     </header>
     <div class="stats-grid">
-      <StatCard :label="t('dashboard.metrics.sources')" :value="metrics.value.active_sources" />
-      <StatCard :label="t('dashboard.metrics.entries')" :value="metrics.value.entries_today" />
-      <StatCard :label="t('dashboard.metrics.candidates')" :value="metrics.value.candidate_needs" />
-      <StatCard :label="t('dashboard.metrics.alerts')" :value="metrics.value.open_alerts" />
+      <StatCard :label="t('dashboard.metrics.sources')" :value="sourcesCard" />
+      <StatCard :label="t('dashboard.metrics.rawEntries')" :value="dashboardMetrics?.raw_entries.total ?? 0" />
+      <StatCard :label="t('dashboard.metrics.candidates')" :value="dashboardMetrics?.candidate_needs.total ?? 0" />
+      <StatCard :label="t('dashboard.metrics.pendingSync')" :value="dashboardMetrics?.pending_sync_needs ?? 0" />
     </div>
     <el-row :gutter="20" class="panels">
       <el-col :span="12">
         <DataTable :rows="recentAlerts" :title="t('dashboard.recentAlerts')">
           <template #default>
-            <el-table-column prop="title" label="描述" />
-            <el-table-column prop="severity" label="级别" />
-            <el-table-column prop="created_at" label="时间" />
+            <el-table-column prop="code" :label="t('dashboard.alertColumns.code')" width="160" />
+            <el-table-column prop="message" :label="t('dashboard.alertColumns.message')" min-width="220" />
+            <el-table-column :label="t('dashboard.alertColumns.severity')" width="140">
+              <template #default="{ row }">
+                <el-tag :type="mapType(row.severity)">
+                  {{ alertSeverityLabel(row.severity) }}
+                </el-tag>
+              </template>
+            </el-table-column>
           </template>
         </DataTable>
       </el-col>
       <el-col :span="12">
         <el-card shadow="never">
           <template #header>
-            <div class="title">队列健康状态</div>
+            <div class="title">{{ t('dashboard.timelineTitle') }}</div>
+            <p class="subtitle">
+              {{
+                t('dashboard.fetchSummary', {
+                  total: dashboardMetrics?.fetch_logs.total ?? 0,
+                  failures: dashboardMetrics?.fetch_logs.failures ?? 0
+                })
+              }}
+            </p>
           </template>
           <el-timeline>
-            <el-timeline-item v-for="alert in recentAlerts" :key="alert.id" :type="mapType(alert.severity)" :timestamp="alert.created_at">
-              {{ alert.title }}
+            <el-timeline-item
+              v-for="alert in recentAlerts"
+              :key="alert.code"
+              :type="mapType(alert.severity)"
+              :timestamp="alert.details?.created_at ?? ''"
+            >
+              {{ alert.message }}
             </el-timeline-item>
             <el-timeline-item v-if="recentAlerts.length === 0">
               {{ t('dashboard.empty') }}
@@ -54,20 +73,21 @@ import { fetchDashboardMetrics, fetchRecentAlerts, type AlertItem } from '../ser
 
 const { t } = useI18n();
 
-const metrics = useQuery({
+const metricsQuery = useQuery({
   queryKey: ['dashboard-metrics'],
   queryFn: fetchDashboardMetrics,
   retry: false,
   staleTime: 30_000,
   initialData: {
-    active_sources: 0,
-    entries_today: 0,
-    candidate_needs: 0,
-    open_alerts: 0
+    sources: { total: 0, active: 0 },
+    raw_entries: { total: 0, by_status: {} },
+    candidate_needs: { total: 0, by_status: {} },
+    pending_sync_needs: 0,
+    fetch_logs: { total: 0, failures: 0 }
   }
 });
 
-const alerts = useQuery({
+const alertsQuery = useQuery({
   queryKey: ['recent-alerts'],
   queryFn: fetchRecentAlerts,
   retry: false,
@@ -75,11 +95,14 @@ const alerts = useQuery({
   initialData: [] as AlertItem[]
 });
 
-const recentAlerts = computed(() => alerts.data.value ?? []);
-const isFetching = computed(() => metrics.isFetching.value || alerts.isFetching.value);
+const dashboardMetrics = computed(() => metricsQuery.data.value);
+const recentAlerts = computed(() => alertsQuery.data.value ?? []);
+const isFetching = computed(
+  () => metricsQuery.isFetching.value || alertsQuery.isFetching.value
+);
 const refetch = () => {
-  metrics.refetch();
-  alerts.refetch();
+  metricsQuery.refetch();
+  alertsQuery.refetch();
 };
 
 const formattedDate = computed(() => new Intl.DateTimeFormat('zh-CN', { dateStyle: 'full', timeStyle: 'short' }).format(new Date()));
@@ -89,6 +112,18 @@ const mapType = (severity: AlertItem['severity']) => {
   if (severity === 'warning') return 'warning';
   return 'info';
 };
+
+const alertSeverityLabel = (severity: AlertItem['severity']) => {
+  if (severity === 'critical') return t('dashboard.severity.critical');
+  if (severity === 'warning') return t('dashboard.severity.warning');
+  return t('dashboard.severity.info');
+};
+
+const sourcesCard = computed(() => {
+  const sourceData = dashboardMetrics.value?.sources;
+  if (!sourceData) return '0/0';
+  return `${sourceData.active}/${sourceData.total}`;
+});
 </script>
 
 <style scoped>

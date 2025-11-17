@@ -2,43 +2,120 @@
   <section class="page">
     <header class="page-header">
       <div>
-        <h1>RSS 源管理</h1>
-        <p>查看源状态、抓取频率与最近一次运行情况</p>
+        <h1>{{ t('sources.title') }}</h1>
+        <p>{{ t('sources.subtitle') }}</p>
       </div>
       <div class="actions">
         <el-button>{{ t('actions.create') }}</el-button>
-        <el-button type="primary">{{ t('actions.refresh') }}</el-button>
+        <el-button type="primary" @click="handleRefresh" :loading="sourcesQuery.isFetching.value">
+          {{ t('actions.refresh') }}
+        </el-button>
       </div>
     </header>
-    <DataTable title="已配置数据源" :rows="sources">
-      <template #actions>
-        <el-input v-model="keyword" :placeholder="t('actions.search')" clearable />
+    <el-card shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>{{ t('sources.table.title') }}</span>
+          <el-input
+            v-model="search"
+            class="search-input"
+            :placeholder="t('sources.filters.searchPlaceholder')"
+            clearable
+          />
+        </div>
       </template>
-      <el-table-column prop="name" label="名称" />
-      <el-table-column prop="category" label="分类" />
-      <el-table-column prop="frequency" label="频率" />
-      <el-table-column prop="status" label="状态" />
-    </DataTable>
+      <el-table :data="sources" v-loading="sourcesQuery.isFetching.value" :empty-text="t('sources.table.empty')">
+        <el-table-column prop="name" :label="t('sources.table.name')" min-width="200" />
+        <el-table-column prop="category" :label="t('sources.table.category')" min-width="160">
+          <template #default="{ row }">{{ row.category ?? '—' }}</template>
+        </el-table-column>
+        <el-table-column :label="t('sources.table.frequency')" width="160">
+          <template #default="{ row }">{{ formatFrequency(row.frequency) }}</template>
+        </el-table-column>
+        <el-table-column :label="t('sources.table.status')" width="140">
+          <template #default="{ row }">
+            <el-tag :type="statusType(row.status)">{{ sourceStatusLabel(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('sources.table.lastFetched')" min-width="200">
+          <template #default="{ row }">{{ formatDate(row.last_fetched_at) }}</template>
+        </el-table-column>
+      </el-table>
+      <div class="pagination-row">
+        <el-pagination
+          background
+          layout="total, prev, pager, next"
+          :total="total"
+          :page-size="pageSize"
+          :current-page="page"
+          @current-change="handlePageChange"
+        />
+      </div>
+    </el-card>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed, ref } from 'vue';
+import { useQuery } from '@tanstack/vue-query';
 import { useI18n } from 'vue-i18n';
-import DataTable from '../components/common/DataTable.vue';
+import { fetchRssSources, type RssSourceQueryParams, type SourceStatus } from '../services/api';
 
 const { t } = useI18n();
-const keyword = ref('');
+const pageSize = 10;
+const page = ref(1);
+const search = ref('');
 
-const mockSources = [
-  { name: 'Product Hunt', category: '产品', frequency: '10m', status: 'active' },
-  { name: '少数派', category: '社区', frequency: '30m', status: 'active' },
-  { name: '脉脉热帖', category: '社区', frequency: '1h', status: 'paused' }
-];
+const queryParams = computed<RssSourceQueryParams>(() => ({
+  skip: (page.value - 1) * pageSize,
+  limit: pageSize,
+  search: search.value.trim() || undefined
+}));
 
-const sources = computed(() =>
-  mockSources.filter((item) => item.name.toLowerCase().includes(keyword.value.toLowerCase()))
-);
+const sourcesQuery = useQuery({
+  queryKey: computed(() => ['rss-sources', queryParams.value]),
+  queryFn: () => fetchRssSources(queryParams.value),
+  keepPreviousData: true,
+  staleTime: 30_000
+});
+
+const sources = computed(() => sourcesQuery.data.value?.items ?? []);
+const total = computed(() => sourcesQuery.data.value?.total ?? 0);
+
+const handlePageChange = (value: number) => {
+  page.value = value;
+};
+
+const handleRefresh = () => {
+  sourcesQuery.refetch();
+};
+
+const formatDate = (value: string | null) => {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }).format(new Date(value));
+};
+
+const formatFrequency = (seconds: number) => {
+  if (seconds < 3600) {
+    return `${Math.round(seconds / 60)} min`;
+  }
+  return `${Math.round(seconds / 3600)} h`;
+};
+
+const statusType = (status: SourceStatus) => {
+  if (status === 'active') return 'success';
+  if (status === 'paused') return 'warning';
+  return 'info';
+};
+
+const sourceStatusLabel = (status: SourceStatus) => {
+  if (status === 'active') return t('sources.status.active');
+  if (status === 'paused') return t('sources.status.paused');
+  return t('sources.status.disabled');
+};
 </script>
 
 <style scoped>
@@ -56,6 +133,22 @@ const sources = computed(() =>
 
 .actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.search-input {
+  width: 240px;
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
 }
 </style>

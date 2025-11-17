@@ -62,6 +62,12 @@ _downstream_total = Counter(
     ("channel", "status"),
     registry=REGISTRY,
 )
+_export_jobs_total = Counter(
+    "needradar_export_jobs_total",
+    "导出任务执行结果数量",
+    ("status",),
+    registry=REGISTRY,
+)
 _task_queue_enqueued = Counter(
     "needradar_task_queue_enqueued_total",
     "入队任务数量（按类型拆分）",
@@ -99,6 +105,12 @@ def record_downstream_delivery(channel: str, status: str) -> None:
     """记录下游同步结果。"""
 
     _downstream_total.labels(channel=channel, status=status).inc()
+
+
+def record_export_job_result(status: str) -> None:
+    """记录导出任务执行状态。"""
+
+    _export_jobs_total.labels(status=status).inc()
 
 
 def record_task_enqueue(kind: str, *, count: int) -> None:
@@ -157,6 +169,7 @@ __all__ = [
     "record_rss_fetch",
     "record_promotion_result",
     "record_downstream_delivery",
+    "record_export_job_result",
     "record_task_enqueue",
     "REGISTRY",
 ]

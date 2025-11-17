@@ -10,12 +10,24 @@
   "dashboard": {
     "welcome": "NeedRadar Overview",
     "metrics": {
-      "sources": "Active Sources",
-      "entries": "New Entries",
-      "candidates": "Candidates",
-      "alerts": "Alerts"
+      "sources": "Active/Total Sources",
+      "rawEntries": "Raw entries",
+      "candidates": "Candidate needs",
+      "pendingSync": "Pending sync"
     },
-    "recentAlerts": "Recent Alerts",
+    "recentAlerts": "Recent alerts",
+    "timelineTitle": "System activity",
+    "fetchSummary": "Fetch logs: {total} total / {failures} failures",
+    "alertColumns": {
+      "code": "Code",
+      "message": "Message",
+      "severity": "Severity"
+    },
+    "severity": {
+      "info": "Info",
+      "warning": "Warning",
+      "critical": "Critical"
+    },
     "empty": "No data available"
   },
   "actions": {
@@ -25,6 +37,101 @@
     "export": "Export",
     "cancel": "Cancel",
     "confirm": "Confirm"
+  },
+  "sources": {
+    "title": "RSS sources",
+    "subtitle": "Inspect fetch cadence and health",
+    "filters": {
+      "searchPlaceholder": "Search by name or URL"
+    },
+    "table": {
+      "title": "Configured sources",
+      "name": "Name",
+      "category": "Category",
+      "frequency": "Frequency",
+      "status": "Status",
+      "lastFetched": "Last fetched",
+      "empty": "No sources"
+    },
+    "status": {
+      "active": "Active",
+      "paused": "Paused",
+      "disabled": "Disabled"
+    }
+  },
+  "entries": {
+    "title": "Raw entries",
+    "subtitle": "Review crawl results and filter outcomes",
+    "filters": {
+      "status": "Status",
+      "searchPlaceholder": "Search by title or summary",
+      "statusOptions": {
+        "all": "All"
+      }
+    },
+    "status": {
+      "pending": "Pending",
+      "filtered": "Filtered",
+      "promoted": "Promoted",
+      "ignored": "Ignored"
+    },
+    "table": {
+      "title": "Title",
+      "source": "Source ID",
+      "status": "Status",
+      "published": "Published at",
+      "ingested": "Ingested at",
+      "empty": "No entries"
+    }
+  },
+  "filterMonitor": {
+    "title": "Filter monitor",
+    "subtitle": "Track rules, LLM performance and per-source conversion",
+    "metrics": {
+      "ruleHits": "Rule hit rate",
+      "promotionRate": "Promotion rate",
+      "averageScore": "Average rule score",
+      "processed": "Processed entries"
+    },
+    "sources": {
+      "title": "Per-source breakdown",
+      "empty": "No statistics",
+      "columns": {
+        "source": "Source",
+        "total": "Total",
+        "filtered": "Filtered",
+        "promoted": "Promoted",
+        "promotionRate": "Promotion rate"
+      }
+    }
+  },
+  "alertsPage": {
+    "title": "System alerts & operations",
+    "subtitle": "Latest fetch failures and downstream sync attempts",
+    "fetchLogs": {
+      "title": "Fetch logs",
+      "empty": "No fetch logs",
+      "columns": {
+        "source": "Source ID",
+        "status": "Status",
+        "http": "HTTP status",
+        "message": "Message",
+        "time": "Fetched at"
+      },
+      "status": {
+        "success": "Success",
+        "failure": "Failure"
+      }
+    },
+    "syncLogs": {
+      "title": "Sync audit",
+      "empty": "No sync attempts",
+      "channels": {
+        "webhook": "Webhook",
+        "mq": "Message queue",
+        "export": "Export"
+      }
+    }
   },
   "feedback": {
     "genericError": "Something went wrong, please try again"

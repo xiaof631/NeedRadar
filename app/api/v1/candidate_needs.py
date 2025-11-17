@@ -9,7 +9,7 @@ from io import StringIO
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.models import CandidateNeedStatus, ExportJobStatus
+from app.models import CandidateNeedStatus, ExportJobStatus, SyncChannel
 from app.schemas import (
     CandidateNeedExportJobCreate,
     CandidateNeedExportJobRead,
@@ -20,8 +20,10 @@ from app.schemas import (
     CandidateNeedStatusLogRead,
     CandidateNeedStatusEnum,
     CandidateNeedStatusUpdate,
+    CandidateNeedSyncLogList,
     CandidateNeedSyncLogRead,
     CandidateNeedUpdate,
+    SyncChannelEnum,
 )
 import app.services.export_jobs as export_jobs
 from app.services import candidate_needs, sync_audit
@@ -62,6 +64,27 @@ async def list_candidate_needs(
     return CandidateNeedList(
         total=total,
         items=[CandidateNeedRead.model_validate(item) for item in items],
+    )
+
+
+@router.get(
+    "/sync-logs",
+    response_model=CandidateNeedSyncLogList,
+    summary="最近候选需求同步日志",
+)
+async def list_recent_sync_logs(
+    need_id: int | None = Query(default=None, description="按候选需求过滤"),
+    channel: SyncChannelEnum | None = Query(default=None, description="按渠道过滤"),
+    limit: int = Query(default=20, ge=1, le=200, description="返回的日志数量"),
+) -> CandidateNeedSyncLogList:
+    logs = sync_audit.list_logs(
+        need_id=need_id,
+        channel=_convert_sync_channel(channel),
+        limit=limit,
+    )
+    return CandidateNeedSyncLogList(
+        total=len(logs),
+        items=[CandidateNeedSyncLogRead.model_validate(item) for item in logs],
     )
 
 
@@ -330,3 +353,13 @@ def _convert_statuses(
     if values is None:
         return None
     return [_convert_status(value) for value in values]
+
+
+def _convert_sync_channel(
+    value: SyncChannelEnum | SyncChannel | None,
+) -> SyncChannel | None:
+    if value is None:
+        return None
+    if isinstance(value, SyncChannel):
+        return value
+    return SyncChannel(value.value)
