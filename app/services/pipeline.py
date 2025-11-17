@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.core import metrics
 from app.models import CandidateNeed, RawEntry, RawEntryStatus
 from app.services import candidate_needs, filter_engine, raw_entries
 from app.services.llm_client import LLMClient, StructuredNeed, get_default_llm_client
@@ -73,6 +74,7 @@ def promote_entry(
     )
     raw_entries.update_entry_status(entry.id, RawEntryStatus.PROMOTED)
     refreshed = raw_entries.get_entry(entry.id)
+    metrics.record_promotion_result("promoted")
     return PromotionResult(
         entry=refreshed,
         candidate_need=need,

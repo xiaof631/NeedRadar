@@ -78,9 +78,72 @@ class Settings(BaseSettings):
         le=200,
     )
 
+    celery_broker_url: str = Field(
+        default="redis://localhost:6379/0",
+        description="Celery 使用的消息队列（Redis/RabbitMQ）连接字符串",
+    )
+    celery_result_backend: str | None = Field(
+        default="redis://localhost:6379/1",
+        description="Celery 任务结果存储地址，可为空",
+    )
+    celery_task_default_queue: str = Field(
+        default="needradar",
+        description="Celery 默认任务队列名称",
+    )
+    celery_task_always_eager: bool = Field(
+        default=False,
+        description="测试环境下是否同步执行任务",
+    )
+    celery_worker_max_tasks_per_child: int | None = Field(
+        default=200,
+        description="每个 worker 进程处理的最大任务数，避免内存泄漏",
+    )
+    celery_task_soft_time_limit: int = Field(
+        default=60,
+        description="任务软超时时间（秒）",
+        ge=1,
+    )
+    celery_task_time_limit: int = Field(
+        default=90,
+        description="任务硬超时时间（秒）",
+        ge=1,
+    )
+    celery_downstream_request_timeout: float = Field(
+        default=10.0,
+        description="推送下游 Webhook 时 HTTP 请求的超时时间（秒）",
+        gt=0,
+    )
+
     api_tokens: tuple[str, ...] = Field(
         default=(),
         description="可访问 API 的 Token 列表，默认关闭认证",
+    )
+
+    telemetry_enabled: bool = Field(
+        default=False,
+        description="是否启用 OpenTelemetry 链路追踪",
+    )
+    telemetry_service_name: str = Field(
+        default="needradar-api",
+        description="OpenTelemetry 服务名称",
+    )
+    telemetry_otlp_endpoint: str | None = Field(
+        default=None,
+        description="OTLP 导出目标，未配置时默认输出至控制台",
+    )
+    telemetry_otlp_insecure: bool = Field(
+        default=True,
+        description="向 OTLP endpoint 传输时是否允许非 TLS 连接",
+    )
+    telemetry_sample_ratio: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="链路采样率，0-1 之间",
+    )
+    telemetry_excluded_urls: tuple[str, ...] = Field(
+        default=("/metrics", "/health"),
+        description="无需采样的 URL 前缀",
     )
 
     model_config = SettingsConfigDict(env_file=('.env', '.env.local'), env_prefix="NEEDRADAR_")

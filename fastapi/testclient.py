@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +16,14 @@ class Response:
 
     def json(self) -> Any:
         return self._json
+
+    @property
+    def text(self) -> str:
+        if isinstance(self._json, bytes):
+            return self._json.decode("utf-8")
+        if isinstance(self._json, str):
+            return self._json
+        return json.dumps(self._json, ensure_ascii=False)
 
 
 class TestClient:

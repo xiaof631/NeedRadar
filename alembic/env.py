@@ -1,15 +1,15 @@
-"""Alembic 环境配置。"""
-
 from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
-from app import models  # noqa: F401
-from app.core.config import get_settings
-from app.db.session import Base
 from sqlalchemy.ext.asyncio import async_engine_from_config
+
+from alembic import context
+from app import models  # noqa: F401  # 保留原领域模型导入
+from app.core.config import get_settings
+from app.db import entities  # noqa: F401  # 确保 ORM 实体注册
+from app.db.base import Base
 
 config = context.config
 if config.config_file_name is not None:

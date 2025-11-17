@@ -11,7 +11,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.models import CandidateNeedStatus
-from jobs import tasks
+from jobs import task_queue
 
 logger = get_logger(__name__)
 
@@ -20,18 +20,14 @@ async def _run_fetch_job() -> None:
     """抓取所有启用的数据源并记录摘要信息。"""
 
     try:
-        results = await tasks.fetch_active_sources()
+        queued = task_queue.enqueue_fetch_sources()
     except Exception:  # pragma: no cover - 调度器异常记录
         logger.exception("scheduler.fetch.failed")
         return
 
-    fetched = sum(result.fetched_entries for result in results)
-    inserted = sum(result.new_entries for result in results)
     logger.info(
         "scheduler.fetch.completed",
-        sources=len(results),
-        fetched_entries=fetched,
-        new_entries=inserted,
+        queued=queued,
     )
 
 
@@ -43,7 +39,7 @@ def _run_promote_job(
     """运行候选需求晋升任务并记录统计。"""
 
     try:
-        results = tasks.promote_pending_entries(
+        queued = task_queue.enqueue_promotions(
             batch_size=batch_size,
             min_score=min_score,
         )
@@ -51,7 +47,7 @@ def _run_promote_job(
         logger.exception("scheduler.promote.failed")
         return
 
-    logger.info("scheduler.promote.completed", promoted=len(results))
+    logger.info("scheduler.promote.completed", queued=queued)
 
 
 async def _run_sync_job(
@@ -63,7 +59,7 @@ async def _run_sync_job(
     """调度候选需求同步任务。"""
 
     try:
-        results = await tasks.sync_new_candidate_needs(
+        queued = task_queue.enqueue_sync_tasks(
             webhook_url=webhook_url,
             statuses=statuses,
             batch_size=batch_size,
@@ -72,16 +68,7 @@ async def _run_sync_job(
         logger.exception("scheduler.sync.failed")
         return
 
-    if not results:
-        return
-
-    delivered = sum(1 for result in results if result.success)
-    failed = len(results) - delivered
-    logger.info(
-        "scheduler.sync.completed",
-        delivered=delivered,
-        failed=failed,
-    )
+    logger.info("scheduler.sync.completed", queued=queued)
 
 
 async def main() -> None:

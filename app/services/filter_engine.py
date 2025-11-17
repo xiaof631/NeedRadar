@@ -39,7 +39,7 @@ def evaluate_entry(
         result = _evaluate_text_with_rule(text, rule)
         if result is None:
             continue
-        if result.score < rule.min_score:
+        if rule.min_score is not None and result.score < rule.min_score:
             continue
         if min_score is not None and result.score < min_score:
             continue

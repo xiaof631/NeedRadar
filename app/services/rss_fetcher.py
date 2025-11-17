@@ -10,6 +10,7 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
+from app.core import metrics
 from app.db.storage import db
 from app.models import FetchStatus, RssSource
 from app.services import raw_entries, rss_sources
@@ -81,13 +82,15 @@ async def _fetch_with_source(
                 status=FetchStatus.FAILURE,
                 error_message=message,
             )
-            return FetchResult(
+            result = FetchResult(
                 source_id=source.id,
                 fetched_entries=0,
                 new_entries=0,
                 status=FetchStatus.FAILURE,
                 error_message=message,
             )
+            metrics.record_rss_fetch(result.status.value, new_entries=result.new_entries)
+            return result
 
         if response.status_code == 304:  # 内容未变更
             rss_sources.mark_source_fetched(
@@ -100,12 +103,14 @@ async def _fetch_with_source(
                 status=FetchStatus.SUCCESS,
                 http_status=response.status_code,
             )
-            return FetchResult(
+            result = FetchResult(
                 source_id=source.id,
                 fetched_entries=0,
                 new_entries=0,
                 status=FetchStatus.SUCCESS,
             )
+            metrics.record_rss_fetch(result.status.value, new_entries=result.new_entries)
+            return result
 
         if response.status_code >= 400:
             message = f"unexpected status code {response.status_code}"
@@ -115,13 +120,15 @@ async def _fetch_with_source(
                 http_status=response.status_code,
                 error_message=message,
             )
-            return FetchResult(
+            result = FetchResult(
                 source_id=source.id,
                 fetched_entries=0,
                 new_entries=0,
                 status=FetchStatus.FAILURE,
                 error_message=message,
             )
+            metrics.record_rss_fetch(result.status.value, new_entries=result.new_entries)
+            return result
 
         try:
             parsed_entries = _parse_feed(response.text)
@@ -133,13 +140,15 @@ async def _fetch_with_source(
                 http_status=response.status_code,
                 error_message=message,
             )
-            return FetchResult(
+            result = FetchResult(
                 source_id=source.id,
                 fetched_entries=0,
                 new_entries=0,
                 status=FetchStatus.FAILURE,
                 error_message=message,
             )
+            metrics.record_rss_fetch(result.status.value, new_entries=result.new_entries)
+            return result
 
         new_entries = 0
         for entry in parsed_entries:
@@ -166,12 +175,14 @@ async def _fetch_with_source(
         rss_sources.mark_source_fetched(source.id, etag=etag, last_modified=last_modified)
         db.add_fetch_log(source.id, status=FetchStatus.SUCCESS, http_status=response.status_code)
 
-        return FetchResult(
+        result = FetchResult(
             source_id=source.id,
             fetched_entries=len(parsed_entries),
             new_entries=new_entries,
             status=FetchStatus.SUCCESS,
         )
+        metrics.record_rss_fetch(result.status.value, new_entries=result.new_entries)
+        return result
     finally:
         if close_client:
             await client.aclose()

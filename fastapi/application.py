@@ -10,6 +10,7 @@ from typing import Any, Annotated, get_args, get_origin
 from pydantic import BaseModel
 
 from .dependencies import Depends, HeaderInfo
+from .responses import Response as PlainResponse
 from .routing import APIRouter, _normalize_path, _join_paths
 
 Handler = Callable[..., Any]
@@ -390,6 +391,8 @@ class FastAPI:
         return value
 
     def _render_response(self, result: Any, response_model: Any | None) -> Any:
+        if isinstance(result, PlainResponse):
+            return result.content
         if isinstance(result, BaseModel):
             return result.model_dump()
         if response_model is not None and hasattr(response_model, "model_validate"):

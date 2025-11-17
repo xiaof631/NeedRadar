@@ -15,7 +15,8 @@ class FilterRule:
     description: str | None = None
     keywords: tuple[str, ...] = ()
     patterns: tuple[str, ...] = ()
-    min_score: float = 0.0
+    min_score: float | None = None
+    weight: float = 1.0
     enabled: bool = True
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))

@@ -6,3 +6,5 @@ pytest_cache/
 data/
 .idea/
 .vscode/
+node_modules/
+web/dist/
