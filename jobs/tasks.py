@@ -100,6 +100,7 @@ async def sync_new_candidate_needs(
                 need,
                 webhook_url=webhook_url,
                 client=client,
+                attempt=1,
             )
             results.append(result)
         return results

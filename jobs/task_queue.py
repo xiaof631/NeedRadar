@@ -13,6 +13,8 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.telemetry import get_tracer
 from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus
+import app.services.export_jobs as export_jobs
+
 from app.services import (
     candidate_needs,
     downstream,
@@ -21,6 +23,7 @@ from app.services import (
     rss_fetcher,
     rss_sources,
 )
+from app.services.export_jobs import ExportJobNotFoundError
 from app.services.pipeline import CandidateAlreadyExistsError, EntryNotQualifiedError
 from jobs.celery_app import celery_app
 
@@ -98,7 +101,9 @@ def promote_entry_task(self, entry_id: int, min_score: float | None = None) -> d
     }
 
 
-async def _sync_candidate_need(need_id: int, webhook_url: str) -> dict[str, Any]:
+async def _sync_candidate_need(
+    need_id: int, webhook_url: str, attempt: int
+) -> dict[str, Any]:
     need = candidate_needs.get_need(need_id)
     async with httpx.AsyncClient(
         timeout=settings.celery_downstream_request_timeout,
@@ -107,11 +112,24 @@ async def _sync_candidate_need(need_id: int, webhook_url: str) -> dict[str, Any]
             need,
             webhook_url=webhook_url,
             client=client,
+            attempt=attempt,
         )
     return {
         "need_id": result.need_id,
         "success": result.success,
+        "channel": result.channel.value,
         "status_code": result.status_code,
+        "error": result.error,
+    }
+
+
+def _publish_candidate_need_to_mq(need_id: int, attempt: int) -> dict[str, Any]:
+    need = candidate_needs.get_need(need_id)
+    result = downstream.publish_need_to_mq(need, attempt=attempt)
+    return {
+        "need_id": result.need_id,
+        "success": result.success,
+        "channel": result.channel.value,
         "error": result.error,
     }
 
@@ -127,9 +145,28 @@ def sync_candidate_need_task(self, need_id: int, webhook_url: str) -> dict[str, 
     """推送单条候选需求至 Webhook。"""
 
     logger.info("tasks.sync.queued", need_id=need_id, task_id=self.request.id)
+    attempt = self.request.retries + 1
     with tracer.start_as_current_span("sync_candidate_need_task"):
-        result = asyncio.run(_sync_candidate_need(need_id, webhook_url))
+        result = asyncio.run(_sync_candidate_need(need_id, webhook_url, attempt))
     logger.info("tasks.sync.completed", need_id=need_id, success=result["success"])
+    return result
+
+
+@celery_app.task(
+    name="jobs.publish_candidate_need_mq",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=60,
+    retry_kwargs={"max_retries": 5},
+)
+def publish_candidate_need_mq_task(self, need_id: int) -> dict[str, Any]:
+    """将候选需求写入 MQ。"""
+
+    logger.info("tasks.sync.mq.queued", need_id=need_id, task_id=self.request.id)
+    attempt = self.request.retries + 1
+    with tracer.start_as_current_span("publish_candidate_need_mq_task"):
+        result = _publish_candidate_need_to_mq(need_id, attempt)
+    logger.info("tasks.sync.mq.completed", need_id=need_id, success=result["success"])
     return result
 
 
@@ -165,16 +202,22 @@ def enqueue_sync_tasks(
     """派发待同步候选需求的 Webhook 推送任务。"""
 
     target_url = webhook_url or settings.downstream_webhook_url
-    if not target_url:
+    if not target_url and not settings.downstream_mq_enabled:
         return 0
     normalized_statuses = _normalize_statuses(statuses)
     limit = batch_size or settings.downstream_sync_batch_size
     needs = candidate_needs.list_unsynced_needs(statuses=normalized_statuses, limit=limit)
-    for need in needs:
-        sync_candidate_need_task.delay(need.id, target_url)
-    count = len(needs)
-    metrics.record_task_enqueue("sync", count=count)
-    return count
+    if not needs:
+        return 0
+    if target_url:
+        for need in needs:
+            sync_candidate_need_task.delay(need.id, target_url)
+        metrics.record_task_enqueue("sync-webhook", count=len(needs))
+    if settings.downstream_mq_enabled:
+        for need in needs:
+            publish_candidate_need_mq_task.delay(need.id)
+        metrics.record_task_enqueue("sync-mq", count=len(needs))
+    return len(needs)
 
 
 def _normalize_statuses(
@@ -216,11 +259,48 @@ def enqueue_sync_task(
     return {"queued": queued}
 
 
+def enqueue_export_job(job_id: int) -> None:
+    """派发导出任务。"""
+
+    metrics.record_task_enqueue("export", count=1)
+    if settings.celery_task_always_eager:
+        export_jobs.run_candidate_export_job(job_id)
+        return
+    export_candidate_needs_task.delay(job_id)
+
+
+@celery_app.task(name="jobs.export_candidate_needs", bind=True)
+def export_candidate_needs_task(self, job_id: int) -> dict[str, Any]:
+    logger.info("tasks.export.queued", job_id=job_id, task_id=self.request.id)
+    with tracer.start_as_current_span("export_candidate_needs_task"):
+        try:
+            job = export_jobs.run_candidate_export_job(job_id)
+        except ExportJobNotFoundError:
+            logger.warning("tasks.export.missing", job_id=job_id)
+            return {"job_id": job_id, "status": "missing"}
+    logger.info(
+        "tasks.export.completed",
+        job_id=job.id,
+        status=job.status.value,
+        records=job.record_count,
+    )
+    return {
+        "job_id": job.id,
+        "status": job.status.value,
+        "file_path": job.file_path,
+        "record_count": job.record_count,
+        "error": job.error_message,
+    }
+
+
 __all__ = [
     "enqueue_fetch_sources",
     "enqueue_promotions",
     "enqueue_sync_tasks",
+    "enqueue_export_job",
     "fetch_rss_source_task",
     "promote_entry_task",
     "sync_candidate_need_task",
+    "publish_candidate_need_mq_task",
+    "export_candidate_needs_task",
 ]

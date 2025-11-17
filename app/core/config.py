@@ -77,6 +77,26 @@ class Settings(BaseSettings):
         ge=1,
         le=200,
     )
+    downstream_mq_enabled: bool = Field(
+        default=False,
+        description="是否启用消息队列推送候选需求",
+    )
+    downstream_mq_broker_url: str | None = Field(
+        default=None,
+        description="消息队列 Broker 连接串（如 amqp:// 或 redis://）",
+    )
+    downstream_mq_exchange: str = Field(
+        default="needradar.candidate_needs",
+        description="候选需求推送使用的 MQ Exchange",
+    )
+    downstream_mq_routing_key: str = Field(
+        default="needradar.candidate_needs",
+        description="候选需求推送使用的 Routing Key",
+    )
+    export_output_dir: str = Field(
+        default="./data/exports",
+        description="导出结果写入的目录",
+    )
 
     celery_broker_url: str = Field(
         default="redis://localhost:6379/0",

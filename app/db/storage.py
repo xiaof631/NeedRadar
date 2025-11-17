@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from app.db.entities import (
     CandidateNeedEntity,
     CandidateNeedStatusLogEntity,
+    DownstreamSyncLogEntity,
+    ExportJobEntity,
     FetchLogEntity,
     FilterRuleEntity,
     RawEntryEntity,
@@ -23,6 +25,9 @@ from app.models import (
     CandidateNeed,
     CandidateNeedStatus,
     CandidateNeedStatusLog,
+    DownstreamSyncLog,
+    ExportJob,
+    ExportJobStatus,
     FetchLog,
     FetchStatus,
     FilterRule,
@@ -30,6 +35,7 @@ from app.models import (
     RawEntryStatus,
     RssSource,
     SourceStatus,
+    SyncChannel,
 )
 
 
@@ -500,6 +506,100 @@ class SQLDatabase:
             session.refresh(entity)
             return _to_candidate_need_log(entity)
 
+    def add_sync_log(
+        self,
+        need_id: int,
+        *,
+        channel: SyncChannel,
+        status: str,
+        attempt: int,
+        message: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> DownstreamSyncLog:
+        with self._session() as session:
+            entity = DownstreamSyncLogEntity(
+                need_id=need_id,
+                channel=channel.value,
+                status=status,
+                attempt=attempt,
+                message=message,
+                details=metadata or {},
+            )
+            session.add(entity)
+            session.flush()
+            session.refresh(entity)
+            return _to_sync_log(entity)
+
+    def list_sync_logs(
+        self,
+        *,
+        need_id: int | None = None,
+        channel: SyncChannel | None = None,
+        limit: int = 50,
+    ) -> list[DownstreamSyncLog]:
+        with self._session() as session:
+            stmt = select(DownstreamSyncLogEntity).order_by(
+                DownstreamSyncLogEntity.delivered_at.desc()
+            )
+            if need_id is not None:
+                stmt = stmt.where(DownstreamSyncLogEntity.need_id == need_id)
+            if channel is not None:
+                stmt = stmt.where(DownstreamSyncLogEntity.channel == channel.value)
+            if limit:
+                stmt = stmt.limit(limit)
+            return [_to_sync_log(row) for row in session.execute(stmt).scalars().all()]
+
+    # 导出任务
+    def create_export_job(self, data: dict) -> ExportJob:
+        payload = {**data}
+        status = payload.get("status", ExportJobStatus.PENDING)
+        if isinstance(status, ExportJobStatus):
+            payload["status"] = status.value
+        payload["filters"] = dict(payload.get("filters", {}) or {})
+        with self._session() as session:
+            entity = ExportJobEntity(**payload)
+            session.add(entity)
+            session.flush()
+            session.refresh(entity)
+            return _to_export_job(entity)
+
+    def update_export_job(
+        self, job_id: int, updater: Callable[[ExportJob], None]
+    ) -> ExportJob:
+        with self._session() as session:
+            entity = session.get(ExportJobEntity, job_id)
+            if entity is None:
+                raise KeyError(job_id)
+            model = _to_export_job(entity)
+            updater(model)
+            _apply_export_job(entity, model)
+            session.add(entity)
+            session.flush()
+            session.refresh(entity)
+            return _to_export_job(entity)
+
+    def get_export_job(self, job_id: int) -> ExportJob | None:
+        with self._session() as session:
+            entity = session.get(ExportJobEntity, job_id)
+            return _to_export_job(entity) if entity else None
+
+    def list_export_jobs(
+        self,
+        *,
+        job_type: str | None = None,
+        status: ExportJobStatus | None = None,
+        limit: int | None = None,
+    ) -> list[ExportJob]:
+        with self._session() as session:
+            stmt = select(ExportJobEntity).order_by(ExportJobEntity.created_at.desc())
+            if job_type is not None:
+                stmt = stmt.where(ExportJobEntity.job_type == job_type)
+            if status is not None:
+                stmt = stmt.where(ExportJobEntity.status == status.value)
+            if limit is not None:
+                stmt = stmt.limit(limit)
+            return [_to_export_job(row) for row in session.execute(stmt).scalars().all()]
+
     # 筛选规则
     def create_filter_rule(self, data: dict) -> FilterRule:
         payload = {**data}
@@ -708,6 +808,51 @@ def _to_candidate_need_log(entity: CandidateNeedStatusLogEntity) -> CandidateNee
         note=entity.note,
         changed_at=entity.changed_at,
     )
+
+
+def _to_sync_log(entity: DownstreamSyncLogEntity) -> DownstreamSyncLog:
+    return DownstreamSyncLog(
+        id=entity.id,
+        need_id=entity.need_id,
+        channel=SyncChannel(entity.channel),
+        status=entity.status,
+        attempt=entity.attempt,
+        message=entity.message,
+        metadata=dict(entity.details or {}),
+        delivered_at=entity.delivered_at,
+    )
+
+
+def _to_export_job(entity: ExportJobEntity) -> ExportJob:
+    return ExportJob(
+        id=entity.id,
+        job_type=entity.job_type,
+        format=entity.format,
+        status=ExportJobStatus(entity.status),
+        filters=dict(entity.filters or {}),
+        record_count=entity.record_count,
+        file_path=entity.file_path,
+        error_message=entity.error_message,
+        attempt_count=entity.attempt_count,
+        created_at=entity.created_at,
+        updated_at=entity.updated_at,
+        started_at=entity.started_at,
+        finished_at=entity.finished_at,
+    )
+
+
+def _apply_export_job(entity: ExportJobEntity, model: ExportJob) -> None:
+    entity.job_type = model.job_type
+    entity.format = model.format
+    entity.status = model.status.value
+    entity.filters = dict(model.filters)
+    entity.record_count = model.record_count
+    entity.file_path = model.file_path
+    entity.error_message = model.error_message
+    entity.attempt_count = model.attempt_count
+    entity.started_at = model.started_at
+    entity.finished_at = model.finished_at
+    entity.updated_at = datetime.now(UTC)
 
 
 def _to_filter_rule(entity: FilterRuleEntity) -> FilterRule:

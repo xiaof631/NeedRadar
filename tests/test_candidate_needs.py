@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
 from app.main import app
-from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus
-from app.services import candidate_needs, raw_entries, rss_sources
+from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus, SyncChannel
+import app.services.export_jobs as export_jobs
+
+from app.services import candidate_needs, raw_entries, rss_sources, sync_audit
+from app.services.export_jobs import ExportJobStatus
 from fastapi.testclient import TestClient
+from jobs import task_queue
 
 
 @pytest.fixture(autouse=True)
@@ -21,6 +26,13 @@ def _reset_db() -> None:
 def client() -> TestClient:
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture()
+def export_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    monkeypatch.setattr(export_jobs.settings, "export_output_dir", str(tmp_path))
+    monkeypatch.setattr(task_queue.settings, "celery_task_always_eager", True)
+    return tmp_path
 
 
 def _seed_candidate_needs() -> tuple[int, list[int]]:
@@ -198,10 +210,50 @@ def test_filter_candidate_needs_by_synced_status(client: TestClient) -> None:
     assert synced_body["total"] == 1
     assert all(item["synced_at"] is not None for item in synced_body["items"])
 
+
+def test_sync_logs_endpoint(client: TestClient) -> None:
+    _, need_ids = _seed_candidate_needs()
+    sync_audit.log_sync_attempt(
+        need_ids[0],
+        channel=SyncChannel.WEBHOOK,
+        status="success",
+        attempt=1,
+        metadata={"status_code": 200},
+    )
+
+    response = client.get(f"/api/v1/candidate-needs/{need_ids[0]}/sync-logs")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["channel"] == SyncChannel.WEBHOOK.value
+    assert body[0]["metadata"]["status_code"] == 200
+
+
+def test_export_task_lifecycle(client: TestClient, export_dir: Path) -> None:
+    _seed_candidate_needs()
+
+    create = client.post(
+        "/api/v1/candidate-needs/export-tasks",
+        json={"format": "json", "limit": 2},
+    )
+    assert create.status_code == 202
+    job_body = create.json()
+    job_id = job_body["id"]
+    assert job_body["status"] == ExportJobStatus.PENDING.value
+
+    completed = export_jobs.run_candidate_export_job(job_id)
+    assert completed.status == ExportJobStatus.COMPLETED
+
+    status_resp = client.get(f"/api/v1/candidate-needs/export-tasks/{job_id}")
+    assert status_resp.status_code == 200
+    status_body = status_resp.json()
+    assert status_body["status"] == ExportJobStatus.COMPLETED.value
+    assert Path(status_body["file_path"]).exists()
+
     unsynced_response = client.get("/api/v1/candidate-needs", params={"synced": False})
     assert unsynced_response.status_code == 200
     unsynced_body = unsynced_response.json()
-    assert unsynced_body["total"] == 1
+    assert unsynced_body["total"] == 2
     assert all(item["synced_at"] is None for item in unsynced_body["items"])
 
 
