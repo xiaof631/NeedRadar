@@ -10,18 +10,200 @@
   "dashboard": {
     "welcome": "NeedRadar 监控概览",
     "metrics": {
-      "sources": "激活源数",
-      "entries": "今日新增条目",
+      "sources": "活跃/总数据源",
+      "rawEntries": "原始条目",
       "candidates": "候选需求",
-      "alerts": "告警"
+      "pendingSync": "待同步"
     },
     "recentAlerts": "最新告警",
+    "timelineTitle": "系统活动",
+    "fetchSummary": "抓取日志：共 {total} 条 / {failures} 条失败",
+    "alertColumns": {
+      "code": "编号",
+      "message": "描述",
+      "severity": "级别"
+    },
+    "severity": {
+      "info": "提示",
+      "warning": "警告",
+      "critical": "严重"
+    },
     "empty": "暂无数据，稍后再试"
   },
   "actions": {
     "refresh": "刷新",
     "search": "搜索",
     "create": "新建",
-    "export": "导出"
+    "export": "导出",
+    "cancel": "取消",
+    "confirm": "确定"
+  },
+  "feedback": {
+    "genericError": "请求失败，请稍后再试"
+  },
+  "sources": {
+    "title": "RSS 源管理",
+    "subtitle": "查看抓取频率与健康状况",
+    "filters": {
+      "searchPlaceholder": "按名称或 URL 搜索"
+    },
+    "table": {
+      "title": "已配置数据源",
+      "name": "名称",
+      "category": "分类",
+      "frequency": "频率",
+      "status": "状态",
+      "lastFetched": "最近抓取",
+      "empty": "暂无数据源"
+    },
+    "status": {
+      "active": "运行中",
+      "paused": "已暂停",
+      "disabled": "已禁用"
+    }
+  },
+  "entries": {
+    "title": "原始内容列表",
+    "subtitle": "核对抓取结果并观察筛选状态",
+    "filters": {
+      "status": "状态",
+      "searchPlaceholder": "输入标题或摘要关键词",
+      "statusOptions": {
+        "all": "全部"
+      }
+    },
+    "status": {
+      "pending": "待处理",
+      "filtered": "已过滤",
+      "promoted": "已晋升",
+      "ignored": "已忽略"
+    },
+    "table": {
+      "title": "标题",
+      "source": "数据源 ID",
+      "status": "状态",
+      "published": "发布时间",
+      "ingested": "入库时间",
+      "empty": "暂无条目"
+    }
+  },
+  "filterMonitor": {
+    "title": "筛选流程监控",
+    "subtitle": "跟踪规则命中率、LLM 表现与各源转化",
+    "metrics": {
+      "ruleHits": "规则命中率",
+      "promotionRate": "转化率",
+      "averageScore": "平均规则得分",
+      "processed": "已处理条目"
+    },
+    "sources": {
+      "title": "按数据源拆解",
+      "empty": "暂无统计数据",
+      "columns": {
+        "source": "数据源",
+        "total": "总量",
+        "filtered": "已过滤",
+        "promoted": "已晋升",
+        "promotionRate": "转化率"
+      }
+    }
+  },
+  "alertsPage": {
+    "title": "系统告警与操作日志",
+    "subtitle": "聚合抓取失败与下游同步记录",
+    "fetchLogs": {
+      "title": "抓取日志",
+      "empty": "暂无抓取记录",
+      "columns": {
+        "source": "数据源",
+        "status": "状态",
+        "http": "HTTP 状态",
+        "message": "错误信息",
+        "time": "时间"
+      },
+      "status": {
+        "success": "成功",
+        "failure": "失败"
+      }
+    },
+    "syncLogs": {
+      "title": "同步审计",
+      "empty": "暂无同步记录",
+      "channels": {
+        "webhook": "Webhook",
+        "mq": "消息队列",
+        "export": "导出"
+      }
+    }
+  },
+  "candidates": {
+    "title": "候选需求工作台",
+    "subtitle": "统一管理评审状态、同步进度与导出任务",
+    "filters": {
+      "search": "关键字",
+      "status": "状态",
+      "synced": "同步状态",
+      "searchPlaceholder": "输入摘要、问题或备注以筛选",
+      "statusOptions": {
+        "all": "全部"
+      },
+      "syncedOptions": {
+        "all": "全部",
+        "synced": "已同步",
+        "unsynced": "未同步"
+      }
+    },
+    "statusLabels": {
+      "pending_review": "待评审",
+      "approved": "已通过",
+      "rejected": "已拒绝",
+      "in_discovery": "探索中",
+      "completed": "已完成"
+    },
+    "syncState": {
+      "synced": "已同步",
+      "pending": "待同步",
+      "failed": "同步失败"
+    },
+    "table": {
+      "summary": "摘要",
+      "status": "状态",
+      "ruleScore": "规则得分",
+      "confidence": "信心",
+      "synced": "同步",
+      "updated": "更新时间",
+      "empty": "暂无候选需求"
+    },
+    "export": {
+      "sectionTitle": "导出任务",
+      "dialogTitle": "创建导出任务",
+      "empty": "暂无导出任务",
+      "fields": {
+        "format": "导出格式",
+        "status": "状态过滤",
+        "synced": "同步过滤",
+        "limit": "最大数量"
+      },
+      "tips": {
+        "limit": "默认一次导出 500 条，可按需调整"
+      },
+      "jobToast": "已创建导出任务 #{id}"
+    },
+    "jobs": {
+      "columns": {
+        "id": "任务 ID",
+        "format": "格式",
+        "status": "状态",
+        "records": "记录数",
+        "finishedAt": "完成时间",
+        "download": "下载链接"
+      },
+      "status": {
+        "pending": "排队中",
+        "running": "执行中",
+        "failed": "失败",
+        "completed": "已完成"
+      }
+    }
   }
 }

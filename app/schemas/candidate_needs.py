@@ -121,6 +121,13 @@ class CandidateNeedSyncLogRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CandidateNeedSyncLogList(BaseModel):
+    """同步日志列表响应。"""
+
+    total: int
+    items: list[CandidateNeedSyncLogRead]
+
+
 class CandidateNeedExportJobCreate(BaseModel):
     """导出任务创建参数。"""
 
@@ -150,5 +157,12 @@ class CandidateNeedExportJobRead(BaseModel):
     finished_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CandidateNeedExportJobList(BaseModel):
+    """导出任务列表。"""
+
+    total: int
+    items: list[CandidateNeedExportJobRead]
 
 

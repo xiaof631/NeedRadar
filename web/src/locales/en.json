@@ -10,18 +10,200 @@
   "dashboard": {
     "welcome": "NeedRadar Overview",
     "metrics": {
-      "sources": "Active Sources",
-      "entries": "New Entries",
-      "candidates": "Candidates",
-      "alerts": "Alerts"
+      "sources": "Active/Total Sources",
+      "rawEntries": "Raw entries",
+      "candidates": "Candidate needs",
+      "pendingSync": "Pending sync"
     },
-    "recentAlerts": "Recent Alerts",
+    "recentAlerts": "Recent alerts",
+    "timelineTitle": "System activity",
+    "fetchSummary": "Fetch logs: {total} total / {failures} failures",
+    "alertColumns": {
+      "code": "Code",
+      "message": "Message",
+      "severity": "Severity"
+    },
+    "severity": {
+      "info": "Info",
+      "warning": "Warning",
+      "critical": "Critical"
+    },
     "empty": "No data available"
   },
   "actions": {
     "refresh": "Refresh",
     "search": "Search",
     "create": "Create",
-    "export": "Export"
+    "export": "Export",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "sources": {
+    "title": "RSS sources",
+    "subtitle": "Inspect fetch cadence and health",
+    "filters": {
+      "searchPlaceholder": "Search by name or URL"
+    },
+    "table": {
+      "title": "Configured sources",
+      "name": "Name",
+      "category": "Category",
+      "frequency": "Frequency",
+      "status": "Status",
+      "lastFetched": "Last fetched",
+      "empty": "No sources"
+    },
+    "status": {
+      "active": "Active",
+      "paused": "Paused",
+      "disabled": "Disabled"
+    }
+  },
+  "entries": {
+    "title": "Raw entries",
+    "subtitle": "Review crawl results and filter outcomes",
+    "filters": {
+      "status": "Status",
+      "searchPlaceholder": "Search by title or summary",
+      "statusOptions": {
+        "all": "All"
+      }
+    },
+    "status": {
+      "pending": "Pending",
+      "filtered": "Filtered",
+      "promoted": "Promoted",
+      "ignored": "Ignored"
+    },
+    "table": {
+      "title": "Title",
+      "source": "Source ID",
+      "status": "Status",
+      "published": "Published at",
+      "ingested": "Ingested at",
+      "empty": "No entries"
+    }
+  },
+  "filterMonitor": {
+    "title": "Filter monitor",
+    "subtitle": "Track rules, LLM performance and per-source conversion",
+    "metrics": {
+      "ruleHits": "Rule hit rate",
+      "promotionRate": "Promotion rate",
+      "averageScore": "Average rule score",
+      "processed": "Processed entries"
+    },
+    "sources": {
+      "title": "Per-source breakdown",
+      "empty": "No statistics",
+      "columns": {
+        "source": "Source",
+        "total": "Total",
+        "filtered": "Filtered",
+        "promoted": "Promoted",
+        "promotionRate": "Promotion rate"
+      }
+    }
+  },
+  "alertsPage": {
+    "title": "System alerts & operations",
+    "subtitle": "Latest fetch failures and downstream sync attempts",
+    "fetchLogs": {
+      "title": "Fetch logs",
+      "empty": "No fetch logs",
+      "columns": {
+        "source": "Source ID",
+        "status": "Status",
+        "http": "HTTP status",
+        "message": "Message",
+        "time": "Fetched at"
+      },
+      "status": {
+        "success": "Success",
+        "failure": "Failure"
+      }
+    },
+    "syncLogs": {
+      "title": "Sync audit",
+      "empty": "No sync attempts",
+      "channels": {
+        "webhook": "Webhook",
+        "mq": "Message queue",
+        "export": "Export"
+      }
+    }
+  },
+  "feedback": {
+    "genericError": "Something went wrong, please try again"
+  },
+  "candidates": {
+    "title": "Candidate Needs",
+    "subtitle": "Track review status, sync progress and export jobs",
+    "filters": {
+      "search": "Keyword",
+      "status": "Status",
+      "synced": "Sync state",
+      "searchPlaceholder": "Type to filter by summary, problem or note",
+      "statusOptions": {
+        "all": "All"
+      },
+      "syncedOptions": {
+        "all": "All",
+        "synced": "Synced",
+        "unsynced": "Not synced"
+      }
+    },
+    "statusLabels": {
+      "pending_review": "Pending review",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "in_discovery": "In discovery",
+      "completed": "Completed"
+    },
+    "syncState": {
+      "synced": "Synced",
+      "pending": "Waiting",
+      "failed": "Sync failed"
+    },
+    "table": {
+      "summary": "Summary",
+      "status": "Status",
+      "ruleScore": "Rule score",
+      "confidence": "Confidence",
+      "synced": "Sync",
+      "updated": "Updated at",
+      "empty": "No candidate needs"
+    },
+    "export": {
+      "sectionTitle": "Export jobs",
+      "dialogTitle": "Create export job",
+      "empty": "No export jobs",
+      "fields": {
+        "format": "Format",
+        "status": "Status filter",
+        "synced": "Sync filter",
+        "limit": "Max items"
+      },
+      "tips": {
+        "limit": "Default export size is 500 items"
+      },
+      "jobToast": "Export job #{id} created"
+    },
+    "jobs": {
+      "columns": {
+        "id": "Job ID",
+        "format": "Format",
+        "status": "Status",
+        "records": "Records",
+        "finishedAt": "Finished at",
+        "download": "Download"
+      },
+      "status": {
+        "pending": "Pending",
+        "running": "Running",
+        "failed": "Failed",
+        "completed": "Completed"
+      }
+    }
   }
 }
