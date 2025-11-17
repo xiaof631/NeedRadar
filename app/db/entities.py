@@ -21,9 +21,11 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 from app.models import (
     CandidateNeedStatus,
+    ExportJobStatus,
     FetchStatus,
     RawEntryStatus,
     SourceStatus,
+    SyncChannel,
 )
 
 
@@ -156,6 +158,39 @@ class CandidateNeedStatusLogEntity(Base):
     need: Mapped[CandidateNeedEntity] = relationship(back_populates="logs")
 
 
+class DownstreamSyncLogEntity(Base):
+    __tablename__ = "downstream_sync_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    need_id: Mapped[int] = mapped_column(ForeignKey("candidate_needs.id", ondelete="CASCADE"))
+    channel: Mapped[str] = mapped_column(String(32), default=SyncChannel.WEBHOOK.value)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    attempt: Mapped[int] = mapped_column(Integer, default=1)
+    message: Mapped[str | None] = mapped_column(Text)
+    details: Mapped[dict] = mapped_column(JSON, default=dict)
+    delivered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+
+    need: Mapped[CandidateNeedEntity] = relationship()
+
+
+class ExportJobEntity(TimestampMixin, Base):
+    __tablename__ = "export_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    format: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default=ExportJobStatus.PENDING.value)
+    filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    record_count: Mapped[int | None] = mapped_column(Integer)
+    file_path: Mapped[str | None] = mapped_column(String(500))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 __all__ = [
     "RssSourceEntity",
     "FetchLogEntity",
@@ -163,4 +198,6 @@ __all__ = [
     "FilterRuleEntity",
     "CandidateNeedEntity",
     "CandidateNeedStatusLogEntity",
+    "DownstreamSyncLogEntity",
+    "ExportJobEntity",
 ]

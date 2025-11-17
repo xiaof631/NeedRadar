@@ -1,13 +1,17 @@
 """Pydantic 模型导出。"""
 
 from app.schemas.candidate_needs import (
+    CandidateNeedExportJobCreate,
+    CandidateNeedExportJobRead,
     CandidateNeedCreate,
     CandidateNeedList,
     CandidateNeedRead,
     CandidateNeedStatusEnum,
     CandidateNeedStatusLogRead,
+    CandidateNeedSyncLogRead,
     CandidateNeedStatusUpdate,
     CandidateNeedUpdate,
+    SyncChannelEnum,
 )
 from app.schemas.dashboard import (
     AlertRead,
@@ -46,13 +50,17 @@ from app.schemas.rss import (
 )
 
 __all__ = [
+    "CandidateNeedExportJobCreate",
+    "CandidateNeedExportJobRead",
     "CandidateNeedCreate",
     "CandidateNeedList",
     "CandidateNeedRead",
     "CandidateNeedStatusLogRead",
+    "CandidateNeedSyncLogRead",
     "CandidateNeedStatusEnum",
     "CandidateNeedStatusUpdate",
     "CandidateNeedUpdate",
+    "SyncChannelEnum",
     "AlertRead",
     "AlertSeverityEnum",
     "DashboardMetricsRead",

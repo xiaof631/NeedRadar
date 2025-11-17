@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
-from app.models import CandidateNeedStatus
+from app.models import CandidateNeedStatus, ExportJobStatus, SyncChannel
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -93,6 +94,60 @@ class CandidateNeedStatusLogRead(BaseModel):
     to_status: CandidateNeedStatusEnum
     note: str | None = None
     changed_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SyncChannelEnum(str, Enum):
+    """下游同步渠道。"""
+
+    WEBHOOK = SyncChannel.WEBHOOK.value
+    MQ = SyncChannel.MQ.value
+    EXPORT = SyncChannel.EXPORT.value
+
+
+class CandidateNeedSyncLogRead(BaseModel):
+    """候选需求同步审计日志。"""
+
+    id: int
+    need_id: int
+    channel: SyncChannelEnum
+    status: str
+    attempt: int
+    message: str | None = None
+    metadata: dict[str, Any]
+    delivered_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CandidateNeedExportJobCreate(BaseModel):
+    """导出任务创建参数。"""
+
+    format: str = Field(pattern="^(json|csv)$", default="json")
+    statuses: list[CandidateNeedStatusEnum] | None = None
+    search: str | None = None
+    raw_entry_id: int | None = None
+    synced: bool | None = None
+    limit: int | None = Field(default=None, ge=1, le=5000)
+
+
+class CandidateNeedExportJobRead(BaseModel):
+    """导出任务详情。"""
+
+    id: int
+    job_type: str
+    format: str
+    status: ExportJobStatus
+    filters: dict[str, Any]
+    record_count: int | None = None
+    file_path: str | None = None
+    error_message: str | None = None
+    attempt_count: int
+    created_at: datetime
+    updated_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -9,9 +9,11 @@ from app.services import (
     filter_engine,
     filter_metrics,
     filter_rules,
+    mq,
     llm_client,
     pipeline,
     raw_entries,
+    sync_audit,
     rss_fetcher,
     rss_sources,
 )
@@ -25,9 +27,11 @@ __all__ = [
     "filter_engine",
     "filter_metrics",
     "filter_rules",
+    "mq",
     "llm_client",
     "pipeline",
     "raw_entries",
+    "sync_audit",
     "rss_fetcher",
     "rss_sources",
 ]

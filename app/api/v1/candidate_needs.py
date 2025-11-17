@@ -11,20 +11,26 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.models import CandidateNeedStatus
 from app.schemas import (
+    CandidateNeedExportJobCreate,
+    CandidateNeedExportJobRead,
     CandidateNeedCreate,
     CandidateNeedList,
     CandidateNeedRead,
     CandidateNeedStatusLogRead,
     CandidateNeedStatusEnum,
     CandidateNeedStatusUpdate,
+    CandidateNeedSyncLogRead,
     CandidateNeedUpdate,
 )
-from app.services import candidate_needs
+import app.services.export_jobs as export_jobs
+from app.services import candidate_needs, sync_audit
+from app.services.export_jobs import ExportJobNotFoundError
 from app.services.candidate_needs import (
     CandidateNeedNotFoundError,
     InvalidStatusTransitionError,
 )
 from app.services.raw_entries import RawEntryNotFoundError
+from jobs import task_queue
 
 router = APIRouter(prefix="/candidate-needs", tags=["Candidate Needs"])
 
@@ -168,6 +174,23 @@ async def list_candidate_need_status_logs(need_id: int) -> list[CandidateNeedSta
     return [CandidateNeedStatusLogRead.model_validate(item) for item in logs]
 
 
+@router.get(
+    "/{need_id}/sync-logs",
+    response_model=list[CandidateNeedSyncLogRead],
+    summary="候选需求下游同步日志",
+)
+async def list_candidate_need_sync_logs(
+    need_id: int,
+    limit: int = Query(default=50, ge=1, le=200, description="返回的日志数量"),
+) -> list[CandidateNeedSyncLogRead]:
+    try:
+        candidate_needs.get_need(need_id)
+    except CandidateNeedNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+    logs = sync_audit.list_logs(need_id=need_id, limit=limit)
+    return [CandidateNeedSyncLogRead.model_validate(item) for item in logs]
+
+
 @router.get("/export", summary="导出候选需求")
 async def export_candidate_needs(
     format: str = Query(default="json", pattern="^(json|csv)$", description="导出格式"),
@@ -233,6 +256,40 @@ async def export_candidate_needs(
             }
         )
     return {"format": "csv", "content": buffer.getvalue()}
+
+
+@router.post(
+    "/export-tasks",
+    response_model=CandidateNeedExportJobRead,
+    status_code=202,
+    summary="创建候选需求导出任务",
+)
+async def create_candidate_need_export_task(
+    payload: CandidateNeedExportJobCreate,
+) -> CandidateNeedExportJobRead:
+    job = export_jobs.create_candidate_export_job(
+        format=payload.format,
+        statuses=_convert_statuses(payload.statuses),
+        search=payload.search,
+        raw_entry_id=payload.raw_entry_id,
+        synced=payload.synced,
+        limit=payload.limit,
+    )
+    task_queue.enqueue_export_job(job.id)
+    return CandidateNeedExportJobRead.model_validate(job)
+
+
+@router.get(
+    "/export-tasks/{job_id}",
+    response_model=CandidateNeedExportJobRead,
+    summary="导出任务详情",
+)
+async def get_candidate_need_export_task(job_id: int) -> CandidateNeedExportJobRead:
+    try:
+        job = export_jobs.get_export_job(job_id)
+    except ExportJobNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="导出任务不存在") from exc
+    return CandidateNeedExportJobRead.model_validate(job)
 
 
 def _convert_status(

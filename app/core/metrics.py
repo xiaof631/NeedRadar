@@ -59,7 +59,7 @@ _promotion_total = Counter(
 _downstream_total = Counter(
     "needradar_downstream_deliveries_total",
     "下游同步结果数量",
-    ("status",),
+    ("channel", "status"),
     registry=REGISTRY,
 )
 _task_queue_enqueued = Counter(
@@ -95,10 +95,10 @@ def record_promotion_result(status: str) -> None:
     _promotion_total.labels(status=status).inc()
 
 
-def record_downstream_delivery(status: str) -> None:
+def record_downstream_delivery(channel: str, status: str) -> None:
     """记录下游同步结果。"""
 
-    _downstream_total.labels(status=status).inc()
+    _downstream_total.labels(channel=channel, status=status).inc()
 
 
 def record_task_enqueue(kind: str, *, count: int) -> None:

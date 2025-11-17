@@ -137,3 +137,31 @@ def test_enqueue_sync_tasks_respects_status_filter(monkeypatch: pytest.MonkeyPat
 
     assert queued_count == 1
     assert queued == [(approved_id, "https://webhook.example.com")]
+
+
+def test_enqueue_sync_tasks_dispatches_mq(monkeypatch: pytest.MonkeyPatch) -> None:
+    need_id = _seed_need(CandidateNeedStatus.APPROVED)
+
+    monkeypatch.setattr(task_queue.settings, "downstream_mq_enabled", True)
+
+    webhook_calls: list[int] = []
+    mq_calls: list[int] = []
+
+    def _fake_sync_delay(target_need_id: int, webhook_url: str) -> None:
+        webhook_calls.append(target_need_id)
+
+    def _fake_mq_delay(target_need_id: int) -> None:
+        mq_calls.append(target_need_id)
+
+    monkeypatch.setattr(task_queue.sync_candidate_need_task, "delay", _fake_sync_delay)
+    monkeypatch.setattr(task_queue.publish_candidate_need_mq_task, "delay", _fake_mq_delay)
+
+    queued = task_queue.enqueue_sync_tasks(
+        webhook_url="https://hook.example.com",
+        statuses=(CandidateNeedStatus.APPROVED,),
+        batch_size=5,
+    )
+
+    assert queued == 1
+    assert webhook_calls == [need_id]
+    assert mq_calls == [need_id]

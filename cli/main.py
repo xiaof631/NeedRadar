@@ -14,6 +14,8 @@ from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.models import CandidateNeedStatus, FetchStatus, RawEntryStatus, SourceStatus
 from app.schemas import CandidateNeedRead, RawEntryRead
+import app.services.export_jobs as export_jobs
+
 from app.services import (
     candidate_needs,
     fetch_logs,
@@ -22,13 +24,16 @@ from app.services import (
     pipeline,
     raw_entries,
     rss_sources,
+    sync_audit,
 )
 from app.services.candidate_needs import (
     CandidateNeedNotFoundError,
     InvalidStatusTransitionError,
 )
+from app.services.export_jobs import ExportJobNotFoundError
 from app.services.pipeline import CandidateAlreadyExistsError, EntryNotQualifiedError
 from app.services.raw_entries import RawEntryNotFoundError
+from jobs import task_queue
 
 app = typer.Typer(help="NeedRadar 工具集")
 logger = get_logger(__name__)
@@ -708,6 +713,32 @@ def show_candidate_need_status_logs(
         typer.echo(message)
 
 
+@candidates_app.command("sync-logs")
+def show_candidate_need_sync_logs(
+    need_id: Annotated[int, typer.Argument(help="候选需求 ID")],
+    limit: Annotated[int, typer.Option(help="最大返回日志条数", min=1, max=200)] = 20,
+) -> None:
+    """展示候选需求的同步审计日志。"""
+
+    try:
+        candidate_needs.get_need(need_id)
+    except CandidateNeedNotFoundError as exc:
+        raise typer.BadParameter("候选需求不存在", param_hint="need_id") from exc
+
+    logs = sync_audit.list_logs(need_id=need_id, limit=limit)
+    if not logs:
+        typer.echo("暂无同步日志")
+        raise typer.Exit()
+
+    typer.echo(f"候选需求 #{need_id} 同步日志：")
+    for log in logs:
+        meta = ", ".join(f"{key}={value}" for key, value in log.metadata.items()) or "-"
+        typer.echo(
+            f"[{log.id}] {log.delivered_at.isoformat()} {log.channel.value} "
+            f"status={log.status} attempts={log.attempt} meta={meta}"
+        )
+
+
 @candidates_app.command("export")
 def export_candidate_needs(
     format: Annotated[
@@ -790,6 +821,60 @@ def export_candidate_needs(
         typer.echo(f"已导出 {len(models)} 条候选需求到 {output}")
     else:
         typer.echo(content)
+
+
+@candidates_app.command("schedule-export")
+def schedule_candidate_need_export(
+    format: Annotated[
+        str,
+        typer.Option("--format", help="导出格式", case_sensitive=False),
+    ] = "json",
+    statuses: Annotated[
+        list[CandidateNeedStatus] | None,
+        typer.Option("--status", help="按状态过滤，可重复", case_sensitive=False),
+    ] = None,
+    search: Annotated[str | None, typer.Option(help="关键字搜索") ] = None,
+    raw_entry_id: Annotated[int | None, typer.Option(help="原始条目 ID 过滤")] = None,
+    synced: Annotated[
+        bool | None,
+        typer.Option("--synced/--unsynced", help="按同步状态过滤"),
+    ] = None,
+    limit: Annotated[int | None, typer.Option(help="最大导出数量", min=1, max=5000)] = None,
+) -> None:
+    """创建异步导出任务并交由队列执行。"""
+
+    fmt = format.lower()
+    if fmt not in {"json", "csv"}:
+        raise typer.BadParameter("format 必须为 json 或 csv", param_hint="format")
+    job = export_jobs.create_candidate_export_job(
+        format=fmt,
+        statuses=statuses,
+        search=search,
+        raw_entry_id=raw_entry_id,
+        synced=synced,
+        limit=limit,
+    )
+    task_queue.enqueue_export_job(job.id)
+    typer.echo(
+        f"已创建导出任务 #{job.id}，格式 {job.format}，状态 {job.status.value}"
+    )
+
+
+@candidates_app.command("export-status")
+def show_candidate_export_status(
+    job_id: Annotated[int, typer.Argument(help="导出任务 ID")]
+) -> None:
+    """查看异步导出任务的执行状态。"""
+
+    try:
+        job = export_jobs.get_export_job(job_id)
+    except ExportJobNotFoundError as exc:
+        raise typer.BadParameter("导出任务不存在", param_hint="job_id") from exc
+
+    typer.echo(
+        f"任务 #{job.id}: status={job.status.value}, records={job.record_count}, "
+        f"file={job.file_path or '-'}"
+    )
 
 
 if __name__ == "__main__":
