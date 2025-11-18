@@ -120,9 +120,10 @@ docker compose up --build
 
 - FastAPI 应用默认挂载 `/metrics`，通过 `app/core/metrics.py` 注入的请求包装统计 HTTP 数量、耗时，并输出 RSS 抓取、候选需求晋升与下游同步等业务指标。
 - `monitoring/prometheus.yml` 提供最小可用的 Prometheus 配置，可直接用 docker-compose 中的 `prometheus` 服务加载。
-- `monitoring/grafana_downstream.json` 是下游同步通道的 Grafana 仪表盘示例，包含成功率、状态拆分与最近错误面板，导入后选择 Prometheus 数据源即可。
+- `monitoring/grafana_downstream.json` 是下游同步通道的 Grafana 仪表盘示例，包含成功率、状态拆分、最近错误以及 file drop 落盘耗时面板，导入后选择 Prometheus 数据源即可。
 - 设置 `NEEDRADAR_TELEMETRY_ENABLED=true` 及对应的 OTLP Endpoint 后，`app/core/telemetry.py` 会自动为 FastAPI 与 Celery 任务注入 OpenTelemetry Trace，便于与 Jaeger/Tempo 等系统联动。
-- 需要立即下发候选需求到 Webhook/MQ/文件同步通道时，可使用 `python -m cli.main candidates sync --channel file_drop --limit 20` 手动派发任务。
+- 下游同步相关的 Prometheus 指标包括 `needradar_downstream_deliveries_total` 与 `needradar_downstream_file_drop_duration_seconds`，后者用于追踪 file drop 通道的写入耗时。
+- 需要立即下发候选需求时，可使用 `python -m cli.main candidates sync --channel webhook --limit 20`（或 `mq`/`file_drop`/`all`）手动派发任务，并可配合 `--status`、`--webhook-url` 等参数。
 
 ## Web 管理前端
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from app.db.storage import db
-from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus
+from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus, SyncChannel
 from app.services import candidate_needs, raw_entries, rss_sources
 from jobs import task_queue
 
@@ -165,3 +167,65 @@ def test_enqueue_sync_tasks_dispatches_mq(monkeypatch: pytest.MonkeyPatch) -> No
     assert queued == 1
     assert webhook_calls == [need_id]
     assert mq_calls == [need_id]
+
+
+def test_enqueue_sync_tasks_dispatches_file_drop(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    need_id = _seed_need(CandidateNeedStatus.APPROVED)
+
+    monkeypatch.setattr(task_queue.settings, "downstream_filesystem_enabled", True)
+    monkeypatch.setattr(task_queue.settings, "downstream_filesystem_dir", str(tmp_path))
+    monkeypatch.setattr(task_queue.settings, "downstream_filesystem_format", "json")
+
+    file_calls: list[int] = []
+
+    def _fake_file_delay(target_need_id: int) -> None:
+        file_calls.append(target_need_id)
+
+    monkeypatch.setattr(
+        task_queue.write_candidate_need_file_drop_task,
+        "delay",
+        _fake_file_delay,
+    )
+
+    queued = task_queue.enqueue_sync_tasks(
+        webhook_url=None,
+        statuses=(CandidateNeedStatus.APPROVED,),
+        batch_size=5,
+    )
+
+    assert queued == 1
+    assert file_calls == [need_id]
+
+
+def test_enqueue_sync_tasks_respects_channel_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    need_id = _seed_need(CandidateNeedStatus.APPROVED)
+
+    monkeypatch.setattr(task_queue.settings, "downstream_mq_enabled", True)
+    monkeypatch.setattr(task_queue.settings, "downstream_filesystem_enabled", True)
+    monkeypatch.setattr(task_queue.settings, "downstream_webhook_url", "https://hook")
+
+    webhook_calls: list[int] = []
+    mq_calls: list[int] = []
+    file_calls: list[int] = []
+
+    monkeypatch.setattr(task_queue.sync_candidate_need_task, "delay", lambda *args: webhook_calls.append(args[0]))
+    monkeypatch.setattr(task_queue.publish_candidate_need_mq_task, "delay", lambda need_id: mq_calls.append(need_id))
+    monkeypatch.setattr(
+        task_queue.write_candidate_need_file_drop_task,
+        "delay",
+        lambda need_id: file_calls.append(need_id),
+    )
+
+    queued = task_queue.enqueue_sync_tasks(
+        webhook_url="https://hook",
+        statuses=(CandidateNeedStatus.APPROVED,),
+        batch_size=5,
+        channels=(SyncChannel.MQ,),
+    )
+
+    assert queued == 1
+    assert webhook_calls == []
+    assert mq_calls == [need_id]
+    assert file_calls == []

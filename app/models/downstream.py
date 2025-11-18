@@ -14,6 +14,7 @@ class SyncChannel(str, Enum):
     WEBHOOK = "webhook"
     MQ = "mq"
     EXPORT = "export"
+    FILE_DROP = "file_drop"
 
 
 @dataclass(slots=True)

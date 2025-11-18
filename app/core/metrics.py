@@ -62,6 +62,13 @@ _downstream_total = Counter(
     ("channel", "status"),
     registry=REGISTRY,
 )
+_file_drop_duration = Histogram(
+    "needradar_downstream_file_drop_duration_seconds",
+    "file drop 通道落盘耗时（秒）",
+    ("format",),
+    registry=REGISTRY,
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0),
+)
 _export_jobs_total = Counter(
     "needradar_export_jobs_total",
     "导出任务执行结果数量",
@@ -105,6 +112,14 @@ def record_downstream_delivery(channel: str, status: str) -> None:
     """记录下游同步结果。"""
 
     _downstream_total.labels(channel=channel, status=status).inc()
+
+
+def record_file_drop_duration(duration: float, *, file_format: str) -> None:
+    """记录 file drop 通道一次写入的耗时。"""
+
+    if duration < 0:
+        duration = 0
+    _file_drop_duration.labels(format=file_format).observe(duration)
 
 
 def record_export_job_result(status: str) -> None:
@@ -169,6 +184,7 @@ __all__ = [
     "record_rss_fetch",
     "record_promotion_result",
     "record_downstream_delivery",
+    "record_file_drop_duration",
     "record_export_job_result",
     "record_task_enqueue",
     "REGISTRY",
