@@ -17,17 +17,20 @@
     </div>
     <el-row :gutter="20" class="panels">
       <el-col :span="12">
-        <DataTable :rows="recentAlerts" :title="t('dashboard.recentAlerts')">
-          <template #default>
-            <el-table-column prop="code" :label="t('dashboard.alertColumns.code')" width="160" />
-            <el-table-column prop="message" :label="t('dashboard.alertColumns.message')" min-width="220" />
-            <el-table-column :label="t('dashboard.alertColumns.severity')" width="140">
-              <template #default="{ row }">
-                <el-tag :type="mapType(row.severity)">
-                  {{ alertSeverityLabel(row.severity) }}
-                </el-tag>
-              </template>
-            </el-table-column>
+        <DataTable
+          :rows="recentAlerts"
+          :title="t('dashboard.recentAlerts')"
+          :columns="alertColumns"
+          :loading="alertsQuery.isFetching.value"
+          refreshable
+          :refresh-text="t('actions.refresh')"
+          @refresh="alertsQuery.refetch()"
+          :empty-text="t('dashboard.empty')"
+        >
+          <template #severity="{ row }">
+            <el-tag :type="mapType(row.severity)">
+              {{ alertSeverityLabel(row.severity) }}
+            </el-tag>
           </template>
         </DataTable>
       </el-col>
@@ -124,6 +127,25 @@ const sourcesCard = computed(() => {
   if (!sourceData) return '0/0';
   return `${sourceData.active}/${sourceData.total}`;
 });
+
+const alertColumns = computed(() => [
+  {
+    label: t('dashboard.alertColumns.code'),
+    prop: 'code',
+    width: 160
+  },
+  {
+    label: t('dashboard.alertColumns.message'),
+    prop: 'message',
+    minWidth: 220
+  },
+  {
+    label: t('dashboard.alertColumns.severity'),
+    prop: 'severity',
+    width: 140,
+    slot: 'severity'
+  }
+]);
 </script>
 
 <style scoped>
