@@ -38,6 +38,22 @@
     "cancel": "取消",
     "confirm": "确定"
   },
+  "components": {
+    "filterPanel": {
+      "clear": "重置筛选",
+      "collapse": "收起筛选",
+      "expand": "展开筛选",
+      "applied": "已应用 {count} 项"
+    },
+    "operationLog": {
+      "status": {
+        "success": "成功",
+        "warning": "警告",
+        "danger": "错误",
+        "info": "提示"
+      }
+    }
+  },
   "feedback": {
     "genericError": "请求失败，请稍后再试"
   },
@@ -111,6 +127,18 @@
   "alertsPage": {
     "title": "系统告警与操作日志",
     "subtitle": "聚合抓取失败与下游同步记录",
+    "filters": {
+      "title": "告警筛选",
+      "description": "按同步通道筛选审计记录，或快速清空筛选条件",
+      "activeLabel": "已有 {count} 条筛选",
+      "clear": "清除筛选",
+      "collapse": "收起",
+      "expand": "展开",
+      "channel": "同步通道",
+      "options": {
+        "all": "全部通道"
+      }
+    },
     "fetchLogs": {
       "title": "抓取日志",
       "empty": "暂无抓取记录",
@@ -128,12 +156,39 @@
     },
     "syncLogs": {
       "title": "同步审计",
+      "subtitle": "查看 Webhook/MQ/文件通道的最新执行记录",
       "empty": "暂无同步记录",
       "channels": {
+        "title": "同步通道",
         "webhook": "Webhook",
         "mq": "消息队列",
-        "export": "导出"
+        "export": "导出",
+        "file": "文件同步"
+      },
+      "statusLabels": {
+        "success": "成功",
+        "failed": "失败",
+        "pending": "进行中"
+      },
+      "metadata": {
+        "attempt": "尝试",
+        "file": "文件",
+        "http": "HTTP"
       }
+    },
+    "syncStats": {
+      "title": "通道表现概览",
+      "subtitle": "按最近日志统计成功率、失败原因与最新时间",
+      "empty": "暂无同步统计数据",
+      "successRate": "成功率",
+      "results": "结果拆分",
+      "success": "成功",
+      "failed": "失败",
+      "pending": "排队",
+      "lastAttempt": "最近执行",
+      "filter": "筛选",
+      "focus": "聚焦",
+      "viewAll": "全部"
     }
   },
   "candidates": {
@@ -144,6 +199,8 @@
       "status": "状态",
       "synced": "同步状态",
       "searchPlaceholder": "输入摘要、问题或备注以筛选",
+      "panelTitle": "筛选条件",
+      "panelDescription": "组合关键字、状态与同步状态以快速定位候选需求",
       "statusOptions": {
         "all": "全部"
       },

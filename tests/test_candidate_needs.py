@@ -200,6 +200,44 @@ def test_export_candidate_needs(client: TestClient) -> None:
     assert "rule_score" in lines[0]
 
 
+def test_sync_channel_stats(client: TestClient) -> None:
+    _, need_ids = _seed_candidate_needs()
+    sync_audit.log_sync_attempt(
+        need_ids[0],
+        channel=SyncChannel.WEBHOOK,
+        status="success",
+        attempt=1,
+    )
+    sync_audit.log_sync_attempt(
+        need_ids[0],
+        channel=SyncChannel.MQ,
+        status="failed",
+        attempt=2,
+        message="mq-down",
+    )
+    sync_audit.log_sync_attempt(
+        need_ids[1],
+        channel=SyncChannel.FILE_DROP,
+        status="failed",
+        attempt=1,
+        message="disk-full",
+    )
+
+    response = client.get(
+        "/api/v1/candidate-needs/sync-stats",
+        params={"limit": 10},
+    )
+    assert response.status_code == 200
+    stats = {item["channel"]: item for item in response.json()}
+    assert stats["webhook"]["success"] == 1
+    assert stats["webhook"]["total_attempts"] == 1
+    assert stats["mq"]["failed"] == 1
+    assert stats["mq"]["last_error"] == "mq-down"
+    assert stats["file_drop"]["failed"] == 1
+    assert stats["file_drop"]["pending"] == 0
+    assert stats["export"]["total_attempts"] == 0
+
+
 def test_filter_candidate_needs_by_synced_status(client: TestClient) -> None:
     _, need_ids = _seed_candidate_needs()
     candidate_needs.mark_need_synced(need_ids[0])

@@ -1,0 +1,89 @@
+{
+  "title": "NeedRadar · Downstream Channels",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["needradar", "downstream"],
+  "templating": {
+    "list": [
+      {
+        "name": "channel",
+        "label": "Channel",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(needradar_downstream_deliveries_total, channel)",
+        "refresh": 2,
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": ["$__all"]
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Success rate",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(needradar_downstream_deliveries_total{status=\"success\",channel=~\"$channel\"}[5m])) / sum(rate(needradar_downstream_deliveries_total{channel=~\"$channel\"}[5m]))",
+          "legendFormat": "Success rate"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Sync attempts by status",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(needradar_downstream_deliveries_total{channel=~\"$channel\"}[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Last errors",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "topk(10, (needradar_downstream_deliveries_total{status=\"write-error\"} > 0))",
+          "legendFormat": "{{channel}}"
+        }
+      ]
+    }
+  ]
+}
