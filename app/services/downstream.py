@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from time import perf_counter
+from typing import Any
 
 import httpx
 
@@ -24,6 +29,7 @@ class SyncDeliveryResult:
     channel: SyncChannel
     status_code: int | None = None
     error: str | None = None
+    metadata: dict[str, str] | None = field(default=None)
 
 
 async def deliver_need_to_webhook(
@@ -35,7 +41,7 @@ async def deliver_need_to_webhook(
 ) -> SyncDeliveryResult:
     """将候选需求推送至配置的 webhook 并返回执行结果。"""
 
-    payload = CandidateNeedRead.model_validate(need).model_dump(mode="json")
+    payload = CandidateNeedRead.model_validate(need)
     try:
         response = await client.post(webhook_url, json=payload)
     except httpx.HTTPError as exc:
@@ -107,7 +113,7 @@ def publish_need_to_mq(
     if publisher is None:
         raise RuntimeError("MQ publisher is not configured")
 
-    payload = CandidateNeedRead.model_validate(need).model_dump(mode="json")
+    payload = CandidateNeedRead.model_validate(need)
     result = publisher.publish(payload)
     if result.success:
         candidate_needs.mark_need_synced(need.id)
@@ -143,3 +149,92 @@ def publish_need_to_mq(
         channel=SyncChannel.MQ,
         error=message,
     )
+
+
+def write_need_to_file_drop(
+    need: CandidateNeed,
+    *,
+    directory: str,
+    file_format: str = "json",
+    attempt: int = 1,
+) -> SyncDeliveryResult:
+    """将候选需求写入文件系统通道。"""
+
+    normalized_format = file_format.lower()
+    if normalized_format not in {"json", "jsonl"}:
+        raise ValueError(f"unsupported file drop format: {file_format}")
+
+    payload = CandidateNeedRead.model_validate(need)
+    target_dir = Path(directory)
+    start = perf_counter()
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        file_path = _write_payload(target_dir, payload, normalized_format)
+    except OSError as exc:
+        candidate_needs.mark_need_sync_failed(need.id, str(exc))
+        metrics.record_downstream_delivery(SyncChannel.FILE_DROP.value, "error")
+        sync_audit.log_sync_attempt(
+            need.id,
+            channel=SyncChannel.FILE_DROP,
+            status="failed",
+            attempt=attempt,
+            message=str(exc),
+            metadata={"format": normalized_format},
+        )
+        return SyncDeliveryResult(
+            need_id=need.id,
+            success=False,
+            channel=SyncChannel.FILE_DROP,
+            error=str(exc),
+        )
+
+    duration = perf_counter() - start
+    candidate_needs.mark_need_synced(need.id)
+    metrics.record_downstream_delivery(SyncChannel.FILE_DROP.value, "success")
+    metrics.record_file_drop_duration(duration, file_format=normalized_format)
+    sync_audit.log_sync_attempt(
+        need.id,
+        channel=SyncChannel.FILE_DROP,
+        status="success",
+        attempt=attempt,
+        metadata={
+            "file_path": str(file_path),
+            "format": normalized_format,
+            "duration_ms": round(duration * 1000, 3),
+        },
+    )
+    return SyncDeliveryResult(
+        need_id=need.id,
+        success=True,
+        channel=SyncChannel.FILE_DROP,
+        metadata={"file_path": str(file_path)},
+    )
+
+
+def _write_payload(directory: Path, payload: CandidateNeedRead, file_format: str) -> Path:
+    timestamp = datetime.now(UTC)
+    if file_format == "jsonl":
+        target = directory / f"needs-{timestamp:%Y%m%d}.jsonl"
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write(_render_payload(payload, indent=None) + "\n")
+        return target
+
+    target = directory / f"need-{payload.id}-{timestamp:%Y%m%d%H%M%S}.json"
+    with target.open("w", encoding="utf-8") as handle:
+        handle.write(_render_payload(payload, indent=2))
+    return target
+
+
+def _render_payload(payload: CandidateNeedRead, *, indent: int | None) -> str:
+    return json.dumps(
+        payload.model_dump(),
+        ensure_ascii=False,
+        indent=indent,
+        default=_json_default,
+    )
+
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value

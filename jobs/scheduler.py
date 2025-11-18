@@ -52,7 +52,7 @@ def _run_promote_job(
 
 async def _run_sync_job(
     *,
-    webhook_url: str,
+    webhook_url: str | None,
     statuses: tuple[CandidateNeedStatus, ...],
     batch_size: int,
 ) -> None:
@@ -95,7 +95,11 @@ async def main() -> None:
         max_instances=1,
         coalesce=True,
     )
-    if settings.downstream_webhook_url:
+    if (
+        settings.downstream_webhook_url
+        or settings.downstream_mq_enabled
+        or settings.downstream_filesystem_enabled
+    ):
         scheduler.add_job(
             _run_sync_job,
             trigger=IntervalTrigger(seconds=settings.scheduler_downstream_interval_seconds),
@@ -114,7 +118,11 @@ async def main() -> None:
         fetch_interval=settings.scheduler_fetch_interval_seconds,
         promote_interval=settings.scheduler_promote_interval_seconds,
         downstream_interval=settings.scheduler_downstream_interval_seconds
-        if settings.downstream_webhook_url
+        if (
+            settings.downstream_webhook_url
+            or settings.downstream_mq_enabled
+            or settings.downstream_filesystem_enabled
+        )
         else None,
     )
 

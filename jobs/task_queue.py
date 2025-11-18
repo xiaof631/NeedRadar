@@ -12,7 +12,7 @@ from app.core import metrics
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.telemetry import get_tracer
-from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus
+from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus, SyncChannel
 import app.services.export_jobs as export_jobs
 
 from app.services import (
@@ -134,6 +134,23 @@ def _publish_candidate_need_to_mq(need_id: int, attempt: int) -> dict[str, Any]:
     }
 
 
+def _write_candidate_need_file_drop(need_id: int, attempt: int) -> dict[str, Any]:
+    need = candidate_needs.get_need(need_id)
+    result = downstream.write_need_to_file_drop(
+        need,
+        directory=settings.downstream_filesystem_dir,
+        file_format=settings.downstream_filesystem_format,
+        attempt=attempt,
+    )
+    return {
+        "need_id": result.need_id,
+        "success": result.success,
+        "channel": result.channel.value,
+        "error": result.error,
+        "file_path": (result.metadata or {}).get("file_path"),
+    }
+
+
 @celery_app.task(
     name="jobs.sync_candidate_need",
     bind=True,
@@ -170,6 +187,24 @@ def publish_candidate_need_mq_task(self, need_id: int) -> dict[str, Any]:
     return result
 
 
+@celery_app.task(
+    name="jobs.write_candidate_need_file_drop",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=60,
+    retry_kwargs={"max_retries": 3},
+)
+def write_candidate_need_file_drop_task(self, need_id: int) -> dict[str, Any]:
+    """将候选需求写入文件同步通道。"""
+
+    logger.info("tasks.sync.file_drop.queued", need_id=need_id, task_id=self.request.id)
+    attempt = self.request.retries + 1
+    with tracer.start_as_current_span("write_candidate_need_file_drop_task"):
+        result = _write_candidate_need_file_drop(need_id, attempt)
+    logger.info("tasks.sync.file_drop.completed", need_id=need_id, success=result["success"])
+    return result
+
+
 def enqueue_fetch_sources(*, limit: int | None = None) -> int:
     """扫描启用的数据源并为每个数据源派发 Celery 任务。"""
 
@@ -198,26 +233,43 @@ def enqueue_sync_tasks(
     webhook_url: str | None = None,
     statuses: Sequence[CandidateNeedStatus | str] | None = None,
     batch_size: int | None = None,
+    channels: Sequence[SyncChannel | str] | None = None,
 ) -> int:
     """派发待同步候选需求的 Webhook 推送任务。"""
 
     target_url = webhook_url or settings.downstream_webhook_url
-    if not target_url and not settings.downstream_mq_enabled:
+    if (
+        not target_url
+        and not settings.downstream_mq_enabled
+        and not settings.downstream_filesystem_enabled
+    ):
         return 0
     normalized_statuses = _normalize_statuses(statuses)
     limit = batch_size or settings.downstream_sync_batch_size
     needs = candidate_needs.list_unsynced_needs(statuses=normalized_statuses, limit=limit)
     if not needs:
         return 0
-    if target_url:
+
+    selected_channels = _normalize_channels(channels)
+    queued_any = False
+    if target_url and _channel_enabled(SyncChannel.WEBHOOK, selected_channels):
         for need in needs:
             sync_candidate_need_task.delay(need.id, target_url)
         metrics.record_task_enqueue("sync-webhook", count=len(needs))
-    if settings.downstream_mq_enabled:
+        queued_any = True
+    if settings.downstream_mq_enabled and _channel_enabled(SyncChannel.MQ, selected_channels):
         for need in needs:
             publish_candidate_need_mq_task.delay(need.id)
         metrics.record_task_enqueue("sync-mq", count=len(needs))
-    return len(needs)
+        queued_any = True
+    if settings.downstream_filesystem_enabled and _channel_enabled(
+        SyncChannel.FILE_DROP, selected_channels
+    ):
+        for need in needs:
+            write_candidate_need_file_drop_task.delay(need.id)
+        metrics.record_task_enqueue("sync-file-drop", count=len(needs))
+        queued_any = True
+    return len(needs) if queued_any else 0
 
 
 def _normalize_statuses(
@@ -232,6 +284,27 @@ def _normalize_statuses(
         else:
             normalized.append(CandidateNeedStatus(status))
     return tuple(normalized)
+
+
+def _normalize_channels(
+    channels: Sequence[SyncChannel | str] | None,
+) -> Sequence[SyncChannel] | None:
+    if channels is None:
+        return None
+    normalized: list[SyncChannel] = []
+    for channel in channels:
+        if isinstance(channel, SyncChannel):
+            normalized.append(channel)
+        else:
+            normalized.append(SyncChannel(channel))
+    return tuple(normalized)
+
+
+def _channel_enabled(
+    channel: SyncChannel,
+    selected: Sequence[SyncChannel] | None,
+) -> bool:
+    return selected is None or channel in selected
 
 
 @celery_app.task(name="jobs.task_queue.enqueue_fetch_sources_task")
@@ -253,8 +326,14 @@ def enqueue_sync_task(
     webhook_url: str | None = None,
     statuses: Sequence[CandidateNeedStatus | str] | None = None,
     batch_size: int | None = None,
+    channels: Sequence[SyncChannel | str] | None = None,
 ) -> dict[str, Any]:
-    queued = enqueue_sync_tasks(webhook_url=webhook_url, statuses=statuses, batch_size=batch_size)
+    queued = enqueue_sync_tasks(
+        webhook_url=webhook_url,
+        statuses=statuses,
+        batch_size=batch_size,
+        channels=channels,
+    )
     logger.info("tasks.enqueue.sync", queued=queued)
     return {"queued": queued}
 
@@ -302,5 +381,6 @@ __all__ = [
     "promote_entry_task",
     "sync_candidate_need_task",
     "publish_candidate_need_mq_task",
+    "write_candidate_need_file_drop_task",
     "export_candidate_needs_task",
 ]

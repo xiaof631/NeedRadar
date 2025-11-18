@@ -12,7 +12,7 @@ from typing import Annotated, Any
 import typer
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
-from app.models import CandidateNeedStatus, FetchStatus, RawEntryStatus, SourceStatus
+from app.models import CandidateNeedStatus, FetchStatus, RawEntryStatus, SourceStatus, SyncChannel
 from app.schemas import CandidateNeedRead, RawEntryRead
 import app.services.export_jobs as export_jobs
 
@@ -717,6 +717,10 @@ def show_candidate_need_status_logs(
 def show_candidate_need_sync_logs(
     need_id: Annotated[int, typer.Argument(help="候选需求 ID")],
     limit: Annotated[int, typer.Option(help="最大返回日志条数", min=1, max=200)] = 20,
+    channel: Annotated[
+        str | None,
+        typer.Option("--channel", help="按通道过滤日志", case_sensitive=False),
+    ] = None,
 ) -> None:
     """展示候选需求的同步审计日志。"""
 
@@ -725,18 +729,78 @@ def show_candidate_need_sync_logs(
     except CandidateNeedNotFoundError as exc:
         raise typer.BadParameter("候选需求不存在", param_hint="need_id") from exc
 
-    logs = sync_audit.list_logs(need_id=need_id, limit=limit)
+    channel_filter: SyncChannel | None = None
+    if channel:
+        try:
+            channel_filter = SyncChannel(channel)
+        except ValueError as exc:
+            raise typer.BadParameter("未知的通道", param_hint="channel") from exc
+
+    logs = sync_audit.list_logs(need_id=need_id, channel=channel_filter, limit=limit)
     if not logs:
         typer.echo("暂无同步日志")
         raise typer.Exit()
 
-    typer.echo(f"候选需求 #{need_id} 同步日志：")
+    channel_label = f"（通道：{channel_filter.value}）" if channel_filter else ""
+    typer.echo(f"候选需求 #{need_id} 同步日志{channel_label}：")
     for log in logs:
         meta = ", ".join(f"{key}={value}" for key, value in log.metadata.items()) or "-"
         typer.echo(
             f"[{log.id}] {log.delivered_at.isoformat()} {log.channel.value} "
             f"status={log.status} attempts={log.attempt} meta={meta}"
         )
+
+
+@candidates_app.command("sync")
+def trigger_candidate_need_sync(
+    channel: Annotated[
+        str,
+        typer.Option(
+            "--channel",
+            help="指定同步通道：webhook/mq/file_drop/all",
+            case_sensitive=False,
+        ),
+    ] = "all",
+    limit: Annotated[int, typer.Option("--limit", min=1, max=200, help="单次派发数量")]
+    = 20,
+    statuses: Annotated[
+        list[CandidateNeedStatus] | None,
+        typer.Option("--status", help="按状态过滤，可重复", case_sensitive=False),
+    ] = None,
+    webhook_url: Annotated[
+        str | None,
+        typer.Option("--webhook-url", help="覆盖配置的 webhook 地址"),
+    ] = None,
+) -> None:
+    """立即向指定通道派发候选需求同步任务。"""
+
+    normalized_statuses = tuple(statuses) if statuses else None
+    selected_channels: tuple[SyncChannel, ...] | None
+    channel_value = channel.lower()
+    if channel_value == "all":
+        selected_channels = None
+    else:
+        try:
+            selected_channels = (SyncChannel(channel_value),)
+        except ValueError as exc:
+            raise typer.BadParameter("未知的通道", param_hint="channel") from exc
+
+    queued = task_queue.enqueue_sync_tasks(
+        webhook_url=webhook_url,
+        statuses=normalized_statuses,
+        batch_size=limit,
+        channels=selected_channels,
+    )
+    if queued == 0:
+        typer.echo("没有可派发的候选需求，或通道尚未启用")
+        raise typer.Exit(code=1)
+
+    channel_label = (
+        "所有已启用通道"
+        if selected_channels is None
+        else ",".join(ch.value for ch in selected_channels)
+    )
+    typer.echo(f"已派发 {queued} 条候选需求到 {channel_label}")
 
 
 @candidates_app.command("export")

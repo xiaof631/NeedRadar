@@ -84,6 +84,28 @@
           "legendFormat": "{{channel}}"
         }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "File drop duration (p95)",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(needradar_downstream_file_drop_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "hidden"
+        }
+      }
     }
   ]
 }

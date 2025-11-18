@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from functools import lru_cache
-from typing import Any
+from typing import Any, Literal
 
 from app.models import CandidateNeedStatus
 from pydantic import Field
@@ -92,6 +92,18 @@ class Settings(BaseSettings):
     downstream_mq_routing_key: str = Field(
         default="needradar.candidate_needs",
         description="候选需求推送使用的 Routing Key",
+    )
+    downstream_filesystem_enabled: bool = Field(
+        default=False,
+        description="是否启用基于文件系统的 file drop 同步通道",
+    )
+    downstream_filesystem_dir: str = Field(
+        default="./data/file_drop",
+        description="file drop 通道写入的目录",
+    )
+    downstream_filesystem_format: Literal["json", "jsonl"] = Field(
+        default="json",
+        description="file drop 输出格式，支持 json 或 jsonl",
     )
     export_output_dir: str = Field(
         default="./data/exports",
