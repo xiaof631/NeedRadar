@@ -181,7 +181,7 @@ export async function fetchFetchLogs(
   return response.data;
 }
 
-export type SyncChannel = 'webhook' | 'mq' | 'export';
+export type SyncChannel = 'webhook' | 'mq' | 'export' | 'file_drop';
 
 export interface SyncLog {
   id: number;
@@ -209,6 +209,30 @@ export async function fetchSyncLogs(
   params: SyncLogQueryParams = {}
 ): Promise<SyncLogListResponse> {
   const response = await apiClient.get('/api/v1/candidate-needs/sync-logs', {
+    params
+  });
+  return response.data;
+}
+
+export interface SyncChannelStat {
+  channel: SyncChannel;
+  total_attempts: number;
+  success: number;
+  failed: number;
+  pending: number;
+  success_rate: number;
+  last_attempt_at: string | null;
+  last_error: string | null;
+}
+
+export interface SyncChannelStatQuery {
+  limit?: number;
+}
+
+export async function fetchSyncChannelStats(
+  params: SyncChannelStatQuery = {}
+): Promise<SyncChannelStat[]> {
+  const response = await apiClient.get('/api/v1/candidate-needs/sync-stats', {
     params
   });
   return response.data;

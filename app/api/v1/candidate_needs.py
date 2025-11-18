@@ -22,11 +22,12 @@ from app.schemas import (
     CandidateNeedStatusUpdate,
     CandidateNeedSyncLogList,
     CandidateNeedSyncLogRead,
+    CandidateNeedSyncChannelStat,
     CandidateNeedUpdate,
     SyncChannelEnum,
 )
 import app.services.export_jobs as export_jobs
-from app.services import candidate_needs, sync_audit
+from app.services import candidate_needs, downstream_metrics, sync_audit
 from app.services.export_jobs import ExportJobNotFoundError
 from app.services.candidate_needs import (
     CandidateNeedNotFoundError,
@@ -86,6 +87,35 @@ async def list_recent_sync_logs(
         total=len(logs),
         items=[CandidateNeedSyncLogRead.model_validate(item) for item in logs],
     )
+
+
+@router.get(
+    "/sync-stats",
+    response_model=list[CandidateNeedSyncChannelStat],
+    summary="按渠道聚合的同步统计",
+)
+async def summarize_sync_channels(
+    limit: int = Query(
+        default=200,
+        ge=10,
+        le=1000,
+        description="统计最近多少条审计日志",
+    ),
+) -> list[CandidateNeedSyncChannelStat]:
+    stats = downstream_metrics.summarize_recent_sync_logs(limit=limit)
+    return [
+        CandidateNeedSyncChannelStat(
+            channel=SyncChannelEnum(stat.channel.value),
+            total_attempts=stat.total_attempts,
+            success=stat.success,
+            failed=stat.failed,
+            pending=stat.pending,
+            success_rate=round(stat.success_rate, 4),
+            last_attempt_at=stat.last_attempt_at,
+            last_error=stat.last_error,
+        )
+        for stat in stats
+    ]
 
 
 @router.post(

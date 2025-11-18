@@ -100,6 +100,7 @@ cp .env.example .env
 - `NEEDRADAR_TELEMETRY_OTLP_ENDPOINT` / `NEEDRADAR_TELEMETRY_OTLP_INSECURE`：可选，指向外部 OTLP Collector；若为空则默认输出至控制台。
 - `NEEDRADAR_TELEMETRY_SAMPLE_RATIO`：0-1 之间的采样率，默认为 `0.1`。
 - `NEEDRADAR_TELEMETRY_EXCLUDED_URLS`：无需采样的 URL（逗号分隔），默认排除 `/metrics` 与 `/health`。
+- `NEEDRADAR_DOWNSTREAM_FILESYSTEM_ENABLED` / `NEEDRADAR_DOWNSTREAM_FILESYSTEM_DIR` / `NEEDRADAR_DOWNSTREAM_FILESYSTEM_FORMAT`：启用基于文件系统的同步通道时需要的开关、输出目录与格式（支持 `jsonl`、`json`）。
 
 前端 `.env` 中可配置：
 
@@ -119,7 +120,9 @@ docker compose up --build
 
 - FastAPI 应用默认挂载 `/metrics`，通过 `app/core/metrics.py` 注入的请求包装统计 HTTP 数量、耗时，并输出 RSS 抓取、候选需求晋升与下游同步等业务指标。
 - `monitoring/prometheus.yml` 提供最小可用的 Prometheus 配置，可直接用 docker-compose 中的 `prometheus` 服务加载。
+- `monitoring/grafana_downstream.json` 是下游同步通道的 Grafana 仪表盘示例，包含成功率、状态拆分与最近错误面板，导入后选择 Prometheus 数据源即可。
 - 设置 `NEEDRADAR_TELEMETRY_ENABLED=true` 及对应的 OTLP Endpoint 后，`app/core/telemetry.py` 会自动为 FastAPI 与 Celery 任务注入 OpenTelemetry Trace，便于与 Jaeger/Tempo 等系统联动。
+- 需要立即下发候选需求到 Webhook/MQ/文件同步通道时，可使用 `python -m cli.main candidates sync --channel file_drop --limit 20` 手动派发任务。
 
 ## Web 管理前端
 

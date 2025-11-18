@@ -38,6 +38,22 @@
     "cancel": "Cancel",
     "confirm": "Confirm"
   },
+  "components": {
+    "filterPanel": {
+      "clear": "Reset filters",
+      "collapse": "Hide filters",
+      "expand": "Show filters",
+      "applied": "{count} filters active"
+    },
+    "operationLog": {
+      "status": {
+        "success": "Success",
+        "warning": "Warning",
+        "danger": "Error",
+        "info": "Info"
+      }
+    }
+  },
   "sources": {
     "title": "RSS sources",
     "subtitle": "Inspect fetch cadence and health",
@@ -108,6 +124,18 @@
   "alertsPage": {
     "title": "System alerts & operations",
     "subtitle": "Latest fetch failures and downstream sync attempts",
+    "filters": {
+      "title": "Alert filters",
+      "description": "Narrow down sync logs by channel",
+      "activeLabel": "{count} filter applied",
+      "clear": "Clear",
+      "collapse": "Hide",
+      "expand": "Show",
+      "channel": "Channel",
+      "options": {
+        "all": "All channels"
+      }
+    },
     "fetchLogs": {
       "title": "Fetch logs",
       "empty": "No fetch logs",
@@ -125,12 +153,39 @@
     },
     "syncLogs": {
       "title": "Sync audit",
+      "subtitle": "Latest pushes across webhook, MQ and file channels",
       "empty": "No sync attempts",
       "channels": {
+        "title": "Channel",
         "webhook": "Webhook",
         "mq": "Message queue",
-        "export": "Export"
+        "export": "Export",
+        "file": "File drop"
+      },
+      "statusLabels": {
+        "success": "Success",
+        "failed": "Failed",
+        "pending": "Pending"
+      },
+      "metadata": {
+        "attempt": "Attempt",
+        "file": "File",
+        "http": "HTTP"
       }
+    },
+    "syncStats": {
+      "title": "Channel overview",
+      "subtitle": "Success rate and last errors from recent logs",
+      "empty": "No sync data yet",
+      "successRate": "Success rate",
+      "results": "Results",
+      "success": "Success",
+      "failed": "Failed",
+      "pending": "Pending",
+      "lastAttempt": "Last attempt",
+      "filter": "Filter",
+      "focus": "Focus",
+      "viewAll": "All"
     }
   },
   "feedback": {
@@ -144,6 +199,8 @@
       "status": "Status",
       "synced": "Sync state",
       "searchPlaceholder": "Type to filter by summary, problem or note",
+      "panelTitle": "Filters",
+      "panelDescription": "Combine keywords, status and sync state to narrow down candidates",
       "statusOptions": {
         "all": "All"
       },

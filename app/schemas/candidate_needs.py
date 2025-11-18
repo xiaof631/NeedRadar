@@ -104,6 +104,7 @@ class SyncChannelEnum(str, Enum):
     WEBHOOK = SyncChannel.WEBHOOK.value
     MQ = SyncChannel.MQ.value
     EXPORT = SyncChannel.EXPORT.value
+    FILE_DROP = SyncChannel.FILE_DROP.value
 
 
 class CandidateNeedSyncLogRead(BaseModel):
@@ -126,6 +127,19 @@ class CandidateNeedSyncLogList(BaseModel):
 
     total: int
     items: list[CandidateNeedSyncLogRead]
+
+
+class CandidateNeedSyncChannelStat(BaseModel):
+    """按通道聚合的同步表现。"""
+
+    channel: SyncChannelEnum
+    total_attempts: int
+    success: int
+    failed: int
+    pending: int
+    success_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    last_attempt_at: datetime | None = None
+    last_error: str | None = None
 
 
 class CandidateNeedExportJobCreate(BaseModel):
