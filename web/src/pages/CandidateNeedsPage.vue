@@ -16,6 +16,76 @@
     </header>
 
     <el-card shadow="never">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <span>{{ t('candidates.intelligence.sectionTitle') }}</span>
+            <p class="section-subtitle">{{ t('candidates.intelligence.subtitle') }}</p>
+          </div>
+          <el-button text size="small" @click="clustersQuery.refetch()" :loading="clustersQuery.isFetching.value">
+            {{ t('actions.refresh') }}
+          </el-button>
+        </div>
+      </template>
+      <el-table
+        size="small"
+        :data="clusters"
+        v-loading="clustersQuery.isFetching.value"
+        :empty-text="t('candidates.intelligence.empty')"
+      >
+        <el-table-column :label="t('candidates.intelligence.columns.summary')" min-width="260">
+          <template #default="{ row }">
+            <div class="cluster-summary">
+              <strong>{{ row.representative_summary }}</strong>
+              <p v-if="row.representative_problem_statement">{{ row.representative_problem_statement }}</p>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('candidates.intelligence.columns.priority')" width="220">
+          <template #default="{ row }">
+            <div class="priority-cell">
+              <el-progress :percentage="toPercent(row.priority_score)" :stroke-width="8" :show-text="false" />
+              <strong>{{ formatPercent(row.priority_score) }}</strong>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('candidates.intelligence.columns.signals')" min-width="250">
+          <template #default="{ row }">
+            <div class="signal-list">
+              <el-tag type="danger" effect="light">
+                {{ t('candidates.intelligence.signals.complaint') }} {{ row.complaint_signal_count }}
+              </el-tag>
+              <el-tag type="warning" effect="light">
+                {{ t('candidates.intelligence.signals.alternative') }} {{ row.alternative_request_count }}
+              </el-tag>
+              <el-tag type="info" effect="light">
+                {{ t('candidates.intelligence.signals.comments') }} {{ row.reddit_comment_count }}
+              </el-tag>
+              <el-tag effect="plain">
+                {{ t('candidates.intelligence.signals.total') }} {{ row.signal_count }}
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('candidates.intelligence.columns.sources')" min-width="220">
+          <template #default="{ row }">
+            <div class="source-list">
+              <el-tag v-for="sourceType in row.source_types" :key="sourceType" effect="plain" type="success">
+                {{ sourceType }}
+              </el-tag>
+              <span class="source-meta">
+                {{ t('candidates.intelligence.sourceCount', { count: row.source_count }) }}
+              </span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('candidates.intelligence.columns.updated')" width="180">
+          <template #default="{ row }">{{ formatDate(row.latest_seen_at) }}</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card shadow="never">
       <div class="filters">
         <el-input
           v-model="searchInput"
@@ -167,13 +237,15 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMutation, useQuery } from '@tanstack/vue-query';
-import { ElMessage } from 'element-plus';
+import { ElMessage } from 'element-plus/es/components/message/index';
 import type { AxiosError } from 'axios';
 
 import {
   createCandidateNeedExportJob,
+  fetchCandidateNeedClusters,
   fetchCandidateNeedExportJobs,
   fetchCandidateNeeds,
+  type CandidateNeedCluster,
   type CandidateNeed,
   type CandidateNeedExportJob,
   type CandidateNeedExportJobPayload,
@@ -227,6 +299,20 @@ const needsQuery = useQuery({
 
 const needs = computed(() => needsQuery.data.value?.items ?? []);
 const total = computed(() => needsQuery.data.value?.total ?? 0);
+
+const clustersQuery = useQuery({
+  queryKey: computed(() => ['candidate-need-clusters', queryOptions.value]),
+  queryFn: () =>
+    fetchCandidateNeedClusters({
+      ...queryOptions.value,
+      limit: 6,
+      min_cluster_size: 2,
+    }),
+  keepPreviousData: true,
+  refetchOnWindowFocus: false,
+});
+
+const clusters = computed<CandidateNeedCluster[]>(() => clustersQuery.data.value?.items ?? []);
 
 const exportJobsQuery = useQuery({
   queryKey: ['candidate-need-export-jobs'],
@@ -328,6 +414,10 @@ const jobStatusTag = (status: ExportJobStatus) => {
 const formatScore = (value: number | null) => {
   return typeof value === 'number' ? value.toFixed(2) : '—';
 };
+
+const formatPercent = (value: number) => `${toPercent(value)}%`;
+
+const toPercent = (value: number) => Math.round(value * 100);
 
 const formatDate = (value: string) => {
   return new Intl.DateTimeFormat(undefined, {
@@ -440,6 +530,13 @@ const submitExport = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
+}
+
+.section-subtitle {
+  margin: 0.25rem 0 0;
+  color: #9ca3af;
+  font-size: 0.875rem;
 }
 
 .limit-field {
@@ -450,5 +547,36 @@ const submitExport = () => {
 
 .limit-field small {
   color: #9ca3af;
+}
+
+.cluster-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cluster-summary p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.priority-cell {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.signal-list,
+.source-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.source-meta {
+  color: #6b7280;
+  font-size: 0.875rem;
 }
 </style>

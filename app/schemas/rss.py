@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from app.models.rss import FetchStatus, SourceStatus
+from app.models.rss import FetchStatus, SourceStatus, SourceType
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, PositiveInt
 
 
@@ -15,6 +15,11 @@ class RssSourceBase(BaseModel):
     url: AnyHttpUrl = Field(..., description="RSS 源地址")
     category: str | None = Field(default=None, max_length=255)
     frequency: PositiveInt = Field(default=3600, description="抓取频率（秒）")
+    source_type: SourceType = Field(default=SourceType.RSS, description="数据源类型")
+    config: dict[str, str | int | float | bool | None] = Field(
+        default={},
+        description="适配器专属配置",
+    )
 
 
 class RssSourceCreate(RssSourceBase):
@@ -30,6 +35,8 @@ class RssSourceUpdate(BaseModel):
     url: AnyHttpUrl | None = Field(default=None)
     category: str | None = Field(default=None, max_length=255)
     frequency: PositiveInt | None = Field(default=None)
+    source_type: SourceType | None = Field(default=None)
+    config: dict[str, str | int | float | bool | None] | None = Field(default=None)
     status: SourceStatus | None = Field(default=None)
 
 
@@ -70,4 +77,3 @@ class FetchLogList(BaseModel):
 
     total: int
     items: list[FetchLogRead]
-

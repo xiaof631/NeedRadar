@@ -231,6 +231,25 @@
       "updated": "Updated at",
       "empty": "No candidate needs"
     },
+    "intelligence": {
+      "sectionTitle": "Signal clusters",
+      "subtitle": "Cross-source groups ranked by complaint, alternative intent and discussion density",
+      "empty": "No repeated signal clusters yet",
+      "columns": {
+        "summary": "Representative need",
+        "priority": "Priority score",
+        "signals": "Signal counts",
+        "sources": "Sources",
+        "updated": "Latest seen"
+      },
+      "signals": {
+        "complaint": "Complaints",
+        "alternative": "Alternatives",
+        "comments": "Comments",
+        "total": "Total"
+      },
+      "sourceCount": "{count} sources"
+    },
     "export": {
       "sectionTitle": "Export jobs",
       "dialogTitle": "Create export job",

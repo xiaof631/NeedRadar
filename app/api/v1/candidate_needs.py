@@ -11,6 +11,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.models import CandidateNeedStatus, ExportJobStatus, SyncChannel
 from app.schemas import (
+    CandidateNeedClusterList,
+    CandidateNeedClusterRead,
     CandidateNeedExportJobCreate,
     CandidateNeedExportJobRead,
     CandidateNeedExportJobList,
@@ -28,6 +30,7 @@ from app.schemas import (
 )
 import app.services.export_jobs as export_jobs
 from app.services import candidate_needs, downstream_metrics, sync_audit
+from app.services import candidate_clusters
 from app.services.export_jobs import ExportJobNotFoundError
 from app.services.candidate_needs import (
     CandidateNeedNotFoundError,
@@ -65,6 +68,42 @@ async def list_candidate_needs(
     return CandidateNeedList(
         total=total,
         items=[CandidateNeedRead.model_validate(item) for item in items],
+    )
+
+
+@router.get(
+    "/clusters",
+    response_model=CandidateNeedClusterList,
+    summary="聚合重复候选需求信号",
+)
+async def list_candidate_need_clusters(
+    statuses: list[CandidateNeedStatusEnum] | None = Query(
+        default=None,
+        description="按状态过滤，可多选",
+    ),
+    search: str | None = Query(default=None, description="关键字搜索"),
+    synced: bool | None = Query(default=None, description="按同步状态过滤"),
+    limit: int = Query(default=100, ge=1, le=500, description="聚类时纳入计算的候选需求数量"),
+    min_cluster_size: int = Query(default=2, ge=2, le=20, description="最小簇大小"),
+    similarity_threshold: float = Query(
+        default=0.25,
+        ge=0.1,
+        le=1.0,
+        description="相似度阈值",
+    ),
+) -> CandidateNeedClusterList:
+    normalized_statuses = _convert_statuses(statuses)
+    clusters = candidate_clusters.summarize_clusters(
+        statuses=tuple(normalized_statuses) if normalized_statuses is not None else None,
+        search=search,
+        synced=synced,
+        limit=limit,
+        min_cluster_size=min_cluster_size,
+        similarity_threshold=similarity_threshold,
+    )
+    return CandidateNeedClusterList(
+        total=len(clusters),
+        items=[CandidateNeedClusterRead.model_validate(item) for item in clusters],
     )
 
 

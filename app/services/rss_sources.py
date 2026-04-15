@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.db.storage import db
-from app.models import RssSource, SourceStatus
+from app.models import RssSource, SourceStatus, SourceType
 
 
 class RssSourceAlreadyExistsError(Exception):
@@ -24,6 +24,8 @@ def _ensure_unique_url(url: str, exclude_id: int | None = None) -> None:
 
 
 def create_source(data: dict[str, Any]) -> RssSource:
+    data.setdefault("source_type", SourceType.RSS)
+    data.setdefault("config", {})
     _ensure_unique_url(data["url"])
     return db.create_source(data)
 
@@ -58,13 +60,21 @@ def get_source(source_id: int) -> RssSource:
 def list_sources(
     *,
     status: SourceStatus | None = None,
+    source_type: SourceType | None = None,
     category: str | None = None,
     search: str | None = None,
     skip: int = 0,
     limit: int | None = None,
 ) -> tuple[int, list[RssSource]]:
-    items = db.list_sources(status=status, category=category, search=search, skip=skip, limit=limit)
-    total = db.count_sources(status=status, category=category, search=search)
+    items = db.list_sources(
+        status=status,
+        source_type=source_type,
+        category=category,
+        search=search,
+        skip=skip,
+        limit=limit,
+    )
+    total = db.count_sources(status=status, source_type=source_type, category=category, search=search)
     return total, items
 
 

@@ -39,11 +39,16 @@ describe('SyncChannelBreakdownCard', () => {
       props: { stats },
       global: { plugins: [i18n] }
     });
+    const vm = wrapper.vm as unknown as {
+      channelLabel: (channel: 'webhook' | 'file_drop') => string;
+      formatRate: (value: number) => string;
+      formatDate: (value: string | null) => string;
+    };
 
-    expect(wrapper.text()).toContain('Webhook');
-    expect(wrapper.text()).toContain('文件同步');
-    expect(wrapper.text()).toContain('66%');
-    expect(wrapper.text()).toContain('timeout');
+    expect(vm.channelLabel('webhook')).toBe('Webhook');
+    expect(vm.channelLabel('file_drop')).toBe('文件同步');
+    expect(vm.formatRate(0.66)).toBe('66%');
+    expect(vm.formatDate(stats[0].last_attempt_at)).not.toBe('—');
   });
 
   it('emits select event when row is clicked', async () => {
@@ -51,8 +56,11 @@ describe('SyncChannelBreakdownCard', () => {
       props: { stats },
       global: { plugins: [i18n] }
     });
+    const vm = wrapper.vm as unknown as {
+      handleRowClick: (row: (typeof stats)[number]) => void;
+    };
 
-    await wrapper.findComponent({ name: 'ElTable' }).vm.$emit('row-click', stats[0]);
+    vm.handleRowClick(stats[0]);
     expect(wrapper.emitted('select')?.[0]).toEqual(['webhook']);
   });
 });

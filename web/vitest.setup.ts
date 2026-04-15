@@ -1,6 +1,4 @@
 import { config } from '@vue/test-utils';
+import ElementPlus from 'element-plus';
 
-config.global.mocks = {
-  ...(config.global.mocks || {}),
-  t: (key: string) => key
-};
+config.global.plugins = [...(config.global.plugins || []), ElementPlus];

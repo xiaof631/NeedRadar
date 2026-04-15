@@ -25,6 +25,7 @@ from app.models import (
     FetchStatus,
     RawEntryStatus,
     SourceStatus,
+    SourceType,
     SyncChannel,
 )
 
@@ -53,6 +54,8 @@ class RssSourceEntity(TimestampMixin, Base):
     url: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
     category: Mapped[str | None] = mapped_column(String(100))
     frequency: Mapped[int] = mapped_column(Integer, default=3600)
+    source_type: Mapped[str] = mapped_column(String(32), default=SourceType.RSS.value)
+    config: Mapped[dict] = mapped_column(JSON, default=dict)
     status: Mapped[str] = mapped_column(String(32), default=SourceStatus.ACTIVE.value)
     last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     etag: Mapped[str | None] = mapped_column(String(200))

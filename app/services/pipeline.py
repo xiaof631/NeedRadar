@@ -9,6 +9,17 @@ from app.models import CandidateNeed, RawEntry, RawEntryStatus
 from app.services import candidate_needs, filter_engine, raw_entries
 from app.services.llm_client import LLMClient, StructuredNeed, get_default_llm_client
 
+_TAG_RULE_SCORE_BOOSTS: dict[str, float] = {
+    "complaint_signal": 0.08,
+    "alternative_request": 0.1,
+    "reddit_comment": 0.02,
+}
+_TAG_CONFIDENCE_BOOSTS: dict[str, float] = {
+    "complaint_signal": 0.06,
+    "alternative_request": 0.08,
+    "reddit_comment": 0.02,
+}
+
 
 class EntryNotQualifiedError(Exception):
     """条目未达到筛选要求。"""
@@ -60,6 +71,8 @@ def promote_entry(
     if not summary:
         summary = "自动生成的候选需求"
 
+    rule_score_boost = _signal_boost(entry, _TAG_RULE_SCORE_BOOSTS)
+    confidence_boost = _signal_boost(entry, _TAG_CONFIDENCE_BOOSTS)
     need = candidate_needs.create_need(
         {
             "raw_entry_id": entry.id,
@@ -68,8 +81,8 @@ def promote_entry(
             "target_users": structured.target_users,
             "value_proposition": structured.value_proposition,
             "competition": structured.competition,
-            "confidence": structured.confidence,
-            "rule_score": rule_match.score,
+            "confidence": min(structured.confidence + confidence_boost, 0.99),
+            "rule_score": min(rule_match.score + rule_score_boost, 1.0),
         }
     )
     raw_entries.update_entry_status(entry.id, RawEntryStatus.PROMOTED)
@@ -81,3 +94,10 @@ def promote_entry(
         rule_match=rule_match,
         structured_need=structured,
     )
+
+
+def _signal_boost(entry: RawEntry, weights: dict[str, float]) -> float:
+    if not entry.tags:
+        return 0.0
+    unique_tags = set(entry.tags)
+    return sum(weight for tag, weight in weights.items() if tag in unique_tags)

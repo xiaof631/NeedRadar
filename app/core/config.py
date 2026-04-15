@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="是否启用调试模式")
     app_name: str = Field(default="NeedRadar API", description="FastAPI 应用名称")
     database_url: str = Field(
-        default="sqlite+aiosqlite:///./data/needradar.db",
+        default="postgresql+asyncpg://needradar:needradar@localhost:5432/needradar",
         description="SQLAlchemy 数据库连接字符串",
     )
     alembic_database_url: str | None = Field(
@@ -150,6 +150,18 @@ class Settings(BaseSettings):
         default=(),
         description="可访问 API 的 Token 列表，默认关闭认证",
     )
+    reddit_access_token: str | None = Field(
+        default=None,
+        description="可选，Reddit OAuth access token；配置后抓取走 Bearer 认证",
+    )
+    reddit_user_agent: str = Field(
+        default="NeedRadar/0.1",
+        description="访问 Reddit 时使用的 User-Agent",
+    )
+    youtube_api_key: str | None = Field(
+        default=None,
+        description="可选，YouTube Data API v3 key；配置后可抓取公开视频搜索结果",
+    )
 
     telemetry_enabled: bool = Field(
         default=False,
@@ -188,6 +200,8 @@ class Settings(BaseSettings):
             return self.alembic_database_url
         if self.database_url.startswith("sqlite+aiosqlite"):
             return self.database_url.replace("sqlite+aiosqlite", "sqlite")
+        if self.database_url.startswith("postgresql+asyncpg"):
+            return self.database_url.replace("postgresql+asyncpg", "postgresql+psycopg", 1)
         return self.database_url
 
 

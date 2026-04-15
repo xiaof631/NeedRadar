@@ -2,6 +2,7 @@
 
 from app.services import (
     alerts,
+    candidate_clusters,
     candidate_needs,
     dashboard,
     downstream,
@@ -9,17 +10,22 @@ from app.services import (
     filter_engine,
     filter_metrics,
     filter_rules,
+    github_fetcher,
+    hacker_news_fetcher,
     mq,
     llm_client,
     pipeline,
     raw_entries,
+    reddit_fetcher,
     sync_audit,
+    youtube_fetcher,
     rss_fetcher,
     rss_sources,
 )
 
 __all__ = [
     "alerts",
+    "candidate_clusters",
     "candidate_needs",
     "dashboard",
     "downstream",
@@ -27,11 +33,15 @@ __all__ = [
     "filter_engine",
     "filter_metrics",
     "filter_rules",
+    "github_fetcher",
+    "hacker_news_fetcher",
     "mq",
     "llm_client",
     "pipeline",
     "raw_entries",
+    "reddit_fetcher",
     "sync_audit",
+    "youtube_fetcher",
     "rss_fetcher",
     "rss_sources",
 ]

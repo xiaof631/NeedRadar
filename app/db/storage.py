@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.entities import (
@@ -20,7 +20,7 @@ from app.db.entities import (
     RawEntryEntity,
     RssSourceEntity,
 )
-from app.db.session import Base, SessionLocal
+from app.db.session import Base, SessionLocal, get_sync_engine
 from app.models import (
     CandidateNeed,
     CandidateNeedStatus,
@@ -35,6 +35,7 @@ from app.models import (
     RawEntryStatus,
     RssSource,
     SourceStatus,
+    SourceType,
     SyncChannel,
 )
 
@@ -58,14 +59,24 @@ class SQLDatabase:
             session.close()
 
     def reset(self) -> None:
-        with self._session() as session:
-            for table in reversed(Base.metadata.sorted_tables):
-                session.execute(delete(table))
+        # Rebuild the schema instead of only truncating rows so tests pick up
+        # newly added columns on existing SQLite files.
+        sync_engine = get_sync_engine()
+        Base.metadata.drop_all(bind=sync_engine)
+        Base.metadata.create_all(bind=sync_engine)
 
     # RSS 源
     def create_source(self, data: dict) -> RssSource:
+        payload = {**data}
+        source_type = payload.get("source_type", SourceType.RSS)
+        payload["source_type"] = (
+            source_type.value if isinstance(source_type, SourceType) else str(source_type)
+        )
+        payload["config"] = dict(payload.get("config", {}))
+        status = payload.get("status", SourceStatus.ACTIVE)
+        payload["status"] = status.value if isinstance(status, SourceStatus) else str(status)
         with self._session() as session:
-            entity = RssSourceEntity(**data)
+            entity = RssSourceEntity(**payload)
             session.add(entity)
             session.flush()
             session.refresh(entity)
@@ -99,6 +110,7 @@ class SQLDatabase:
         self,
         *,
         status: SourceStatus | None = None,
+        source_type: SourceType | None = None,
         category: str | None = None,
         search: str | None = None,
         skip: int = 0,
@@ -108,6 +120,8 @@ class SQLDatabase:
             stmt = select(RssSourceEntity).order_by(RssSourceEntity.created_at.desc())
             if status is not None:
                 stmt = stmt.where(RssSourceEntity.status == status.value)
+            if source_type is not None:
+                stmt = stmt.where(RssSourceEntity.source_type == source_type.value)
             if category:
                 stmt = stmt.where(RssSourceEntity.category == category)
             if search:
@@ -124,6 +138,7 @@ class SQLDatabase:
         self,
         *,
         status: SourceStatus | None = None,
+        source_type: SourceType | None = None,
         category: str | None = None,
         search: str | None = None,
     ) -> int:
@@ -131,6 +146,8 @@ class SQLDatabase:
             stmt = select(func.count(RssSourceEntity.id))
             if status is not None:
                 stmt = stmt.where(RssSourceEntity.status == status.value)
+            if source_type is not None:
+                stmt = stmt.where(RssSourceEntity.source_type == source_type.value)
             if category:
                 stmt = stmt.where(RssSourceEntity.category == category)
             if search:
@@ -692,6 +709,8 @@ def _to_rss_source(entity: RssSourceEntity) -> RssSource:
         url=entity.url,
         category=entity.category,
         frequency=entity.frequency,
+        source_type=SourceType(entity.source_type),
+        config=dict(entity.config or {}),
         status=SourceStatus(entity.status),
         last_fetched_at=entity.last_fetched_at,
         etag=entity.etag,
@@ -706,6 +725,11 @@ def _apply_source(entity: RssSourceEntity, model: RssSource) -> None:
     entity.url = model.url
     entity.category = model.category
     entity.frequency = model.frequency
+    if isinstance(model.source_type, SourceType):
+        entity.source_type = model.source_type.value
+    else:
+        entity.source_type = str(model.source_type)
+    entity.config = dict(model.config)
     if isinstance(model.status, SourceStatus):
         entity.status = model.status.value
     else:
@@ -882,4 +906,3 @@ def _apply_filter_rule(entity: FilterRuleEntity, model: FilterRule) -> None:
 
 
 db = SQLDatabase()
-

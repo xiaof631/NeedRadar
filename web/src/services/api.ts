@@ -268,6 +268,32 @@ export interface CandidateNeedListResponse {
   items: CandidateNeed[];
 }
 
+export interface CandidateNeedCluster {
+  cluster_id: string;
+  representative_need_id: number;
+  representative_summary: string;
+  representative_problem_statement: string | null;
+  signal_count: number;
+  source_count: number;
+  cross_source: boolean;
+  source_names: string[];
+  source_types: string[];
+  need_ids: number[];
+  statuses: CandidateNeedStatus[];
+  avg_confidence: number | null;
+  avg_rule_score: number | null;
+  complaint_signal_count: number;
+  alternative_request_count: number;
+  reddit_comment_count: number;
+  priority_score: number;
+  latest_seen_at: string;
+}
+
+export interface CandidateNeedClusterListResponse {
+  total: number;
+  items: CandidateNeedCluster[];
+}
+
 export interface CandidateNeedQueryParams {
   skip?: number;
   limit?: number;
@@ -281,6 +307,25 @@ export async function fetchCandidateNeeds(
 ): Promise<CandidateNeedListResponse> {
   const response = await apiClient.get('/api/v1/candidate-needs', {
     params: buildCandidateNeedParams(params)
+  });
+  return response.data;
+}
+
+export async function fetchCandidateNeedClusters(
+  params: CandidateNeedQueryParams & {
+    min_cluster_size?: number;
+    similarity_threshold?: number;
+  } = {}
+): Promise<CandidateNeedClusterListResponse> {
+  const searchParams = buildCandidateNeedParams(params);
+  if (typeof params.min_cluster_size === 'number') {
+    searchParams.set('min_cluster_size', String(params.min_cluster_size));
+  }
+  if (typeof params.similarity_threshold === 'number') {
+    searchParams.set('similarity_threshold', String(params.similarity_threshold));
+  }
+  const response = await apiClient.get('/api/v1/candidate-needs/clusters', {
+    params: searchParams
   });
   return response.data;
 }

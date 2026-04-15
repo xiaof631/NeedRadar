@@ -12,8 +12,15 @@ import httpx
 
 from app.core import metrics
 from app.db.storage import db
-from app.models import FetchStatus, RssSource
-from app.services import raw_entries, rss_sources
+from app.models import FetchStatus, RssSource, SourceType
+from app.services import (
+    github_fetcher,
+    hacker_news_fetcher,
+    raw_entries,
+    reddit_fetcher,
+    rss_sources,
+    youtube_fetcher,
+)
 
 
 class RssFeedParseError(Exception):
@@ -50,10 +57,22 @@ async def fetch_rss_source(
     *,
     client: httpx.AsyncClient | None = None,
 ) -> FetchResult:
-    """抓取指定数据源的 RSS。"""
+    """按数据源类型抓取指定数据源。"""
 
     source = rss_sources.get_source(source_id)
-    return await _fetch_with_source(source, client=client)
+    fetcher = _get_source_fetcher(source.source_type)
+    return await fetcher(source, client=client)
+
+
+def _get_source_fetcher(source_type: SourceType):
+    registry = {
+        SourceType.RSS: _fetch_with_source,
+        SourceType.HACKER_NEWS: hacker_news_fetcher.fetch_hacker_news_source,
+        SourceType.GITHUB_ISSUES: github_fetcher.fetch_github_issues_source,
+        SourceType.REDDIT: reddit_fetcher.fetch_reddit_source,
+        SourceType.YOUTUBE: youtube_fetcher.fetch_youtube_source,
+    }
+    return registry.get(source_type, _fetch_with_source)
 
 
 async def _fetch_with_source(

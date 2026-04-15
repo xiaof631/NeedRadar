@@ -15,6 +15,7 @@ from app.models.rss import (
     RawEntryStatus,
     RssSource,
     SourceStatus,
+    SourceType,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "RawEntryStatus",
     "RssSource",
     "SourceStatus",
+    "SourceType",
 ]

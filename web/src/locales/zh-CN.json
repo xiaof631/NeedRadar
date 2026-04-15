@@ -231,6 +231,25 @@
       "updated": "更新时间",
       "empty": "暂无候选需求"
     },
+    "intelligence": {
+      "sectionTitle": "情报信号簇",
+      "subtitle": "按抱怨、求替代与讨论密度聚合跨源重复需求信号",
+      "empty": "暂无重复信号簇",
+      "columns": {
+        "summary": "代表需求",
+        "priority": "优先级得分",
+        "signals": "信号计数",
+        "sources": "来源",
+        "updated": "最近出现"
+      },
+      "signals": {
+        "complaint": "抱怨",
+        "alternative": "求替代",
+        "comments": "评论",
+        "total": "总信号"
+      },
+      "sourceCount": "{count} 个来源"
+    },
     "export": {
       "sectionTitle": "导出任务",
       "dialogTitle": "创建导出任务",

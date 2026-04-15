@@ -49,6 +49,38 @@ class CandidateNeedList(BaseModel):
     items: list[CandidateNeedRead]
 
 
+class CandidateNeedClusterRead(BaseModel):
+    """候选需求重复信号聚类。"""
+
+    cluster_id: str
+    representative_need_id: int
+    representative_summary: str
+    representative_problem_statement: str | None = None
+    signal_count: int
+    source_count: int
+    cross_source: bool
+    source_names: list[str]
+    source_types: list[str]
+    need_ids: list[int]
+    statuses: list[CandidateNeedStatusEnum]
+    avg_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    avg_rule_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    complaint_signal_count: int = Field(default=0, ge=0)
+    alternative_request_count: int = Field(default=0, ge=0)
+    reddit_comment_count: int = Field(default=0, ge=0)
+    priority_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    latest_seen_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CandidateNeedClusterList(BaseModel):
+    """候选需求聚类列表。"""
+
+    total: int
+    items: list[CandidateNeedClusterRead]
+
+
 class CandidateNeedCreate(BaseModel):
     """候选需求创建请求。"""
 
@@ -178,5 +210,3 @@ class CandidateNeedExportJobList(BaseModel):
 
     total: int
     items: list[CandidateNeedExportJobRead]
-
-

@@ -1,6 +1,8 @@
 """Pydantic 模型导出。"""
 
 from app.schemas.candidate_needs import (
+    CandidateNeedClusterList,
+    CandidateNeedClusterRead,
     CandidateNeedExportJobCreate,
     CandidateNeedExportJobRead,
     CandidateNeedExportJobList,
@@ -57,6 +59,8 @@ __all__ = [
     "CandidateNeedExportJobRead",
     "CandidateNeedExportJobList",
     "CandidateNeedCreate",
+    "CandidateNeedClusterList",
+    "CandidateNeedClusterRead",
     "CandidateNeedList",
     "CandidateNeedRead",
     "CandidateNeedStatusLogRead",

@@ -12,7 +12,14 @@ from typing import Annotated, Any
 import typer
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
-from app.models import CandidateNeedStatus, FetchStatus, RawEntryStatus, SourceStatus, SyncChannel
+from app.models import (
+    CandidateNeedStatus,
+    FetchStatus,
+    RawEntryStatus,
+    SourceStatus,
+    SourceType,
+    SyncChannel,
+)
 from app.schemas import CandidateNeedRead, RawEntryRead
 import app.services.export_jobs as export_jobs
 
@@ -202,6 +209,10 @@ def list_sources(
         SourceStatus | None,
         typer.Option(help="根据状态过滤", case_sensitive=False),
     ] = None,
+    source_type: Annotated[
+        SourceType | None,
+        typer.Option("--source-type", help="根据数据源类型过滤", case_sensitive=False),
+    ] = None,
     category: Annotated[
         str | None,
         typer.Option(help="根据分类过滤"),
@@ -209,7 +220,7 @@ def list_sources(
 ) -> None:
     """列出所有 RSS 源。"""
 
-    total, items = rss_sources.list_sources(status=status, category=category)
+    total, items = rss_sources.list_sources(status=status, source_type=source_type, category=category)
     if total == 0:
         typer.echo("暂无 RSS 源")
         raise typer.Exit()
@@ -217,7 +228,7 @@ def list_sources(
     for source in items:
         message = (
             f"[{source.id}] {source.name} - {source.url} "
-            f"(分类: {source.category or '-'}, 状态: {source.status})"
+            f"(类型: {source.source_type.value}, 分类: {source.category or '-'}, 状态: {source.status})"
         )
         typer.echo(message)
 
@@ -270,10 +281,14 @@ def list_fetch_logs(
 
 @rss_app.command("create")
 def create_source(
-    name: Annotated[str, typer.Argument(help="RSS 源名称")],
-    url: Annotated[str, typer.Argument(help="RSS 地址")],
+    name: Annotated[str, typer.Argument(help="数据源名称")],
+    url: Annotated[str, typer.Argument(help="数据源地址")],
     frequency: Annotated[int, typer.Option(help="抓取频率（秒）", min=60)] = 3600,
     category: Annotated[str | None, typer.Option(help="分类标签")] = None,
+    source_type: Annotated[
+        SourceType,
+        typer.Option("--source-type", help="数据源类型", case_sensitive=False),
+    ] = SourceType.RSS,
 ) -> None:
     """创建新的 RSS 源。"""
 
@@ -284,6 +299,7 @@ def create_source(
                 "url": url,
                 "frequency": frequency,
                 "category": category,
+                "source_type": source_type,
             }
         )
     except rss_sources.RssSourceAlreadyExistsError as exc:  # pragma: no cover - CLI 提示
@@ -294,11 +310,15 @@ def create_source(
 
 @rss_app.command("update")
 def update_source(
-    source_id: Annotated[int, typer.Argument(help="RSS 源 ID")],
+    source_id: Annotated[int, typer.Argument(help="数据源 ID")],
     name: Annotated[str | None, typer.Option(help="名称")] = None,
-    url: Annotated[str | None, typer.Option(help="RSS 地址")] = None,
+    url: Annotated[str | None, typer.Option(help="数据源地址")] = None,
     frequency: Annotated[int | None, typer.Option(help="抓取频率（秒）", min=60)] = None,
     category: Annotated[str | None, typer.Option(help="分类标签")] = None,
+    source_type: Annotated[
+        SourceType | None,
+        typer.Option("--source-type", help="数据源类型", case_sensitive=False),
+    ] = None,
     status: Annotated[SourceStatus | None, typer.Option(help="状态", case_sensitive=False)] = None,
 ) -> None:
     """更新 RSS 源信息。"""
@@ -310,6 +330,7 @@ def update_source(
             "url": url,
             "frequency": frequency,
             "category": category,
+            "source_type": source_type,
             "status": status,
         }.items()
         if value is not None

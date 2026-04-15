@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 
 from app.main import app
-from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus, SyncChannel
+from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus, SourceType, SyncChannel
 import app.services.export_jobs as export_jobs
 
-from app.services import candidate_needs, raw_entries, rss_sources, sync_audit
+from app.services import candidate_clusters, candidate_needs, raw_entries, rss_sources, sync_audit
 from app.services.export_jobs import ExportJobStatus
 from fastapi.testclient import TestClient
 from jobs import task_queue
@@ -460,3 +460,223 @@ def test_candidate_need_status_transition_validation(client: TestClient) -> None
         json={"status": CandidateNeedStatus.PENDING_REVIEW.value},
     )
     assert reopen.status_code == 400
+
+
+def _seed_cluster_candidates() -> None:
+    rss_source = rss_sources.create_source(
+        {
+            "name": "RSS Feed",
+            "url": "https://example.com/issues.xml",
+            "frequency": 3600,
+            "source_type": SourceType.RSS,
+        }
+    )
+    github_source = rss_sources.create_source(
+        {
+            "name": "GitHub Repo Issues",
+            "url": "https://api.github.com/repos/acme/needradar/issues",
+            "frequency": 1800,
+            "source_type": SourceType.GITHUB_ISSUES,
+        }
+    )
+    hn_source = rss_sources.create_source(
+        {
+            "name": "Ask HN",
+            "url": "https://hacker-news.firebaseio.com/v0/askstories.json",
+            "frequency": 900,
+            "source_type": SourceType.HACKER_NEWS,
+        }
+    )
+
+    first_entry = raw_entries.create_entry(
+        {
+            "source_id": rss_source.id,
+            "guid": "rss-issue-triage",
+            "title": "Manual issue triage for engineering teams",
+            "summary": "Teams still triage inbound issues manually",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+    second_entry = raw_entries.create_entry(
+        {
+            "source_id": github_source.id,
+            "guid": "gh-issue-triage",
+            "title": "Need faster GitHub issue triage",
+            "summary": "Engineering teams process issue queues manually",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+    third_entry = raw_entries.create_entry(
+        {
+            "source_id": hn_source.id,
+            "guid": "hn-podcast-clips",
+            "title": "Podcast clip generator",
+            "summary": "Create short video clips from long podcasts",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": first_entry.id,
+            "summary": "Issue triage assistant for engineering teams",
+            "problem_statement": "Engineering teams manually triage inbound issues every day",
+            "confidence": 0.82,
+            "rule_score": 0.76,
+            "status": CandidateNeedStatus.APPROVED,
+        }
+    )
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": second_entry.id,
+            "summary": "Engineering issue triage copilot",
+            "problem_statement": "Teams process GitHub issues manually and lose context",
+            "confidence": 0.78,
+            "rule_score": 0.73,
+            "status": CandidateNeedStatus.PENDING_REVIEW,
+        }
+    )
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": third_entry.id,
+            "summary": "Podcast clip maker",
+            "problem_statement": "Creators need highlight clips from long-form audio",
+            "confidence": 0.61,
+            "rule_score": 0.58,
+            "status": CandidateNeedStatus.PENDING_REVIEW,
+        }
+    )
+
+
+def _seed_signal_cluster_candidates() -> None:
+    reddit_source = rss_sources.create_source(
+        {
+            "name": "Reddit Comments",
+            "url": "https://www.reddit.com/r/sideproject/comments",
+            "frequency": 900,
+            "source_type": SourceType.REDDIT,
+        }
+    )
+    github_source = rss_sources.create_source(
+        {
+            "name": "GitHub Repo Issues",
+            "url": "https://api.github.com/repos/acme/needradar/issues",
+            "frequency": 1800,
+            "source_type": SourceType.GITHUB_ISSUES,
+        }
+    )
+
+    reddit_entry = raw_entries.create_entry(
+        {
+            "source_id": reddit_source.id,
+            "guid": "reddit-comment-1",
+            "title": "Comment on Manual customer support workflows",
+            "summary": "still manually copying customer emails into notion",
+            "content": (
+                "This is so annoying and tedious. Looking for a better tool to "
+                "replace our manual customer support workflow."
+            ),
+            "tags": [
+                "reddit",
+                "reddit_comment",
+                "complaint_signal",
+                "alternative_request",
+            ],
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+    github_entry = raw_entries.create_entry(
+        {
+            "source_id": github_source.id,
+            "guid": "gh-support-automation",
+            "title": "Support queue automation for small teams",
+            "summary": "Small teams still triage support requests manually",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": reddit_entry.id,
+            "summary": "Automation for manual customer support triage",
+            "problem_statement": "Small teams still copy support requests by hand every day",
+            "confidence": 0.88,
+            "rule_score": 0.92,
+            "status": CandidateNeedStatus.PENDING_REVIEW,
+        }
+    )
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": github_entry.id,
+            "summary": "Customer support triage copilot",
+            "problem_statement": "Support teams manually route and summarize incoming requests",
+            "confidence": 0.74,
+            "rule_score": 0.69,
+            "status": CandidateNeedStatus.APPROVED,
+        }
+    )
+
+
+def test_candidate_clusters_service() -> None:
+    _seed_cluster_candidates()
+
+    clusters = candidate_clusters.summarize_clusters(limit=20, min_cluster_size=2)
+
+    assert len(clusters) == 1
+    cluster = clusters[0]
+    assert cluster.signal_count == 2
+    assert cluster.cross_source is True
+    assert cluster.source_count == 2
+    assert "RSS Feed" in cluster.source_names
+    assert "GitHub Repo Issues" in cluster.source_names
+    assert SourceType.RSS.value in cluster.source_types
+    assert SourceType.GITHUB_ISSUES.value in cluster.source_types
+
+
+def test_candidate_clusters_api(client: TestClient) -> None:
+    _seed_cluster_candidates()
+
+    response = client.get(
+        "/api/v1/candidate-needs/clusters",
+        params={"limit": 20, "min_cluster_size": 2},
+    )
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["total"] == 1
+    cluster = body["items"][0]
+    assert cluster["signal_count"] == 2
+    assert cluster["cross_source"] is True
+    assert cluster["source_count"] == 2
+    assert SourceType.GITHUB_ISSUES.value in cluster["source_types"]
+
+
+def test_candidate_clusters_prioritize_complaint_and_alternative_signals() -> None:
+    _seed_signal_cluster_candidates()
+
+    clusters = candidate_clusters.summarize_clusters(limit=20, min_cluster_size=2)
+
+    assert len(clusters) == 1
+    cluster = clusters[0]
+    assert cluster.complaint_signal_count == 1
+    assert cluster.alternative_request_count == 1
+    assert cluster.reddit_comment_count == 1
+    assert cluster.priority_score > 0.5
+
+
+def test_candidate_clusters_api_exposes_signal_counts(client: TestClient) -> None:
+    _seed_signal_cluster_candidates()
+
+    response = client.get(
+        "/api/v1/candidate-needs/clusters",
+        params={"limit": 20, "min_cluster_size": 2},
+    )
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["total"] == 1
+    cluster = body["items"][0]
+    assert cluster["complaint_signal_count"] == 1
+    assert cluster["alternative_request_count"] == 1
+    assert cluster["reddit_comment_count"] == 1
+    assert cluster["priority_score"] > 0.5

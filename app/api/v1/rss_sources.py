@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.models import SourceStatus
+from app.models import SourceStatus, SourceType
 from app.schemas import RssSourceCreate, RssSourceList, RssSourceRead, RssSourceUpdate
 from app.services import rss_sources
 from fastapi import APIRouter, HTTPException, Query, status
@@ -15,6 +15,7 @@ async def list_rss_sources(
     skip: int = Query(default=0, ge=0, description="跳过的记录数量"),
     limit: int = Query(default=20, ge=1, le=100, description="返回的记录数量"),
     status: SourceStatus | None = Query(default=None, description="过滤状态"),
+    source_type: SourceType | None = Query(default=None, description="过滤数据源类型"),
     category: str | None = Query(default=None, description="过滤分类"),
     search: str | None = Query(default=None, description="名称模糊搜索"),
 ) -> RssSourceList:
@@ -22,6 +23,7 @@ async def list_rss_sources(
         skip=skip,
         limit=limit,
         status=status,
+        source_type=source_type,
         category=category,
         search=search,
     )

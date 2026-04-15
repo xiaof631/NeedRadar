@@ -25,7 +25,7 @@ class DummyClient:
         )
 
 
-def _seed_entry() -> int:
+def _seed_entry(*, tags: list[str] | None = None) -> int:
     source = rss_sources.create_source(
         {
             "name": "Tech",
@@ -40,6 +40,7 @@ def _seed_entry() -> int:
             "guid": "entry-1",
             "title": "LLM 自动化助手",
             "summary": "开发者需要更快的 LLM 工作流",
+            "tags": tags or [],
         }
     )
     filter_rules.create_rule(
@@ -78,3 +79,15 @@ def test_promote_entry_rejects_duplicate_candidates() -> None:
 
     with pytest.raises(CandidateAlreadyExistsError):
         pipeline.promote_entry(entry_id, llm_client=DummyClient())
+
+
+def test_promote_entry_boosts_scores_for_reddit_signal_tags() -> None:
+    entry_id = _seed_entry(
+        tags=["reddit", "reddit_comment", "complaint_signal", "alternative_request"]
+    )
+
+    result = pipeline.promote_entry(entry_id, llm_client=DummyClient())
+
+    assert result.rule_match.score == pytest.approx(1.0)
+    assert result.candidate_need.rule_score == pytest.approx(1.0)
+    assert result.candidate_need.confidence == pytest.approx(0.96)

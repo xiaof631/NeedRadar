@@ -17,6 +17,16 @@ class SourceStatus(str, Enum):
     DISABLED = "disabled"
 
 
+class SourceType(str, Enum):
+    """数据源类型。"""
+
+    RSS = "rss"
+    HACKER_NEWS = "hacker_news"
+    GITHUB_ISSUES = "github_issues"
+    REDDIT = "reddit"
+    YOUTUBE = "youtube"
+
+
 class FetchStatus(str, Enum):
     """抓取日志的状态。"""
 
@@ -42,6 +52,8 @@ class RssSource:
     url: str
     category: str | None = None
     frequency: int = 3600
+    source_type: SourceType = SourceType.RSS
+    config: dict[str, Any] = field(default_factory=dict)
     status: SourceStatus = SourceStatus.ACTIVE
     last_fetched_at: datetime | None = None
     etag: str | None = None

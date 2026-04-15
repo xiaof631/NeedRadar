@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.main import app
-from app.models import SourceStatus
+from app.models import SourceStatus, SourceType
 from app.services import rss_sources
 from fastapi.testclient import TestClient
 
@@ -90,3 +90,131 @@ def test_rss_source_filtering(client: TestClient) -> None:
     result = search.json()
     assert result["total"] == 1
     assert result["items"][0]["name"] == first["name"]
+
+
+def test_can_create_and_filter_hacker_news_source(client: TestClient) -> None:
+    rss_response = client.post(
+        "/api/v1/rss-sources",
+        json={
+            "name": "AI Weekly",
+            "url": "https://feeds.example.com/ai.xml",
+            "category": "ai",
+            "frequency": 3600,
+        },
+    )
+    assert rss_response.status_code == 201
+
+    hn_payload = {
+        "name": "Ask HN",
+        "url": "https://hacker-news.firebaseio.com/v0/askstories.json",
+        "category": "community",
+        "frequency": 900,
+        "source_type": SourceType.HACKER_NEWS.value,
+        "config": {"item_limit": 5},
+    }
+    hn_response = client.post("/api/v1/rss-sources", json=hn_payload)
+    assert hn_response.status_code == 201
+    body = hn_response.json()
+    assert body["source_type"] == SourceType.HACKER_NEWS.value
+    assert body["config"]["item_limit"] == 5
+
+    filtered = client.get(
+        "/api/v1/rss-sources",
+        params={"source_type": SourceType.HACKER_NEWS.value},
+    )
+    assert filtered.status_code == 200
+    result = filtered.json()
+    assert result["total"] == 1
+    assert result["items"][0]["name"] == hn_payload["name"]
+
+
+def test_can_create_and_filter_github_issues_source(client: TestClient) -> None:
+    payload = {
+        "name": "NeedRadar Repo Issues",
+        "url": "https://api.github.com/repos/acme/needradar/issues",
+        "category": "developer-tools",
+        "frequency": 1200,
+        "source_type": SourceType.GITHUB_ISSUES.value,
+        "config": {"item_limit": 10, "state": "open"},
+    }
+    response = client.post("/api/v1/rss-sources", json=payload)
+    assert response.status_code == 201
+    body = response.json()
+    assert body["source_type"] == SourceType.GITHUB_ISSUES.value
+    assert body["config"]["state"] == "open"
+
+    filtered = client.get(
+        "/api/v1/rss-sources",
+        params={"source_type": SourceType.GITHUB_ISSUES.value},
+    )
+    assert filtered.status_code == 200
+    result = filtered.json()
+    assert result["total"] == 1
+    assert result["items"][0]["url"] == payload["url"]
+
+
+def test_can_create_and_filter_reddit_source(client: TestClient) -> None:
+    payload = {
+        "name": "r/startups new",
+        "url": "https://www.reddit.com/r/startups/new",
+        "category": "community",
+        "frequency": 1200,
+        "source_type": SourceType.REDDIT.value,
+        "config": {"item_limit": 10, "time": "week"},
+    }
+    response = client.post("/api/v1/rss-sources", json=payload)
+    assert response.status_code == 201
+    body = response.json()
+    assert body["source_type"] == SourceType.REDDIT.value
+    assert body["config"]["time"] == "week"
+
+    filtered = client.get(
+        "/api/v1/rss-sources",
+        params={"source_type": SourceType.REDDIT.value},
+    )
+    assert filtered.status_code == 200
+    result = filtered.json()
+    assert result["total"] == 1
+    assert result["items"][0]["name"] == payload["name"]
+
+
+def test_can_create_reddit_comments_source(client: TestClient) -> None:
+    payload = {
+        "name": "r/startups comments",
+        "url": "https://www.reddit.com/r/startups/comments",
+        "category": "community",
+        "frequency": 900,
+        "source_type": SourceType.REDDIT.value,
+        "config": {"item_limit": 25, "sort": "new"},
+    }
+    response = client.post("/api/v1/rss-sources", json=payload)
+    assert response.status_code == 201
+    body = response.json()
+    assert body["source_type"] == SourceType.REDDIT.value
+    assert body["config"]["sort"] == "new"
+    assert body["config"]["item_limit"] == 25
+
+
+def test_can_create_and_filter_youtube_source(client: TestClient) -> None:
+    payload = {
+        "name": "YouTube workflow search",
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "category": "video",
+        "frequency": 1800,
+        "source_type": SourceType.YOUTUBE.value,
+        "config": {"query": "manual workflow automation", "item_limit": 10},
+    }
+    response = client.post("/api/v1/rss-sources", json=payload)
+    assert response.status_code == 201
+    body = response.json()
+    assert body["source_type"] == SourceType.YOUTUBE.value
+    assert body["config"]["query"] == "manual workflow automation"
+
+    filtered = client.get(
+        "/api/v1/rss-sources",
+        params={"source_type": SourceType.YOUTUBE.value},
+    )
+    assert filtered.status_code == 200
+    result = filtered.json()
+    assert result["total"] == 1
+    assert result["items"][0]["name"] == payload["name"]
