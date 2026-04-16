@@ -111,6 +111,23 @@
     </el-card>
 
     <el-card shadow="never">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <span>{{ t('candidates.sourceOverview.title') }}</span>
+            <p class="section-subtitle">{{ t('candidates.sourceOverview.subtitle') }}</p>
+          </div>
+        </div>
+      </template>
+      <div class="source-overview">
+        <div v-for="item in sourceOverviewItems" :key="item.key" class="source-overview__item">
+          <strong>{{ item.label }}</strong>
+          <span>{{ item.count }}</span>
+        </div>
+      </div>
+    </el-card>
+
+    <el-card shadow="never">
       <div class="filters">
         <el-input
           v-model="searchInput"
@@ -481,6 +498,11 @@ const exportJobsQuery = useQuery({
 const exportJobs = computed(() => exportJobsQuery.data.value?.items ?? []);
 const detailDrawerVisible = ref(false);
 const selectedNeedId = ref<number | null>(null);
+const sourceOverviewQuery = useQuery({
+  queryKey: ['candidate-needs-source-overview'],
+  queryFn: () => fetchCandidateNeeds({ limit: 200 }),
+  refetchOnWindowFocus: false,
+});
 
 watch([statusFilter, syncFilter, sourceTypeFilter], () => {
   page.value = 1;
@@ -555,6 +577,22 @@ const sourceTypeLabel = (sourceType: CandidateNeed['source_type']) => {
   }
   return t(`candidates.filters.sourceTypeOptions.${sourceType}`);
 };
+
+const sourceOverviewItems = computed(() => {
+  const counts = new Map<string, number>();
+  for (const need of sourceOverviewQuery.data.value?.items ?? []) {
+    const key = need.source_type ?? 'unknown';
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const orderedKeys: CandidateNeedSourceType[] = ['github_issues', 'rss', 'hacker_news', 'reddit', 'youtube'];
+  return orderedKeys
+    .filter((key) => (counts.get(key) ?? 0) > 0)
+    .map((key) => ({
+      key,
+      label: sourceTypeLabel(key),
+      count: counts.get(key) ?? 0,
+    }));
+});
 
 const jobStatusLabel = (status: ExportJobStatus) => {
   switch (status) {
@@ -814,6 +852,32 @@ const submitExport = () => {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.source-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.source-overview__item {
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #fafafa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.source-overview__item strong {
+  color: #374151;
+}
+
+.source-overview__item span {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
 }
 
 .review-guide__item {

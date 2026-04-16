@@ -259,6 +259,10 @@
         "description": "问题看起来有价值，但还需要更多同类信号、用户场景或竞品验证，建议进探索中。"
       }
     },
+    "sourceOverview": {
+      "title": "来源分布",
+      "subtitle": "当前候选池按来源类型的数量分布"
+    },
     "detail": {
       "title": "候选详情",
       "feedback": {

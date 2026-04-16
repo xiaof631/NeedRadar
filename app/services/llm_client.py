@@ -96,6 +96,8 @@ class HeuristicLLMClient:
             problem = _sanitize_need_field(entry.title)
         target_users = self._detect_target_users(text)
         value = _pick_sentence(sentences, self._VALUE_PATTERNS)
+        if value and _should_suppress_value(entry, value):
+            value = None
         competition = self._detect_competition(text)
         confidence = self._estimate_confidence(summary, problem, target_users, value, competition)
         return StructuredNeed(
@@ -243,7 +245,9 @@ def _sanitize_need_field(value: str | None, *, max_length: int = 500) -> str:
         return ""
     text = re.sub(r"\b(if applicable|bug report written with the help of claude)\b", "", text, flags=re.IGNORECASE)
     text = re.sub(
-        r"^(describe the bug|actual behavior|expected behavior|steps to reproduce|screenshots?|additional context|environment)\s*:?\s*",
+        r"^[^\w\u4e00-\u9fff]*"
+        r"(describe the bug|actual behavior|expected behavior|steps to reproduce|screenshots?|"
+        r"additional context|environment|requested fix|requested help)\s*:?\s*",
         "",
         text,
         flags=re.IGNORECASE,
@@ -287,6 +291,52 @@ def _is_noise_sentence(sentence: str) -> bool:
         return True
     if "github.com/" in lowered:
         return True
+    return False
+
+
+def _is_issue_like_entry(entry: RawEntry) -> bool:
+    combined = " ".join(part for part in (entry.title, entry.summary, entry.content) if part)
+    lowered = _clean_text(combined).lower()
+    issue_markers = (
+        "describe the bug",
+        "steps to reproduce",
+        "expected behavior",
+        "requested fix",
+        "requested help",
+        "bug report",
+        "not working",
+        "typeerror",
+        "err_",
+        "invalid",
+        "stuck",
+        "crash",
+        "failed",
+        "error",
+    )
+    return any(marker in lowered for marker in issue_markers)
+
+
+def _looks_like_code_noise(value: str) -> bool:
+    lowered = value.lower()
+    if re.search(r"\b[\w.-]+\.(tsx|ts|js|jsx|py|go|java|rb)\b", lowered):
+        return True
+    if "::" in value or "/" in value or "\\" in value:
+        return True
+    if "already handles this correctly" in lowered:
+        return True
+    return False
+
+
+def _should_suppress_value(entry: RawEntry, value: str) -> bool:
+    lowered = value.lower()
+    if _is_noise_sentence(value) or _looks_like_code_noise(value):
+        return True
+    if lowered.startswith(("requested fix", "requested help", "add screenshots", "screenshots")):
+        return True
+    if _is_issue_like_entry(entry):
+        positive_markers = ("可以", "能够", "提供", "让", "支持", "helps", "lets", "allow", "allows")
+        if not any(marker in lowered for marker in positive_markers):
+            return True
     return False
 
 

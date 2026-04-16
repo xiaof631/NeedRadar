@@ -101,3 +101,16 @@ def test_heuristic_llm_cleans_github_issue_noise_fields() -> None:
     assert result.problem_statement == "Project remains stuck behind an invalid certificate error"
     assert result.value_proposition is None
     assert result.competition is None
+
+
+def test_heuristic_llm_suppresses_issue_template_value_proposition_noise() -> None:
+    client = HeuristicLLMClient()
+    entry = _entry(
+        title="Project Pausing Stuck Indefinitely",
+        summary="### Requested Fix / Help 1",
+        content="searchable-select.tsx already handles this correctly with internal guards.",
+    )
+
+    result = client.analyze_entry(entry)
+
+    assert result.value_proposition is None

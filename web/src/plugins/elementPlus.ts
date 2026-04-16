@@ -3,6 +3,7 @@ import { ElButton } from 'element-plus/es/components/button/index';
 import { ElCard } from 'element-plus/es/components/card/index';
 import { ElCol } from 'element-plus/es/components/col/index';
 import { ElDialog } from 'element-plus/es/components/dialog/index';
+import { ElDrawer } from 'element-plus/es/components/drawer/index';
 import { ElForm, ElFormItem } from 'element-plus/es/components/form/index';
 import { ElInput } from 'element-plus/es/components/input/index';
 import { ElInputNumber } from 'element-plus/es/components/input-number/index';
@@ -14,6 +15,7 @@ import { ElPagination } from 'element-plus/es/components/pagination/index';
 import { ElProgress } from 'element-plus/es/components/progress/index';
 import { ElRadioButton, ElRadioGroup } from 'element-plus/es/components/radio/index';
 import { ElRow } from 'element-plus/es/components/row/index';
+import { ElSkeleton } from 'element-plus/es/components/skeleton/index';
 import { ElTable, ElTableColumn } from 'element-plus/es/components/table/index';
 import { ElTag } from 'element-plus/es/components/tag/index';
 import { ElTimeline, ElTimelineItem } from 'element-plus/es/components/timeline/index';
@@ -23,6 +25,7 @@ import 'element-plus/es/components/button/style/css';
 import 'element-plus/es/components/card/style/css';
 import 'element-plus/es/components/col/style/css';
 import 'element-plus/es/components/dialog/style/css';
+import 'element-plus/es/components/drawer/style/css';
 import 'element-plus/es/components/form/style/css';
 import 'element-plus/es/components/form-item/style/css';
 import 'element-plus/es/components/input/style/css';
@@ -39,6 +42,7 @@ import 'element-plus/es/components/radio-button/style/css';
 import 'element-plus/es/components/radio-group/style/css';
 import 'element-plus/es/components/row/style/css';
 import 'element-plus/es/components/select/style/css';
+import 'element-plus/es/components/skeleton/style/css';
 import 'element-plus/es/components/table/style/css';
 import 'element-plus/es/components/table-column/style/css';
 import 'element-plus/es/components/tag/style/css';
@@ -51,6 +55,7 @@ const components = [
   ElCard,
   ElCol,
   ElDialog,
+  ElDrawer,
   ElForm,
   ElFormItem,
   ElInput,
@@ -65,6 +70,7 @@ const components = [
   ElRadioGroup,
   ElRow,
   ElSelect,
+  ElSkeleton,
   ElTable,
   ElTableColumn,
   ElTag,

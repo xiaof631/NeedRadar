@@ -259,6 +259,10 @@
         "description": "The signal looks promising but still needs more evidence, user context, or competitive validation."
       }
     },
+    "sourceOverview": {
+      "title": "Source mix",
+      "subtitle": "Current candidate volume by source type"
+    },
     "detail": {
       "title": "Candidate detail",
       "feedback": {
