@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.db.storage import db
-from app.models import CandidateNeed, CandidateNeedStatus, CandidateNeedStatusLog
+from app.models import CandidateNeed, CandidateNeedStatus, CandidateNeedStatusLog, SourceType
 from app.services.raw_entries import RawEntryNotFoundError
 
 
@@ -154,6 +154,7 @@ def list_needs(
     statuses: Iterable[CandidateNeedStatus] | None = None,
     search: str | None = None,
     raw_entry_id: int | None = None,
+    source_type: SourceType | None = None,
     synced: bool | None = None,
     skip: int = 0,
     limit: int | None = None,
@@ -164,6 +165,7 @@ def list_needs(
         statuses=statuses,
         search=search,
         raw_entry_id=raw_entry_id,
+        source_type=source_type,
         synced=synced,
         skip=skip,
         limit=limit,
@@ -172,6 +174,7 @@ def list_needs(
         statuses=statuses,
         search=search,
         raw_entry_id=raw_entry_id,
+        source_type=source_type,
         synced=synced,
     )
     return total, items
@@ -182,6 +185,7 @@ def export_needs(
     statuses: Iterable[CandidateNeedStatus] | None = None,
     search: str | None = None,
     raw_entry_id: int | None = None,
+    source_type: SourceType | None = None,
     synced: bool | None = None,
     limit: int | None = None,
 ) -> list[CandidateNeed]:
@@ -191,6 +195,7 @@ def export_needs(
         statuses=statuses,
         search=search,
         raw_entry_id=raw_entry_id,
+        source_type=source_type,
         synced=synced,
         skip=0,
         limit=limit,
@@ -201,12 +206,14 @@ def export_needs(
 def list_unsynced_needs(
     *,
     statuses: Iterable[CandidateNeedStatus] | None = None,
+    source_type: SourceType | None = None,
     limit: int | None = None,
 ) -> list[CandidateNeed]:
     """返回尚未推送至下游的候选需求。"""
 
     _, items = list_needs(
         statuses=statuses,
+        source_type=source_type,
         synced=False,
         limit=limit,
     )

@@ -245,6 +245,13 @@ export type CandidateNeedStatus =
   | 'in_discovery'
   | 'completed';
 
+export type CandidateNeedSourceType =
+  | 'rss'
+  | 'hacker_news'
+  | 'github_issues'
+  | 'reddit'
+  | 'youtube';
+
 export interface CandidateNeed {
   id: number;
   raw_entry_id: number;
@@ -259,6 +266,8 @@ export interface CandidateNeed {
   notes: string | null;
   synced_at: string | null;
   sync_error: string | null;
+  source_name: string | null;
+  source_type: CandidateNeedSourceType | null;
   created_at: string;
   updated_at: string;
 }
@@ -299,6 +308,7 @@ export interface CandidateNeedQueryParams {
   limit?: number;
   statuses?: CandidateNeedStatus[];
   search?: string;
+  source_type?: CandidateNeedSourceType;
   synced?: boolean;
 }
 
@@ -358,6 +368,7 @@ export interface CandidateNeedExportJobPayload {
   statuses?: CandidateNeedStatus[];
   search?: string;
   raw_entry_id?: number;
+  source_type?: CandidateNeedSourceType;
   synced?: boolean;
   limit?: number;
 }
@@ -396,6 +407,9 @@ function buildCandidateNeedParams(params: CandidateNeedQueryParams): URLSearchPa
   }
   if (params.search) {
     searchParams.set('search', params.search);
+  }
+  if (params.source_type) {
+    searchParams.set('source_type', params.source_type);
   }
   if (params.statuses) {
     params.statuses.forEach((status) => searchParams.append('statuses', status));

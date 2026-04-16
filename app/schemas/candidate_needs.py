@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from app.models import CandidateNeedStatus, ExportJobStatus, SyncChannel
+from app.models import CandidateNeedStatus, ExportJobStatus, SourceType, SyncChannel
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -36,6 +36,8 @@ class CandidateNeedRead(BaseModel):
     notes: str | None = None
     synced_at: datetime | None = None
     sync_error: str | None = None
+    source_name: str | None = None
+    source_type: SourceType | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -181,6 +183,7 @@ class CandidateNeedExportJobCreate(BaseModel):
     statuses: list[CandidateNeedStatusEnum] | None = None
     search: str | None = None
     raw_entry_id: int | None = None
+    source_type: SourceType | None = None
     synced: bool | None = None
     limit: int | None = Field(default=None, ge=1, le=5000)
 

@@ -11,7 +11,7 @@ from app.core import metrics
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.storage import db
-from app.models import CandidateNeedStatus, ExportJob, ExportJobStatus, SyncChannel
+from app.models import CandidateNeedStatus, ExportJob, ExportJobStatus, SourceType, SyncChannel
 from app.schemas import CandidateNeedRead
 from app.services import candidate_needs, sync_audit
 
@@ -32,6 +32,7 @@ def create_candidate_export_job(
     statuses: Iterable[CandidateNeedStatus] | None = None,
     search: str | None = None,
     raw_entry_id: int | None = None,
+    source_type: SourceType | None = None,
     synced: bool | None = None,
     limit: int | None = None,
 ) -> ExportJob:
@@ -41,6 +42,7 @@ def create_candidate_export_job(
         "statuses": [status.value for status in statuses] if statuses else None,
         "search": search,
         "raw_entry_id": raw_entry_id,
+        "source_type": source_type.value if source_type else None,
         "synced": synced,
         "limit": limit,
     }
@@ -121,6 +123,7 @@ def _render_candidates(job: ExportJob) -> Tuple[dict[str, Any], list[CandidateNe
         statuses=parsed_statuses,
         search=filters.get("search"),
         raw_entry_id=filters.get("raw_entry_id"),
+        source_type=SourceType(filters["source_type"]) if filters.get("source_type") else None,
         synced=filters.get("synced"),
         limit=filters.get("limit"),
     )

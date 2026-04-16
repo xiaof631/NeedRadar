@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Iterable
+from dataclasses import asdict
 from io import StringIO
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.models import CandidateNeedStatus, ExportJobStatus, SyncChannel
+from app.db.storage import db
+from app.models import CandidateNeed, CandidateNeedStatus, ExportJobStatus, RssSource, SourceType, SyncChannel
 from app.schemas import (
     CandidateNeedClusterList,
     CandidateNeedClusterRead,
@@ -52,6 +54,7 @@ async def list_candidate_needs(
     ),
     search: str | None = Query(default=None, description="关键字搜索"),
     raw_entry_id: int | None = Query(default=None, description="关联的原始条目 ID"),
+    source_type: SourceType | None = Query(default=None, description="按来源类型过滤"),
     synced: bool | None = Query(
         default=None,
         description="按同步状态过滤，true 表示已同步，false 表示未同步",
@@ -61,13 +64,14 @@ async def list_candidate_needs(
         statuses=_convert_statuses(statuses),
         search=search,
         raw_entry_id=raw_entry_id,
+        source_type=source_type,
         synced=synced,
         skip=skip,
         limit=limit,
     )
     return CandidateNeedList(
         total=total,
-        items=[CandidateNeedRead.model_validate(item) for item in items],
+        items=_build_candidate_need_reads(items),
     )
 
 
@@ -82,6 +86,7 @@ async def list_candidate_need_clusters(
         description="按状态过滤，可多选",
     ),
     search: str | None = Query(default=None, description="关键字搜索"),
+    source_type: SourceType | None = Query(default=None, description="按来源类型过滤"),
     synced: bool | None = Query(default=None, description="按同步状态过滤"),
     limit: int = Query(default=100, ge=1, le=500, description="聚类时纳入计算的候选需求数量"),
     min_cluster_size: int = Query(default=2, ge=2, le=20, description="最小簇大小"),
@@ -96,6 +101,7 @@ async def list_candidate_need_clusters(
     clusters = candidate_clusters.summarize_clusters(
         statuses=tuple(normalized_statuses) if normalized_statuses is not None else None,
         search=search,
+        source_type=source_type,
         synced=synced,
         limit=limit,
         min_cluster_size=min_cluster_size,
@@ -176,7 +182,7 @@ async def create_candidate_need(payload: CandidateNeedCreate) -> CandidateNeedRe
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="关联的原始条目不存在",
         ) from exc
-    return CandidateNeedRead.model_validate(need)
+    return _build_candidate_need_reads([need])[0]
 
 
 @router.get(
@@ -189,7 +195,7 @@ async def get_candidate_need(need_id: int) -> CandidateNeedRead:
         need = candidate_needs.get_need(need_id)
     except CandidateNeedNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
-    return CandidateNeedRead.model_validate(need)
+    return _build_candidate_need_reads([need])[0]
 
 
 @router.put(
@@ -219,7 +225,7 @@ async def update_candidate_need(need_id: int, payload: CandidateNeedUpdate) -> C
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    return CandidateNeedRead.model_validate(need)
+    return _build_candidate_need_reads([need])[0]
 
 
 @router.put(
@@ -239,7 +245,7 @@ async def update_candidate_need_status(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    return CandidateNeedRead.model_validate(need)
+    return _build_candidate_need_reads([need])[0]
 
 
 @router.delete(
@@ -293,6 +299,7 @@ async def export_candidate_needs(
     ),
     search: str | None = Query(default=None, description="关键字搜索"),
     raw_entry_id: int | None = Query(default=None, description="关联的原始条目 ID"),
+    source_type: SourceType | None = Query(default=None, description="按来源类型过滤"),
     synced: bool | None = Query(
         default=None,
         description="按同步状态过滤，true 表示已同步，false 表示未同步",
@@ -303,12 +310,13 @@ async def export_candidate_needs(
         statuses=_convert_statuses(statuses),
         search=search,
         raw_entry_id=raw_entry_id,
+        source_type=source_type,
         synced=synced,
         limit=limit,
     )
 
     if format == "json":
-        payload = [CandidateNeedRead.model_validate(item).model_dump(mode="json") for item in needs]
+        payload = [item.model_dump(mode="json") for item in _build_candidate_need_reads(needs)]
         return {"format": "json", "items": payload}
 
     buffer = StringIO()
@@ -329,8 +337,7 @@ async def export_candidate_needs(
     ]
     writer = csv.DictWriter(buffer, fieldnames=fieldnames)
     writer.writeheader()
-    for need in needs:
-        model = CandidateNeedRead.model_validate(need)
+    for model in _build_candidate_need_reads(needs):
         writer.writerow(
             {
                 "id": model.id,
@@ -384,6 +391,7 @@ async def create_candidate_need_export_task(
         statuses=_convert_statuses(payload.statuses),
         search=payload.search,
         raw_entry_id=payload.raw_entry_id,
+        source_type=payload.source_type,
         synced=payload.synced,
         limit=payload.limit,
     )
@@ -432,3 +440,34 @@ def _convert_sync_channel(
     if isinstance(value, SyncChannel):
         return value
     return SyncChannel(value.value)
+
+
+def _build_candidate_need_reads(items: list[CandidateNeed]) -> list[CandidateNeedRead]:
+    raw_entry_cache: dict[int, object | None] = {}
+    source_cache: dict[int, RssSource | None] = {}
+    payloads: list[CandidateNeedRead] = []
+    for item in items:
+        raw_entry = raw_entry_cache.get(item.raw_entry_id)
+        if raw_entry is None:
+            raw_entry = db.get_raw_entry(item.raw_entry_id)
+            raw_entry_cache[item.raw_entry_id] = raw_entry
+        source_name: str | None = None
+        source_type: SourceType | None = None
+        if raw_entry is not None:
+            source = source_cache.get(raw_entry.source_id)
+            if source is None:
+                source = db.get_source(raw_entry.source_id)
+                source_cache[raw_entry.source_id] = source
+            if source is not None:
+                source_name = source.name
+                source_type = source.source_type
+        payloads.append(
+            CandidateNeedRead.model_validate(
+                {
+                    **asdict(item),
+                    "source_name": source_name,
+                    "source_type": source_type,
+                }
+            )
+        )
+    return payloads

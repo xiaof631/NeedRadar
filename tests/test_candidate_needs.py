@@ -142,6 +142,16 @@ def test_create_and_list_candidate_needs(client: TestClient) -> None:
     assert search_body["total"] >= 1
     assert any("assistant" in item["summary"].lower() for item in search_body["items"])
 
+    source_filter_response = client.get(
+        "/api/v1/candidate-needs",
+        params={"source_type": SourceType.RSS.value},
+    )
+    assert source_filter_response.status_code == 200
+    source_filter_body = source_filter_response.json()
+    assert source_filter_body["total"] == 3
+    assert all(item["source_type"] == SourceType.RSS.value for item in source_filter_body["items"])
+    assert all(item["source_name"] == "Tech" for item in source_filter_body["items"])
+
 
 def test_update_candidate_need_and_status(client: TestClient) -> None:
     _, need_ids = _seed_candidate_needs()
@@ -737,3 +747,79 @@ def test_candidate_clusters_skip_generic_false_positive_overlap() -> None:
     clusters = candidate_clusters.summarize_clusters(limit=20, min_cluster_size=2)
 
     assert clusters == []
+
+
+def test_candidate_clusters_skip_cross_source_github_bug_false_positive_overlap() -> None:
+    rss_source = rss_sources.create_source(
+        {
+            "name": "DEV SaaS Feed",
+            "url": "https://dev.to/feed/saas",
+            "frequency": 1800,
+            "source_type": SourceType.RSS,
+        }
+    )
+    github_source = rss_sources.create_source(
+        {
+            "name": "Supabase Issues",
+            "url": "https://api.github.com/repos/supabase/supabase/issues",
+            "frequency": 1800,
+            "source_type": SourceType.GITHUB_ISSUES,
+        }
+    )
+    rss_entry = raw_entries.create_entry(
+        {
+            "source_id": rss_source.id,
+            "guid": "switching-calendly",
+            "title": "Switching from Calendly to a lighter scheduling stack",
+            "summary": "Ops teams want a simpler alternative with fewer integration headaches.",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+    github_entry = raw_entries.create_entry(
+        {
+            "source_id": github_source.id,
+            "guid": "ssl-cert-invalid",
+            "title": "ERR_CERT_AUTHORITY_INVALID — SSL certificate invalid on project",
+            "summary": "Self-hosted project remains stuck behind an invalid certificate error.",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": rss_entry.id,
+            "summary": "Calendly alternative for lean ops teams",
+            "problem_statement": "Teams want a simpler scheduling stack without extra integration overhead.",
+            "status": CandidateNeedStatus.PENDING_REVIEW,
+            "rule_score": 0.61,
+        }
+    )
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": github_entry.id,
+            "summary": "SSL certificate invalid on self-hosted project",
+            "problem_statement": "Self-hosted projects get stuck behind invalid certificate failures.",
+            "status": CandidateNeedStatus.PENDING_REVIEW,
+            "rule_score": 0.73,
+        }
+    )
+
+    clusters = candidate_clusters.summarize_clusters(limit=20, min_cluster_size=2)
+
+    assert clusters == []
+
+
+def test_candidate_clusters_can_filter_by_source_type(client: TestClient) -> None:
+    _seed_cluster_candidates()
+
+    response = client.get(
+        "/api/v1/candidate-needs/clusters",
+        params={
+            "limit": 20,
+            "min_cluster_size": 2,
+            "source_type": SourceType.GITHUB_ISSUES.value,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["total"] == 0

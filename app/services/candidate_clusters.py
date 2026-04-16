@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from app.db.storage import db
-from app.models import CandidateNeed, CandidateNeedStatus, RssSource
+from app.models import CandidateNeed, CandidateNeedStatus, RssSource, SourceType
 import app.services.candidate_needs as candidate_needs
 
 _LATIN_TOKEN_RE = re.compile(r"[a-z0-9]{2,}")
@@ -60,12 +60,39 @@ _LATIN_STOPWORDS = {
     "better",
     "local",
 }
+_GENERIC_FAILURE_TOKENS = {
+    "bug",
+    "bugs",
+    "issue",
+    "issues",
+    "error",
+    "errors",
+    "failed",
+    "failure",
+    "failing",
+    "crash",
+    "crashes",
+    "stuck",
+    "invalid",
+    "unexpected",
+    "broken",
+    "unable",
+    "cannot",
+    "working",
+}
 _CJK_STOPWORDS = {
     "分享创造",
     "分享发现",
     "程序员",
     "问与答",
 }
+_BUG_SIGNAL_RE = re.compile(
+    r"\b("
+    r"not working|stuck|fail(?:ed|ing|s)?|error|errors|crash|invalid|unexpected|"
+    r"unable|cannot|broken|denied|missing|timeout"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(slots=True)
@@ -100,12 +127,14 @@ class _NeedContext:
     tokens: set[str]
     normalized_summary: str
     tags: set[str]
+    bug_signal: bool
 
 
 def summarize_clusters(
     *,
     statuses: tuple[CandidateNeedStatus, ...] | None = None,
     search: str | None = None,
+    source_type: SourceType | None = None,
     synced: bool | None = None,
     limit: int = 100,
     min_cluster_size: int = 2,
@@ -116,6 +145,7 @@ def summarize_clusters(
     _, needs = candidate_needs.list_needs(
         statuses=statuses,
         search=search,
+        source_type=source_type,
         synced=synced,
         limit=limit,
     )
@@ -158,10 +188,16 @@ def summarize_clusters(
                             supporting_text,
                         )
                         if part
-                    )
+                    ),
+                    source_type=source_type,
                 ),
                 normalized_summary=_normalize_text(need.summary),
                 tags=set(raw_entry.tags if raw_entry is not None and raw_entry.tags else ()),
+                bug_signal=_is_bug_signal(
+                    source_type=source_type,
+                    title=raw_entry.title if raw_entry is not None else need.summary,
+                    summary=raw_entry.summary if raw_entry is not None else need.problem_statement,
+                ),
             )
         )
 
@@ -206,13 +242,21 @@ def _are_similar(left: _NeedContext, right: _NeedContext, *, threshold: float) -
         return True
     if not left.tokens or not right.tokens:
         return False
-    overlap = len(left.tokens & right.tokens)
+    shared_tokens = left.tokens & right.tokens
+    overlap = len(shared_tokens)
     if overlap == 0:
         return False
     union = len(left.tokens | right.tokens)
     jaccard_similarity = overlap / union
     coverage_similarity = overlap / min(len(left.tokens), len(right.tokens))
-    return max(jaccard_similarity, coverage_similarity) >= threshold
+    effective_threshold = _effective_threshold(left, right, base=threshold)
+    if _requires_strict_cross_source_match(left, right):
+        meaningful_overlap = sum(len(token) >= 5 for token in shared_tokens)
+        if meaningful_overlap < 2:
+            return False
+        if coverage_similarity < max(effective_threshold, 0.45):
+            return False
+    return max(jaccard_similarity, coverage_similarity) >= effective_threshold
 
 
 def _build_cluster(members: list[_NeedContext]) -> CandidateNeedCluster:
@@ -267,7 +311,7 @@ def _build_cluster(members: list[_NeedContext]) -> CandidateNeedCluster:
     )
 
 
-def _tokenize(text: str) -> set[str]:
+def _tokenize(text: str, *, source_type: str | None = None) -> set[str]:
     normalized = _normalize_text(text)
     if not normalized:
         return set()
@@ -276,6 +320,8 @@ def _tokenize(text: str) -> set[str]:
         for token in _LATIN_TOKEN_RE.findall(normalized)
         if (normalized_token := _normalize_latin_token(token)) not in _LATIN_STOPWORDS
     }
+    if source_type == SourceType.GITHUB_ISSUES.value:
+        tokens.difference_update(_GENERIC_FAILURE_TOKENS)
     tokens.update(token for token in _CJK_TOKEN_RE.findall(normalized) if token not in _CJK_STOPWORDS)
     return tokens
 
@@ -292,6 +338,33 @@ def _normalize_latin_token(token: str) -> str:
     if len(token) > 4 and token.endswith("s"):
         return token[:-1]
     return token
+
+
+def _is_bug_signal(*, source_type: str, title: str | None, summary: str | None) -> bool:
+    if source_type != SourceType.GITHUB_ISSUES.value:
+        return False
+    return bool(_BUG_SIGNAL_RE.search(" ".join(part for part in (title, summary) if part)))
+
+
+def _effective_threshold(left: _NeedContext, right: _NeedContext, *, base: float) -> float:
+    threshold = base
+    if left.source_type != right.source_type and (
+        left.source_type == SourceType.GITHUB_ISSUES.value
+        or right.source_type == SourceType.GITHUB_ISSUES.value
+    ):
+        threshold += 0.15
+    if left.bug_signal != right.bug_signal and (
+        left.source_type == SourceType.GITHUB_ISSUES.value
+        or right.source_type == SourceType.GITHUB_ISSUES.value
+    ):
+        threshold += 0.1
+    return min(threshold, 0.65)
+
+
+def _requires_strict_cross_source_match(left: _NeedContext, right: _NeedContext) -> bool:
+    if left.source_type == right.source_type:
+        return False
+    return left.bug_signal or right.bug_signal
 
 
 def _calculate_priority_score(

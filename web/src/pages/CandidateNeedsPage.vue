@@ -101,6 +101,14 @@
         <el-select v-model="syncFilter" class="filters__select" :placeholder="t('candidates.filters.synced')">
           <el-option v-for="option in syncOptions" :key="option.value" :label="option.label" :value="option.value" />
         </el-select>
+        <el-select v-model="sourceTypeFilter" class="filters__select" :placeholder="t('candidates.filters.sourceType')">
+          <el-option
+            v-for="option in sourceTypeOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
       </div>
       <el-table
         :data="needs"
@@ -109,6 +117,14 @@
         :empty-text="t('candidates.table.empty')"
       >
         <el-table-column prop="summary" :label="t('candidates.table.summary')" min-width="220" show-overflow-tooltip />
+        <el-table-column :label="t('candidates.table.source')" min-width="200">
+          <template #default="{ row }">
+            <div class="source-cell">
+              <el-tag effect="plain" size="small">{{ sourceTypeLabel(row.source_type) }}</el-tag>
+              <span>{{ row.source_name || '—' }}</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('candidates.table.status')" width="140">
           <template #default="{ row }">
             <el-tag :type="statusTag(row.status)">
@@ -209,6 +225,16 @@
             <el-option v-for="option in statusOptions" :key="option.value" :label="option.label" :value="option.value" />
           </el-select>
         </el-form-item>
+        <el-form-item :label="t('candidates.export.fields.sourceType')">
+          <el-select v-model="exportForm.sourceType">
+            <el-option
+              v-for="option in sourceTypeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="t('candidates.export.fields.synced')">
           <el-select v-model="exportForm.synced">
             <el-option v-for="option in syncOptions" :key="option.value" :label="option.label" :value="option.value" />
@@ -247,6 +273,7 @@ import {
   fetchCandidateNeeds,
   type CandidateNeedCluster,
   type CandidateNeed,
+  type CandidateNeedSourceType,
   type CandidateNeedExportJob,
   type CandidateNeedExportJobPayload,
   type CandidateNeedQueryParams,
@@ -261,11 +288,13 @@ const searchTerm = ref('');
 
 type StatusFilter = CandidateNeed['status'] | 'all';
 type SyncFilter = 'all' | 'synced' | 'unsynced';
+type SourceTypeFilter = CandidateNeedSourceType | 'all';
 
 type ExportFormat = 'csv' | 'json';
 
 const statusFilter = ref<StatusFilter>('all');
 const syncFilter = ref<SyncFilter>('all');
+const sourceTypeFilter = ref<SourceTypeFilter>('all');
 
 const statusOptions = computed(() => [
   { label: t('candidates.filters.statusOptions.all'), value: 'all' as const },
@@ -282,11 +311,21 @@ const syncOptions = computed(() => [
   { label: t('candidates.filters.syncedOptions.unsynced'), value: 'unsynced' as const },
 ]);
 
+const sourceTypeOptions = computed(() => [
+  { label: t('candidates.filters.sourceTypeOptions.all'), value: 'all' as const },
+  { label: t('candidates.filters.sourceTypeOptions.github_issues'), value: 'github_issues' as const },
+  { label: t('candidates.filters.sourceTypeOptions.rss'), value: 'rss' as const },
+  { label: t('candidates.filters.sourceTypeOptions.hacker_news'), value: 'hacker_news' as const },
+  { label: t('candidates.filters.sourceTypeOptions.reddit'), value: 'reddit' as const },
+  { label: t('candidates.filters.sourceTypeOptions.youtube'), value: 'youtube' as const },
+]);
+
 const queryOptions = computed<CandidateNeedQueryParams>(() => ({
   skip: (page.value - 1) * pageSize,
   limit: pageSize,
   search: searchTerm.value || undefined,
   statuses: statusFilter.value === 'all' ? undefined : [statusFilter.value],
+  source_type: sourceTypeFilter.value === 'all' ? undefined : sourceTypeFilter.value,
   synced: syncFilter.value === 'all' ? undefined : syncFilter.value === 'synced',
 }));
 
@@ -323,7 +362,7 @@ const exportJobsQuery = useQuery({
 
 const exportJobs = computed(() => exportJobsQuery.data.value?.items ?? []);
 
-watch([statusFilter, syncFilter], () => {
+watch([statusFilter, syncFilter, sourceTypeFilter], () => {
   page.value = 1;
 });
 
@@ -385,6 +424,13 @@ const syncState = (need: CandidateNeed) => {
   return { label: t('candidates.syncState.pending'), type: 'warning' as const };
 };
 
+const sourceTypeLabel = (sourceType: CandidateNeed['source_type']) => {
+  if (!sourceType) {
+    return t('candidates.filters.sourceTypeOptions.all');
+  }
+  return t(`candidates.filters.sourceTypeOptions.${sourceType}`);
+};
+
 const jobStatusLabel = (status: ExportJobStatus) => {
   switch (status) {
     case 'completed':
@@ -431,12 +477,14 @@ const exportForm = reactive({
   format: 'csv' as ExportFormat,
   status: 'all' as StatusFilter,
   synced: 'all' as SyncFilter,
+  sourceType: 'all' as SourceTypeFilter,
   limit: 500,
 });
 
 const openExportDialog = () => {
   exportForm.status = statusFilter.value;
   exportForm.synced = syncFilter.value;
+  exportForm.sourceType = sourceTypeFilter.value;
   exportDialogVisible.value = true;
 };
 
@@ -448,6 +496,7 @@ const resetExportForm = () => {
   exportForm.format = 'csv';
   exportForm.status = 'all';
   exportForm.synced = 'all';
+  exportForm.sourceType = 'all';
   exportForm.limit = 500;
 };
 
@@ -473,6 +522,9 @@ const submitExport = () => {
   };
   if (exportForm.status !== 'all') {
     payload.statuses = [exportForm.status];
+  }
+  if (exportForm.sourceType !== 'all') {
+    payload.source_type = exportForm.sourceType;
   }
   if (exportForm.synced !== 'all') {
     payload.synced = exportForm.synced === 'synced';
@@ -518,6 +570,12 @@ const submitExport = () => {
 
 .filters__select {
   width: 180px;
+}
+
+.source-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .pagination-row {

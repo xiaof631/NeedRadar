@@ -421,12 +421,19 @@ class SQLDatabase:
         statuses: Iterable[CandidateNeedStatus] | None = None,
         search: str | None = None,
         raw_entry_id: int | None = None,
+        source_type: SourceType | None = None,
         synced: bool | None = None,
         skip: int = 0,
         limit: int | None = None,
     ) -> list[CandidateNeed]:
         with self._session() as session:
             stmt = select(CandidateNeedEntity).order_by(CandidateNeedEntity.created_at.desc())
+            if source_type is not None:
+                stmt = (
+                    stmt.join(RawEntryEntity, CandidateNeedEntity.raw_entry_id == RawEntryEntity.id)
+                    .join(RssSourceEntity, RawEntryEntity.source_id == RssSourceEntity.id)
+                    .where(RssSourceEntity.source_type == source_type.value)
+                )
             if statuses:
                 stmt = stmt.where(
                     CandidateNeedEntity.status.in_([status.value for status in statuses])
@@ -462,10 +469,18 @@ class SQLDatabase:
         statuses: Iterable[CandidateNeedStatus] | None = None,
         search: str | None = None,
         raw_entry_id: int | None = None,
+        source_type: SourceType | None = None,
         synced: bool | None = None,
     ) -> int:
         with self._session() as session:
             stmt = select(func.count(CandidateNeedEntity.id))
+            if source_type is not None:
+                stmt = (
+                    stmt.select_from(CandidateNeedEntity)
+                    .join(RawEntryEntity, CandidateNeedEntity.raw_entry_id == RawEntryEntity.id)
+                    .join(RssSourceEntity, RawEntryEntity.source_id == RssSourceEntity.id)
+                    .where(RssSourceEntity.source_type == source_type.value)
+                )
             if statuses:
                 stmt = stmt.where(
                     CandidateNeedEntity.status.in_([status.value for status in statuses])

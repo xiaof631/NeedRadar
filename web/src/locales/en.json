@@ -197,12 +197,21 @@
     "filters": {
       "search": "Keyword",
       "status": "Status",
+      "sourceType": "Source type",
       "synced": "Sync state",
       "searchPlaceholder": "Type to filter by summary, problem or note",
       "panelTitle": "Filters",
       "panelDescription": "Combine keywords, status and sync state to narrow down candidates",
       "statusOptions": {
         "all": "All"
+      },
+      "sourceTypeOptions": {
+        "all": "All sources",
+        "github_issues": "GitHub Issues",
+        "rss": "RSS",
+        "hacker_news": "Hacker News",
+        "reddit": "Reddit",
+        "youtube": "YouTube"
       },
       "syncedOptions": {
         "all": "All",
@@ -224,6 +233,7 @@
     },
     "table": {
       "summary": "Summary",
+      "source": "Source",
       "status": "Status",
       "ruleScore": "Rule score",
       "confidence": "Confidence",
@@ -257,6 +267,7 @@
       "fields": {
         "format": "Format",
         "status": "Status filter",
+        "sourceType": "Source filter",
         "synced": "Sync filter",
         "limit": "Max items"
       },
