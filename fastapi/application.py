@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import inspect
 import enum
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from urllib.parse import parse_qsl
 from typing import Any, Annotated, get_args, get_origin
 
 from pydantic import BaseModel
 
 from .dependencies import Depends, HeaderInfo
+from .exceptions import HTTPException
 from .responses import Response as PlainResponse
 from .routing import APIRouter, _normalize_path, _join_paths
 
@@ -131,6 +134,58 @@ class FastAPI:
                 dependencies=dependencies,
             )
 
+    async def __call__(self, scope: dict[str, Any], receive: Callable[..., Awaitable[Any]], send: Callable[..., Awaitable[None]]) -> None:
+        if scope["type"] == "lifespan":
+            await self._handle_lifespan(receive, send)
+            return
+        if scope["type"] != "http":
+            raise RuntimeError(f"Unsupported scope type: {scope['type']}")
+
+        method = scope["method"]
+        path = scope["path"]
+        query_params = dict(parse_qsl(scope.get("query_string", b"").decode()))
+        headers = {
+            key.decode().lower(): value.decode()
+            for key, value in scope.get("headers", [])
+        }
+        body = await self._read_body(receive)
+        payload: Any | None = None
+        if body:
+            content_type = headers.get("content-type", "")
+            if "application/json" in content_type:
+                payload = json.loads(body.decode())
+            else:
+                payload = body.decode()
+
+        try:
+            status_code, response = await self.dispatch(
+                method,
+                path,
+                params=query_params,
+                json=payload,
+                headers=headers,
+            )
+        except LookupError:
+            status_code = 404
+            response = {"detail": "Not Found"}
+        except HTTPException as exc:
+            status_code = exc.status_code
+            response = {"detail": exc.detail}
+        except Exception:
+            status_code = 500
+            response = {"detail": "Internal Server Error"}
+            raise
+
+        raw_body, media_type = self._encode_asgi_response(response)
+        await send(
+            {
+                "type": "http.response.start",
+                "status": status_code,
+                "headers": [(b"content-type", media_type.encode("latin-1"))],
+            }
+        )
+        await send({"type": "http.response.body", "body": raw_body})
+
     def resolve(self, method: str, path: str) -> tuple[Route | None, dict[str, str]]:
         """查找指定请求的处理函数。"""
 
@@ -207,6 +262,47 @@ class FastAPI:
         if isinstance(result, Awaitable):
             return await result
         return result
+
+    async def _handle_lifespan(
+        self,
+        receive: Callable[..., Awaitable[Any]],
+        send: Callable[..., Awaitable[None]],
+    ) -> None:
+        while True:
+            message = await receive()
+            if message["type"] == "lifespan.startup":
+                await self._run_event_handlers(self._startup_handlers)
+                await send({"type": "lifespan.startup.complete"})
+            elif message["type"] == "lifespan.shutdown":
+                await self._run_event_handlers(self._shutdown_handlers, reverse=True)
+                await send({"type": "lifespan.shutdown.complete"})
+                return
+
+    async def _read_body(self, receive: Callable[..., Awaitable[Any]]) -> bytes:
+        chunks: list[bytes] = []
+        while True:
+            message = await receive()
+            if message["type"] != "http.request":
+                continue
+            chunks.append(message.get("body", b""))
+            if not message.get("more_body", False):
+                break
+        return b"".join(chunks)
+
+    def _encode_asgi_response(self, response: Any) -> tuple[bytes, str]:
+        if isinstance(response, PlainResponse):
+            media_type = response.media_type or "text/plain; charset=utf-8"
+            content = response.content
+            if isinstance(content, bytes):
+                return content, media_type
+            if isinstance(content, str):
+                return content.encode("utf-8"), media_type
+            return json.dumps(content, ensure_ascii=False).encode("utf-8"), media_type
+        if isinstance(response, bytes):
+            return response, "application/octet-stream"
+        if isinstance(response, str):
+            return response.encode("utf-8"), "text/plain; charset=utf-8"
+        return json.dumps(response, ensure_ascii=False, default=str).encode("utf-8"), "application/json; charset=utf-8"
 
     async def _close_dependencies(self, closers: list[Callable[[], Awaitable[None] | None]]) -> None:
         for closer in reversed(closers):
@@ -412,5 +508,4 @@ class FastAPI:
             except Exception:  # noqa: BLE001
                 return value
         return value
-
 

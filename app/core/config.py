@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="是否启用调试模式")
     app_name: str = Field(default="NeedRadar API", description="FastAPI 应用名称")
     database_url: str = Field(
-        default="postgresql+asyncpg://needradar:needradar@localhost:5432/needradar",
+        default="postgresql+asyncpg://needradar:needradar@localhost:5406/needradar",
         description="SQLAlchemy 数据库连接字符串",
     )
     alembic_database_url: str | None = Field(
@@ -111,11 +111,11 @@ class Settings(BaseSettings):
     )
 
     celery_broker_url: str = Field(
-        default="redis://localhost:6379/0",
+        default="redis://localhost:6406/0",
         description="Celery 使用的消息队列（Redis/RabbitMQ）连接字符串",
     )
     celery_result_backend: str | None = Field(
-        default="redis://localhost:6379/1",
+        default="redis://localhost:6406/1",
         description="Celery 任务结果存储地址，可为空",
     )
     celery_task_default_queue: str = Field(

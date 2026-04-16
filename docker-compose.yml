@@ -10,7 +10,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5406:5432"
 
   redis:
     image: redis:7
@@ -18,11 +18,12 @@ services:
     volumes:
       - redis-data:/data
     ports:
-      - "6379:6379"
+      - "6406:6379"
 
   api:
+    profiles: ["fullstack"]
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 3106 --reload
     depends_on:
       - postgres
       - redis
@@ -34,9 +35,10 @@ services:
     volumes:
       - ./:/app
     ports:
-      - "8000:8000"
+      - "3106:3106"
 
   worker:
+    profiles: ["fullstack"]
     build: .
     command: celery -A jobs.celery_app worker --loglevel=info
     depends_on:
@@ -51,6 +53,7 @@ services:
       - ./:/app
 
   scheduler:
+    profiles: ["fullstack"]
     build: .
     command: celery -A jobs.celery_app beat --loglevel=info
     depends_on:
@@ -65,6 +68,7 @@ services:
       - ./:/app
 
   prometheus:
+    profiles: ["fullstack"]
     image: prom/prometheus:v2.52.0
     depends_on:
       - api

@@ -19,8 +19,6 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import get_settings
 from app.db.base import Base
 
-settings = get_settings()
-
 _sync_engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
 _async_engine: AsyncEngine | None = None
@@ -40,6 +38,7 @@ def get_sync_engine() -> Engine:
 
     global _sync_engine
     if _sync_engine is None:
+        settings = get_settings()
         _ensure_sqlite_dir(settings.sync_database_url)
         _sync_engine = create_engine(settings.sync_database_url, future=True)
         Base.metadata.create_all(_sync_engine)
@@ -64,6 +63,7 @@ def get_async_engine() -> AsyncEngine:
 
     global _async_engine
     if _async_engine is None:
+        settings = get_settings()
         _async_engine = create_async_engine(settings.database_url, future=True)
     return _async_engine
 
