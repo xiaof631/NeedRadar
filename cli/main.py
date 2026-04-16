@@ -486,6 +486,63 @@ def promote_raw_entry(
     )
 
 
+@entries_app.command("promote-balanced")
+def promote_balanced_entries(
+    source_types: Annotated[
+        list[SourceType],
+        typer.Option(
+            "--source-type",
+            help="限制参与平衡晋升的数据源类型，可重复",
+            case_sensitive=False,
+        ),
+    ] = [SourceType.RSS, SourceType.HACKER_NEWS],
+    per_source_type: Annotated[
+        int,
+        typer.Option("--per-source-type", help="每类来源最多晋升数量", min=1, max=20),
+    ] = 3,
+    min_score: Annotated[
+        float,
+        typer.Option("--min-score", help="候选最低得分阈值", min=0.0, max=1.0),
+    ] = 0.25,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="仅预览将被晋升的条目"),
+    ] = False,
+) -> None:
+    """按来源配额挑选并晋升一批待处理条目。"""
+
+    ordered_source_types = tuple(dict.fromkeys(source_types))
+    previews = pipeline.plan_balanced_promotions(
+        source_types=ordered_source_types,
+        per_source_type=per_source_type,
+        min_score=min_score,
+    )
+    if not previews:
+        typer.echo("没有找到符合条件的待晋升条目")
+        raise typer.Exit()
+
+    typer.echo(f"共挑选出 {len(previews)} 条待晋升条目：")
+    for preview in previews:
+        typer.echo(
+            f"[{preview.entry.id}] {preview.entry.title} "
+            f"(来源: {preview.source.name}/{preview.source.source_type.value}, "
+            f"规则: {preview.rule_match.rule.name}, 得分: {preview.rule_match.score:.2f})"
+        )
+
+    if dry_run:
+        raise typer.Exit()
+
+    promoted = 0
+    for preview in previews:
+        try:
+            pipeline.promote_entry(preview.entry.id, min_score=min_score)
+        except (EntryNotQualifiedError, CandidateAlreadyExistsError):
+            continue
+        promoted += 1
+
+    typer.echo(f"已生成 {promoted} 条候选需求")
+
+
 @entries_app.command("update-status")
 def update_raw_entry_status(
     entry_id: Annotated[int, typer.Argument(help="原始条目 ID")],

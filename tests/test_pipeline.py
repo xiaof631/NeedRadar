@@ -1,6 +1,8 @@
+from datetime import UTC, datetime
+
 import pytest
 
-from app.models import RawEntryStatus, SourceStatus
+from app.models import RawEntryStatus, SourceStatus, SourceType
 from app.services import candidate_needs, filter_rules, pipeline, raw_entries, rss_sources
 from app.services.llm_client import StructuredNeed
 from app.services.pipeline import CandidateAlreadyExistsError, EntryNotQualifiedError
@@ -50,6 +52,37 @@ def _seed_entry(*, tags: list[str] | None = None) -> int:
             "patterns": [],
             "min_score": 0.3,
             "enabled": True,
+        }
+    )
+    return entry.id
+
+
+def _seed_entry_for_source(
+    *,
+    guid: str,
+    title: str,
+    summary: str | None,
+    source_name: str,
+    source_url: str,
+    source_type: SourceType,
+    published_at: datetime | None = None,
+) -> int:
+    source = rss_sources.create_source(
+        {
+            "name": source_name,
+            "url": source_url,
+            "frequency": 3600,
+            "status": SourceStatus.ACTIVE,
+            "source_type": source_type,
+        }
+    )
+    entry = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": guid,
+            "title": title,
+            "summary": summary,
+            "published_at": published_at,
         }
     )
     return entry.id
@@ -207,3 +240,73 @@ def test_promote_entry_normalizes_optional_fields() -> None:
     assert result.candidate_need.target_users == "开发者"
     assert result.candidate_need.value_proposition is None
     assert result.candidate_need.competition is None
+
+
+def test_plan_balanced_promotions_respects_source_quotas_and_skips_noise() -> None:
+    filter_rules.create_rule(
+        {
+            "name": "Need Signals",
+            "keywords": ["manual", "painful", "stuck", "offline", "error", "which"],
+            "patterns": [],
+            "min_score": 0.15,
+            "enabled": True,
+        }
+    )
+
+    skipped_show_hn = _seed_entry_for_source(
+        guid="show-hn",
+        title="Show HN: boringBar – a taskbar-style dock replacement for macOS",
+        summary="I recently switched from a Fedora laptop to a MacBook Air.",
+        source_name="Show HN",
+        source_url="https://example.com/show-hn.xml",
+        source_type=SourceType.HACKER_NEWS,
+        published_at=datetime(2026, 4, 10, tzinfo=UTC),
+    )
+    skipped_monthly_thread = _seed_entry_for_source(
+        guid="contributors",
+        title="Ask HN: Who needs contributors? (April 2026)",
+        summary="Looking for contributors to your project?",
+        source_name="Ask HN",
+        source_url="https://example.com/ask-hn.xml",
+        source_type=SourceType.HACKER_NEWS,
+        published_at=datetime(2026, 4, 11, tzinfo=UTC),
+    )
+    selected_hn = _seed_entry_for_source(
+        guid="docker-fails",
+        title="Tell HN: Docker pull fails in Spain due to football Cloudflare block",
+        summary="My locally-hosted gitlab runner would fail to create pipelines.",
+        source_name="Ask HN",
+        source_url="https://example.com/ask-hn-2.xml",
+        source_type=SourceType.HACKER_NEWS,
+        published_at=datetime(2026, 4, 12, tzinfo=UTC),
+    )
+    selected_rss = _seed_entry_for_source(
+        guid="manual-dedup",
+        title="Data matching tool pain",
+        summary="The dedup project that should be automated is entirely manual.",
+        source_name="DEV SaaS Feed",
+        source_url="https://example.com/dev.xml",
+        source_type=SourceType.RSS,
+        published_at=datetime(2026, 4, 13, tzinfo=UTC),
+    )
+    skipped_promo = _seed_entry_for_source(
+        guid="promo",
+        title="[推广] 稳定运营两年 AI 中转",
+        summary="企业级 api 渠道服务。",
+        source_name="V2EX Index",
+        source_url="https://example.com/v2ex.xml",
+        source_type=SourceType.RSS,
+        published_at=datetime(2026, 4, 14, tzinfo=UTC),
+    )
+
+    previews = pipeline.plan_balanced_promotions(
+        source_types=(SourceType.RSS, SourceType.HACKER_NEWS),
+        per_source_type=1,
+        min_score=0.15,
+    )
+
+    preview_ids = {preview.entry.id for preview in previews}
+    assert preview_ids == {selected_rss, selected_hn}
+    assert skipped_show_hn not in preview_ids
+    assert skipped_monthly_thread not in preview_ids
+    assert skipped_promo not in preview_ids

@@ -5,10 +5,11 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from app.core import metrics
-from app.models import CandidateNeed, RawEntry, RawEntryStatus
-from app.services import candidate_needs, filter_engine, raw_entries
+from app.models import CandidateNeed, RawEntry, RawEntryStatus, RssSource, SourceType
+from app.services import candidate_needs, filter_engine, raw_entries, rss_sources
 from app.services.llm_client import (
     LLMClient,
     StructuredNeed,
@@ -27,6 +28,41 @@ _TAG_CONFIDENCE_BOOSTS: dict[str, float] = {
     "reddit_comment": 0.02,
 }
 _SUMMARY_MAX_LENGTH = 500
+_BALANCED_SKIP_TITLE_PATTERNS = (
+    re.compile(r"^show hn:", flags=re.IGNORECASE),
+    re.compile(r"^ask hn:\s+who needs contributors\b", flags=re.IGNORECASE),
+    re.compile(r"^ask hn:\s+what are you working on\b", flags=re.IGNORECASE),
+)
+_BALANCED_SKIP_TEXT_MARKERS = (
+    "[推广]",
+    "[酷工作]",
+    "招聘",
+    "代充",
+)
+_BALANCED_PRIORITY_MARKERS = (
+    "can't",
+    "cannot",
+    "pain",
+    "painful",
+    "problem",
+    "stuck",
+    "down",
+    "error",
+    "fails",
+    "failed",
+    "manual",
+    "offline",
+    "frustrat",
+    "求推荐",
+    "推荐",
+    "替代",
+    "崩了",
+    "记事本",
+    "what standards",
+    "which",
+    "easiest",
+    "what should i do",
+)
 
 
 class EntryNotQualifiedError(Exception):
@@ -49,6 +85,15 @@ class PromotionResult:
     candidate_need: CandidateNeed
     rule_match: filter_engine.RuleMatchResult
     structured_need: StructuredNeed
+
+
+@dataclass(slots=True)
+class PromotionPreview:
+    """描述一条待晋升的候选预览。"""
+
+    entry: RawEntry
+    source: RssSource
+    rule_match: filter_engine.RuleMatchResult
 
 
 def promote_entry(
@@ -105,11 +150,89 @@ def promote_entry(
     )
 
 
+def plan_balanced_promotions(
+    *,
+    source_types: tuple[SourceType, ...],
+    per_source_type: int,
+    min_score: float = 0.25,
+) -> list[PromotionPreview]:
+    """按来源类型挑选一批更适合晋升的待处理条目。"""
+
+    if per_source_type < 1:
+        return []
+
+    allowed_source_types = set(source_types)
+    previews_by_source_type: dict[SourceType, list[PromotionPreview]] = {
+        source_type: [] for source_type in source_types
+    }
+
+    for entry in raw_entries.export_entries(status=RawEntryStatus.PENDING):
+        source = rss_sources.get_source(entry.source_id)
+        if source.source_type not in allowed_source_types:
+            continue
+        if candidate_needs.get_need_by_raw_entry(entry.id) is not None:
+            continue
+        rule_match = filter_engine.evaluate_entry(entry, min_score=min_score)
+        if rule_match is None:
+            continue
+        if _should_skip_balanced_promotion(entry, source):
+            continue
+        previews_by_source_type[source.source_type].append(
+            PromotionPreview(entry=entry, source=source, rule_match=rule_match)
+        )
+
+    selected: list[PromotionPreview] = []
+    for source_type in source_types:
+        candidates = previews_by_source_type.get(source_type, [])
+        candidates.sort(key=_balanced_preview_sort_key)
+        selected.extend(candidates[:per_source_type])
+    return selected
+
+
 def _signal_boost(entry: RawEntry, weights: dict[str, float]) -> float:
     if not entry.tags:
         return 0.0
     unique_tags = set(entry.tags)
     return sum(weight for tag, weight in weights.items() if tag in unique_tags)
+
+
+def _balanced_preview_sort_key(preview: PromotionPreview) -> tuple[float, float, int]:
+    published_at = preview.entry.published_at or datetime.min.replace(tzinfo=UTC)
+    priority = preview.rule_match.score + _balanced_priority_bonus(preview.entry)
+    return (-priority, -published_at.timestamp(), preview.entry.id)
+
+
+def _balanced_priority_bonus(entry: RawEntry) -> float:
+    text = _compose_entry_text(entry).lower()
+    bonus = 0.0
+    for marker in _BALANCED_PRIORITY_MARKERS:
+        if marker in text:
+            bonus += 0.02
+    return min(bonus, 0.12)
+
+
+def _should_skip_balanced_promotion(entry: RawEntry, source: RssSource) -> bool:
+    title = entry.title.strip()
+    lowered_title = title.lower()
+    if any(pattern.search(title) for pattern in _BALANCED_SKIP_TITLE_PATTERNS):
+        return True
+
+    text = _compose_entry_text(entry).lower()
+    if any(marker in text for marker in _BALANCED_SKIP_TEXT_MARKERS):
+        return True
+
+    if source.source_type == SourceType.HACKER_NEWS and lowered_title.startswith("ask hn:"):
+        if not any(marker in text for marker in _BALANCED_PRIORITY_MARKERS):
+            return True
+    return False
+
+
+def _compose_entry_text(entry: RawEntry) -> str:
+    return "\n".join(
+        value
+        for value in (entry.title, entry.summary, entry.content, entry.author)
+        if value
+    )
 
 
 def _normalize_summary(value: str) -> str:
