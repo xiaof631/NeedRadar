@@ -17,7 +17,9 @@ def _reset_db() -> None:
     rss_sources.reset_storage()
     config_module.get_settings.cache_clear()
     config_module.settings = config_module.get_settings()
+    os.environ.pop("NEEDRADAR_GITHUB_ACCESS_TOKEN", None)
     os.environ.pop("NEEDRADAR_YOUTUBE_API_KEY", None)
+    os.environ.pop("NEEDRADAR_REDDIT_ACCESS_TOKEN", None)
 
 
 SAMPLE_RSS = """<?xml version=\"1.0\"?>
@@ -294,6 +296,7 @@ def test_fetch_github_issues_source_success() -> None:
 
         def handler(request: httpx.Request) -> httpx.Response:
             assert request.headers["Accept"] == "application/vnd.github+json"
+            assert request.headers["User-Agent"] == "NeedRadar/0.1"
             assert request.url.params["per_page"] == "5"
             assert request.url.params["state"] == "open"
             return httpx.Response(
@@ -345,6 +348,39 @@ def test_fetch_github_issues_source_success() -> None:
     asyncio.run(_run())
 
 
+def test_fetch_github_issues_source_rate_limit_failure() -> None:
+    async def _run() -> None:
+        source = rss_sources.create_source(
+            {
+                "name": "Rate Limited Issues",
+                "url": "https://api.github.com/repos/acme/needradar/issues",
+                "frequency": 1800,
+                "source_type": SourceType.GITHUB_ISSUES,
+                "config": {"item_limit": 5},
+            }
+        )
+
+        def handler(_: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                403,
+                headers={"x-ratelimit-remaining": "0"},
+                json={"message": "API rate limit exceeded for 127.0.0.1."},
+            )
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert result.status == FetchStatus.FAILURE
+        assert result.error_message == "github api rate limit exceeded; configure NEEDRADAR_GITHUB_ACCESS_TOKEN"
+
+        logs = db.list_fetch_logs(source_id=source.id)
+        assert len(logs) == 1
+        assert logs[0].status == FetchStatus.FAILURE
+        assert logs[0].http_status == 403
+
+    asyncio.run(_run())
+
+
 def test_fetch_reddit_source_success() -> None:
     async def _run() -> None:
         source = rss_sources.create_source(
@@ -361,43 +397,29 @@ def test_fetch_reddit_source_success() -> None:
             assert request.headers["User-Agent"] == "NeedRadar/0.1"
             assert request.url.params["limit"] == "2"
             assert request.url.params["t"] == "week"
-            assert request.url.path.endswith("/r/startups/new.json")
+            assert "raw_json" not in request.url.params
+            assert request.url.path.endswith("/r/startups/new/.rss")
             return httpx.Response(
                 200,
-                json={
-                    "data": {
-                        "children": [
-                            {
-                                "data": {
-                                    "name": "t3_abc123",
-                                    "title": "Need a lightweight client onboarding tool",
-                                    "selftext": "Our agency still manages onboarding manually.",
-                                    "permalink": "/r/startups/comments/abc123/client_onboarding_tool/",
-                                    "author": "founder1",
-                                    "created_utc": 1711000000,
-                                    "subreddit": "startups",
-                                    "link_flair_text": "Discussion",
-                                    "post_hint": "self",
-                                    "is_self": True,
-                                    "stickied": False,
-                                }
-                            },
-                            {
-                                "data": {
-                                    "name": "t3_def456",
-                                    "title": "Hiring tracker for small teams",
-                                    "selftext": "",
-                                    "permalink": "/r/startups/comments/def456/hiring_tracker/",
-                                    "author": "founder2",
-                                    "created_utc": 1711000500,
-                                    "subreddit": "startups",
-                                    "is_self": True,
-                                    "stickied": False,
-                                }
-                            },
-                        ]
-                    }
-                },
+                text="""<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>t3_abc123</id>
+    <title>Need a lightweight client onboarding tool</title>
+    <updated>2024-03-20T10:00:00Z</updated>
+    <author><name>founder1</name></author>
+    <content type="html">&lt;p&gt;Our agency still manages onboarding manually.&lt;/p&gt;</content>
+    <link href="https://www.reddit.com/r/startups/comments/abc123/client_onboarding_tool/" />
+  </entry>
+  <entry>
+    <id>t3_def456</id>
+    <title>Hiring tracker for small teams</title>
+    <updated>2024-03-20T11:00:00Z</updated>
+    <author><name>founder2</name></author>
+    <content type="html">&lt;p&gt;Still juggling spreadsheets.&lt;/p&gt;</content>
+    <link href="https://www.reddit.com/r/startups/comments/def456/hiring_tracker/" />
+  </entry>
+</feed>""",
             )
 
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
@@ -412,6 +434,7 @@ def test_fetch_reddit_source_success() -> None:
         assert entries[0].guid in {"t3_abc123", "t3_def456"}
         assert "reddit" in entries[0].tags
         assert "startups" in entries[0].tags
+        assert "reddit_post" in entries[0].tags
 
         logs = db.list_fetch_logs(source_id=source.id)
         assert len(logs) == 1
@@ -436,25 +459,81 @@ def test_fetch_reddit_comments_source_with_signal_tags() -> None:
             assert request.headers["User-Agent"] == "NeedRadar/0.1"
             assert request.url.params["limit"] == "2"
             assert request.url.params["sort"] == "new"
-            assert request.url.path.endswith("/r/startups/comments.json")
+            assert request.url.path.endswith("/r/startups/comments/.rss")
+            return httpx.Response(
+                200,
+                text="""<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>t1_xyz789</id>
+    <title>Comment on onboarding workflow</title>
+    <updated>2024-03-20T12:00:00Z</updated>
+    <author><name>ops_founder</name></author>
+    <summary>I hate how manual onboarding is.</summary>
+    <content type="html">&lt;p&gt;I hate how manual onboarding is. Looking for an alternative to Notion for small clients.&lt;/p&gt;</content>
+    <link href="https://www.reddit.com/r/startups/comments/post123/comment_xyz789/" />
+  </entry>
+</feed>""",
+            )
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert result.status == FetchStatus.SUCCESS
+        assert result.fetched_entries == 1
+        assert result.new_entries == 1
+
+        total, entries = raw_entries.list_entries(source_id=source.id)
+        assert total == 1
+        assert entries[0].guid == "t1_xyz789"
+        assert entries[0].title == "Comment on onboarding workflow"
+        assert "reddit_comment" in entries[0].tags
+        assert "complaint_signal" in entries[0].tags
+        assert "alternative_request" in entries[0].tags
+        assert entries[0].author == "ops_founder"
+        assert "manual onboarding" in (entries[0].summary or "").lower()
+
+    asyncio.run(_run())
+
+
+def test_fetch_reddit_source_uses_json_when_access_token_configured() -> None:
+    async def _run() -> None:
+        os.environ["NEEDRADAR_REDDIT_ACCESS_TOKEN"] = "reddit-test-token"
+        config_module.get_settings.cache_clear()
+        config_module.settings = config_module.get_settings()
+
+        source = rss_sources.create_source(
+            {
+                "name": "r/startups new",
+                "url": "https://www.reddit.com/r/startups/new",
+                "frequency": 1200,
+                "source_type": SourceType.REDDIT,
+                "config": {"item_limit": 1, "time": "month"},
+            }
+        )
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.headers["Authorization"] == "Bearer reddit-test-token"
+            assert request.url.params["raw_json"] == "1"
+            assert request.url.path.endswith("/r/startups/new.json")
             return httpx.Response(
                 200,
                 json={
                     "data": {
                         "children": [
                             {
-                                "kind": "t1",
                                 "data": {
-                                    "name": "t1_xyz789",
-                                    "body": "I hate how manual onboarding is. Looking for an alternative to Notion for small clients.",
-                                    "permalink": "/r/startups/comments/post123/comment_xyz789/",
-                                    "author": "ops_founder",
-                                    "created_utc": 1711000800,
+                                    "name": "t3_ghi789",
+                                    "title": "Looking for a better invoicing stack",
+                                    "selftext": "QuickBooks feels clunky for our agency.",
+                                    "permalink": "/r/startups/comments/ghi789/better_invoicing_stack/",
+                                    "author": "agency_ops",
+                                    "created_utc": 1711001000,
                                     "subreddit": "startups",
-                                    "link_title": "How are you handling onboarding?",
-                                    "author_flair_text": "Founder",
+                                    "post_hint": "self",
+                                    "is_self": True,
                                     "stickied": False,
-                                },
+                                }
                             }
                         ]
                     }
@@ -470,13 +549,8 @@ def test_fetch_reddit_comments_source_with_signal_tags() -> None:
 
         total, entries = raw_entries.list_entries(source_id=source.id)
         assert total == 1
-        assert entries[0].guid == "t1_xyz789"
-        assert entries[0].title == "Comment on How are you handling onboarding?"
-        assert "reddit_comment" in entries[0].tags
-        assert "complaint_signal" in entries[0].tags
-        assert "alternative_request" in entries[0].tags
-        assert entries[0].author == "ops_founder"
-        assert "manual onboarding" in (entries[0].summary or "").lower()
+        assert entries[0].guid == "t3_ghi789"
+        assert "reddit_post" in entries[0].tags
 
     asyncio.run(_run())
 

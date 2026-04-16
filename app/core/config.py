@@ -158,6 +158,10 @@ class Settings(BaseSettings):
         default="NeedRadar/0.1",
         description="访问 Reddit 时使用的 User-Agent",
     )
+    github_access_token: str | None = Field(
+        default=None,
+        description="可选，GitHub access token；配置后可提升 Issues API 抓取额度",
+    )
     youtube_api_key: str | None = Field(
         default=None,
         description="可选，YouTube Data API v3 key；配置后可抓取公开视频搜索结果",

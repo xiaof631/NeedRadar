@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from app.core import metrics
+from app.core.config import get_settings
 from app.db.storage import db
 from app.models import FetchStatus, RssSource
 from app.services import raw_entries, rss_sources
@@ -32,10 +33,13 @@ async def fetch_github_issues_source(
 
     try:
         params = _build_query_params(source.config)
+        settings = get_settings()
         headers = {
             "Accept": "application/vnd.github+json",
             "User-Agent": "NeedRadar/0.1",
         }
+        if settings.github_access_token:
+            headers["Authorization"] = f"Bearer {settings.github_access_token}"
         try:
             response = await client.get(source.url, params=params, headers=headers)
         except httpx.HTTPError as exc:
@@ -52,7 +56,7 @@ async def fetch_github_issues_source(
             return result
 
         if response.status_code >= 400:
-            message = f"unexpected status code {response.status_code}"
+            message = _build_error_message(response)
             db.add_fetch_log(
                 source.id,
                 status=FetchStatus.FAILURE,
@@ -250,3 +254,11 @@ def _coerce_bool(value: Any) -> bool:
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes", "on"}
     return False
+
+
+def _build_error_message(response: httpx.Response) -> str:
+    if response.status_code == 403:
+        body_text = response.text.lower()
+        if "rate limit" in body_text or response.headers.get("x-ratelimit-remaining") == "0":
+            return "github api rate limit exceeded; configure NEEDRADAR_GITHUB_ACCESS_TOKEN"
+    return f"unexpected status code {response.status_code}"

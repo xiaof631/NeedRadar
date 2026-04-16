@@ -107,6 +107,8 @@ cp .env.example .env
 - `NEEDRADAR_CELERY_BROKER_URL`：Celery 消息队列地址，默认指向 `redis://localhost:6406/0`。
 - `NEEDRADAR_CELERY_RESULT_BACKEND`：Celery 任务结果存储地址，默认 Redis `1` 号库，可设为 `null` 关闭。
 - `NEEDRADAR_CELERY_TASK_ALWAYS_EAGER`：调试/测试模式下是否同步执行任务，默认为 `False`。
+- `NEEDRADAR_REDDIT_ACCESS_TOKEN` / `NEEDRADAR_REDDIT_USER_AGENT`：可选，配置后 Reddit 源走 OAuth JSON API；未配置 token 时会自动回退到公开 RSS。
+- `NEEDRADAR_GITHUB_ACCESS_TOKEN`：可选，GitHub Issues 源在共享公网出口下建议配置，用于避免匿名 API rate limit。
 - `NEEDRADAR_TELEMETRY_ENABLED`：是否启用 OpenTelemetry 采样与 Trace 导出，默认为 `False`。
 - `NEEDRADAR_TELEMETRY_SERVICE_NAME`：Trace 中展示的服务名称，默认为 `needradar-api`。
 - `NEEDRADAR_TELEMETRY_OTLP_ENDPOINT` / `NEEDRADAR_TELEMETRY_OTLP_INSECURE`：可选，指向外部 OTLP Collector；若为空则默认输出至控制台。
