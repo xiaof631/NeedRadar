@@ -31,6 +31,7 @@ from app.services import (
     pipeline,
     raw_entries,
     rss_sources,
+    source_catalog,
     sync_audit,
 )
 from app.services.candidate_needs import (
@@ -306,6 +307,41 @@ def create_source(
         raise typer.BadParameter("RSS 源已存在", param_hint="url") from exc
 
     typer.echo(f"已创建 RSS 源 #{source.id}: {source.name}")
+
+
+@rss_app.command("seed-catalog")
+def seed_source_catalog(
+    profile: Annotated[
+        str,
+        typer.Option(
+            "--profile",
+            help="预置数据源目录名称，可选值: github-public-expanded",
+        ),
+    ] = "github-public-expanded",
+    status: Annotated[
+        SourceStatus | None,
+        typer.Option(help="可选，覆盖导入后数据源状态", case_sensitive=False),
+    ] = None,
+) -> None:
+    """导入预置数据源目录。"""
+
+    try:
+        created, skipped = source_catalog.seed_catalog(profile, status=status)
+    except source_catalog.SourceCatalogNotFoundError as exc:
+        available = ", ".join(sorted(source_catalog.list_catalogs()))
+        raise typer.BadParameter(
+            f"未知目录，当前可用: {available}",
+            param_hint="profile",
+        ) from exc
+
+    typer.echo(
+        f"目录 {profile} 导入完成：新增 {len(created)} 个，跳过 {len(skipped)} 个已存在数据源。"
+    )
+    if created:
+        statuses = sorted({source.status.value for source in created})
+        typer.echo(f"新增数据源状态: {', '.join(statuses)}")
+    for source in created:
+        typer.echo(f"  + [{source.id}] {source.name}")
 
 
 @rss_app.command("update")

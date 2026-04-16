@@ -41,7 +41,12 @@ async def fetch_github_issues_source(
         if settings.github_access_token:
             headers["Authorization"] = f"Bearer {settings.github_access_token}"
         try:
-            response = await client.get(source.url, params=params, headers=headers)
+            response = await client.get(
+                source.url,
+                params=params,
+                headers=headers,
+                follow_redirects=True,
+            )
         except httpx.HTTPError as exc:
             message = str(exc)
             db.add_fetch_log(source.id, status=FetchStatus.FAILURE, error_message=message)
