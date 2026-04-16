@@ -9,7 +9,12 @@ from dataclasses import dataclass
 from app.core import metrics
 from app.models import CandidateNeed, RawEntry, RawEntryStatus
 from app.services import candidate_needs, filter_engine, raw_entries
-from app.services.llm_client import LLMClient, StructuredNeed, get_default_llm_client
+from app.services.llm_client import (
+    LLMClient,
+    StructuredNeed,
+    _sanitize_need_field,
+    get_default_llm_client,
+)
 
 _TAG_RULE_SCORE_BOOSTS: dict[str, float] = {
     "complaint_signal": 0.08,
@@ -81,10 +86,10 @@ def promote_entry(
         {
             "raw_entry_id": entry.id,
             "summary": summary,
-            "problem_statement": structured.problem_statement,
-            "target_users": structured.target_users,
-            "value_proposition": structured.value_proposition,
-            "competition": structured.competition,
+            "problem_statement": _normalize_optional_field(structured.problem_statement, summary=summary),
+            "target_users": _normalize_optional_field(structured.target_users, summary=summary, max_length=200),
+            "value_proposition": _normalize_optional_field(structured.value_proposition, summary=summary),
+            "competition": _normalize_optional_field(structured.competition, summary=summary, max_length=120),
             "confidence": min(structured.confidence + confidence_boost, 0.99),
             "rule_score": min(rule_match.score + rule_score_boost, 1.0),
         }
@@ -114,3 +119,31 @@ def _normalize_summary(value: str) -> str:
     if len(text) <= _SUMMARY_MAX_LENGTH:
         return text
     return text[: _SUMMARY_MAX_LENGTH - 1].rstrip() + "…"
+
+
+def _normalize_optional_field(
+    value: str | None,
+    *,
+    summary: str,
+    max_length: int = 800,
+) -> str | None:
+    text = _sanitize_need_field(value, max_length=max_length)
+    if not text:
+        return None
+    if text.lower() == summary.lower():
+        return None
+    lowered = text.lower()
+    if lowered in {"github", "gitlab"}:
+        return None
+    if lowered.startswith(
+        (
+            "screenshots",
+            "add screenshots",
+            "steps to reproduce",
+            "expected behavior",
+            "additional context",
+            "environment",
+        )
+    ):
+        return None
+    return text

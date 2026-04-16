@@ -161,3 +161,49 @@ def test_promote_entry_truncates_long_summary_to_fit_column() -> None:
     assert len(result.candidate_need.summary) == 500
     assert "<" not in result.candidate_need.summary
     assert result.candidate_need.summary.endswith("…")
+
+
+def test_promote_entry_normalizes_optional_fields() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Issue Feed",
+            "url": "https://example.com/issues.xml",
+            "frequency": 3600,
+            "status": SourceStatus.ACTIVE,
+        }
+    )
+    entry = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "entry-issue",
+            "title": "Project pause stuck indefinitely",
+            "summary": "project cannot pause after disk IO exhaustion",
+        }
+    )
+    filter_rules.create_rule(
+        {
+            "name": "Breakage",
+            "keywords": ["stuck", "cannot"],
+            "patterns": [],
+            "min_score": 0.3,
+            "enabled": True,
+        }
+    )
+
+    class NoisyClient:
+        def analyze_entry(self, entry) -> StructuredNeed:  # type: ignore[override]
+            return StructuredNeed(
+                summary="[BUG]: Project pause stuck indefinitely",
+                problem_statement="### Actual behavior Project remains stuck after disk IO exhaustion.",
+                target_users="<b>开发者</b>",
+                value_proposition="## Screenshots If applicable, add screenshots to help explain your problem.",
+                competition="Github",
+                confidence=0.7,
+            )
+
+    result = pipeline.promote_entry(entry.id, llm_client=NoisyClient())
+
+    assert result.candidate_need.problem_statement == "Project remains stuck after disk IO exhaustion."
+    assert result.candidate_need.target_users == "开发者"
+    assert result.candidate_need.value_proposition is None
+    assert result.candidate_need.competition is None

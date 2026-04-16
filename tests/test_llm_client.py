@@ -80,3 +80,24 @@ def test_heuristic_llm_splits_english_sentences_for_problem_statement() -> None:
     result = client.analyze_entry(entry)
 
     assert result.problem_statement == "The friction gets painful when teams scale"
+
+
+def test_heuristic_llm_cleans_github_issue_noise_fields() -> None:
+    client = HeuristicLLMClient()
+    entry = _entry(
+        title="[BUG]: TypeError: cyclic object value when clicking refresh on MultiSelectDropdown",
+        summary="## Screenshots If applicable, add screenshots to help explain your problem.",
+        content=(
+            "Project remains stuck behind an invalid certificate error. "
+            "### Steps to reproduce "
+            "Open https://github.com/example/repo/issues/1 and retry. "
+            "Bug report written with the help of Claude."
+        ),
+    )
+
+    result = client.analyze_entry(entry)
+
+    assert result.summary == "TypeError: cyclic object value when clicking refresh on MultiSelectDropdown"
+    assert result.problem_statement == "Project remains stuck behind an invalid certificate error"
+    assert result.value_proposition is None
+    assert result.competition is None

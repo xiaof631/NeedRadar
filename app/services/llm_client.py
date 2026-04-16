@@ -67,11 +67,24 @@ class HeuristicLLMClient:
         "slow",
         "tedious",
         "annoying",
+        "stuck",
+        "not working",
+        "does not work",
+        "fail",
+        "failed",
+        "error",
+        "typeerror",
+        "invalid",
+        "err_",
+        "cannot",
+        "unable",
+        "crash",
+        "broken",
+        "missing",
     )
     _COMPETITORS: dict[str, tuple[str, ...]] = {
         "Notion": ("Notion", "Evernote"),
         "飞书": ("飞书", "钉钉"),
-        "Github": ("GitHub", "Gitlab"),
     }
 
     def analyze_entry(self, entry: RawEntry) -> StructuredNeed:
@@ -79,6 +92,8 @@ class HeuristicLLMClient:
         sentences = _split_sentences(text)
         summary = _build_summary(entry, sentences)
         problem = _pick_sentence(sentences, self._PROBLEM_PATTERNS)
+        if not problem and _looks_like_problem(entry.title):
+            problem = _sanitize_need_field(entry.title)
         target_users = self._detect_target_users(text)
         value = _pick_sentence(sentences, self._VALUE_PATTERNS)
         competition = self._detect_competition(text)
@@ -152,37 +167,49 @@ def _split_sentences(text: str) -> list[str]:
 
 def _pick_sentence(sentences: Sequence[str], patterns: Sequence[str]) -> str | None:
     for sentence in sentences:
+        if _is_noise_sentence(sentence):
+            continue
         lowered = sentence.lower()
         for pattern in patterns:
             if pattern.lower() in lowered:
-                return sentence
+                cleaned = _sanitize_need_field(sentence)
+                if cleaned:
+                    return cleaned
     return None
 
 
 def _build_summary(entry: RawEntry, sentences: Sequence[str]) -> str:
     if entry.title:
+        title = _sanitize_summary(entry.title)
         if not entry.summary:
-            return entry.title.strip()
+            return title
         cleaned_summary = _clean_text(entry.summary)
         if (
             not cleaned_summary
+            or _is_noise_sentence(cleaned_summary)
             or len(cleaned_summary) > 180
             or cleaned_summary.count(" ") > 24
         ):
-            return entry.title.strip()
-        return cleaned_summary
+            return title
+        return _sanitize_summary(cleaned_summary)
     if entry.summary:
-        return _clean_text(entry.summary)
+        return _sanitize_summary(entry.summary)
     if sentences:
-        return sentences[0]
-    return _clean_text(entry.content) if entry.content else "未命名需求"
+        return _sanitize_summary(sentences[0])
+    return _sanitize_summary(entry.content) if entry.content else "未命名需求"
 
 
 def _clean_text(value: str | None) -> str:
     if not value:
         return ""
     text = html.unescape(value)
+    text = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", r"\1", text)
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"`{1,3}", "", text)
     text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"^[>#*\-]+\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\d+[.)]\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\*+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
 
@@ -194,6 +221,73 @@ def _contains_keyword(text: str, keyword: str) -> bool:
         pattern = re.compile(rf"(?<![a-z0-9]){re.escape(keyword.lower())}(?![a-z0-9])")
         return bool(pattern.search(text.lower()))
     return keyword.lower() in text.lower()
+
+
+def _sanitize_summary(value: str | None) -> str:
+    text = _sanitize_need_field(value)
+    if not text:
+        return ""
+    text = re.sub(r"^\[(bug|feature|question|help)\]\s*:?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"^(bug|feature request|question|fix|feat|chore)(\([^)]+\))?\s*:?\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return text.strip(" -:")
+
+
+def _sanitize_need_field(value: str | None, *, max_length: int = 500) -> str:
+    text = _clean_text(value)
+    if not text:
+        return ""
+    text = re.sub(r"\b(if applicable|bug report written with the help of claude)\b", "", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"^(describe the bug|actual behavior|expected behavior|steps to reproduce|screenshots?|additional context|environment)\s*:?\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\s+", " ", text).strip(" ,-:#")
+    if len(text) <= max_length:
+        return text
+    return text[: max_length - 1].rstrip() + "…"
+
+
+def _looks_like_problem(value: str | None) -> bool:
+    if not value:
+        return False
+    lowered = _clean_text(value).lower()
+    return any(pattern in lowered for pattern in HeuristicLLMClient._PROBLEM_PATTERNS)
+
+
+def _is_noise_sentence(sentence: str) -> bool:
+    lowered = sentence.lower().strip()
+    if not lowered or len(lowered) < 8:
+        return True
+    if " " not in lowered and len(lowered) < 20:
+        return True
+    noise_prefixes = (
+        "screenshots",
+        "screenshot",
+        "steps to reproduce",
+        "expected behavior",
+        "actual behavior",
+        "additional context",
+        "environment",
+        "workaround",
+        "requested fix",
+        "requested help",
+        "version",
+        "checklist",
+        "logs",
+        "no tables require manual retry",
+    )
+    if lowered.startswith(noise_prefixes):
+        return True
+    if "github.com/" in lowered:
+        return True
+    return False
 
 
 @lru_cache
