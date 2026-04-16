@@ -33,6 +33,7 @@
   "actions": {
     "refresh": "刷新",
     "search": "搜索",
+    "view": "查看",
     "create": "新建",
     "export": "导出",
     "cancel": "取消",
@@ -239,7 +240,53 @@
       "confidence": "信心",
       "synced": "同步",
       "updated": "更新时间",
+      "actions": "操作",
       "empty": "暂无候选需求"
+    },
+    "reviewGuide": {
+      "title": "待评审处理规则",
+      "subtitle": "先判断是不是值得继续推进的需求，再决定状态流转",
+      "approve": {
+        "title": "通过",
+        "description": "问题真实、可复现、具备重复出现的需求价值，建议改成已通过。"
+      },
+      "reject": {
+        "title": "拒绝",
+        "description": "噪音、一次性故障、纯实现细节或与产品机会弱相关，建议改成已拒绝。"
+      },
+      "discovery": {
+        "title": "进入调研",
+        "description": "问题看起来有价值，但还需要更多同类信号、用户场景或竞品验证，建议进探索中。"
+      }
+    },
+    "detail": {
+      "title": "候选详情",
+      "feedback": {
+        "updated": "候选状态已更新"
+      },
+      "review": {
+        "title": "评审动作",
+        "approve": "标记为通过",
+        "reject": "标记为拒绝",
+        "discovery": "进入调研",
+        "reopen": "重新进入待评审",
+        "complete": "标记为已完成"
+      },
+      "reviewHints": {
+        "github": "GitHub issue 更适合判断是否代表稳定存在的工作流问题，而不是单点技术故障。",
+        "community": "社区来源更适合判断是否代表一类重复出现的真实需求，而不是单次闲聊或泛建议。",
+        "default": "优先判断问题是否真实、是否重复出现、是否值得进入后续调研。"
+      },
+      "fields": {
+        "problem": "问题陈述",
+        "targetUsers": "目标用户",
+        "value": "价值主张",
+        "competition": "竞品/替代",
+        "ruleScore": "规则得分",
+        "confidence": "信心",
+        "rawEntryId": "原始条目",
+        "updatedAt": "更新时间"
+      }
     },
     "intelligence": {
       "sectionTitle": "情报信号簇",

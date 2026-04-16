@@ -33,6 +33,7 @@
   "actions": {
     "refresh": "Refresh",
     "search": "Search",
+    "view": "View",
     "create": "Create",
     "export": "Export",
     "cancel": "Cancel",
@@ -239,7 +240,53 @@
       "confidence": "Confidence",
       "synced": "Sync",
       "updated": "Updated at",
+      "actions": "Actions",
       "empty": "No candidate needs"
+    },
+    "reviewGuide": {
+      "title": "Review rules",
+      "subtitle": "Decide whether the item is worth advancing before changing its status",
+      "approve": {
+        "title": "Approve",
+        "description": "The problem is real, repeatable, and has enough demand signal to move forward."
+      },
+      "reject": {
+        "title": "Reject",
+        "description": "The item is noise, a one-off failure, or too implementation-specific to represent product demand."
+      },
+      "discovery": {
+        "title": "Move to discovery",
+        "description": "The signal looks promising but still needs more evidence, user context, or competitive validation."
+      }
+    },
+    "detail": {
+      "title": "Candidate detail",
+      "feedback": {
+        "updated": "Candidate status updated"
+      },
+      "review": {
+        "title": "Review actions",
+        "approve": "Mark approved",
+        "reject": "Mark rejected",
+        "discovery": "Move to discovery",
+        "reopen": "Return to review",
+        "complete": "Mark completed"
+      },
+      "reviewHints": {
+        "github": "GitHub issues should be reviewed for durable workflow pain, not just isolated implementation bugs.",
+        "community": "Community signals should be reviewed for repeated real demand, not casual discussion or generic advice.",
+        "default": "Check whether the problem is real, recurring, and worth deeper validation."
+      },
+      "fields": {
+        "problem": "Problem statement",
+        "targetUsers": "Target users",
+        "value": "Value proposition",
+        "competition": "Competition / alternative",
+        "ruleScore": "Rule score",
+        "confidence": "Confidence",
+        "rawEntryId": "Raw entry",
+        "updatedAt": "Updated at"
+      }
     },
     "intelligence": {
       "sectionTitle": "Signal clusters",

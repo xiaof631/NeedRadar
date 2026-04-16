@@ -321,6 +321,21 @@ export async function fetchCandidateNeeds(
   return response.data;
 }
 
+export async function fetchCandidateNeed(needId: number): Promise<CandidateNeed> {
+  const response = await apiClient.get(`/api/v1/candidate-needs/${needId}`);
+  return response.data;
+}
+
+export async function updateCandidateNeedStatus(
+  needId: number,
+  status: CandidateNeedStatus
+): Promise<CandidateNeed> {
+  const response = await apiClient.put(`/api/v1/candidate-needs/${needId}/status`, {
+    status
+  });
+  return response.data;
+}
+
 export async function fetchCandidateNeedClusters(
   params: CandidateNeedQueryParams & {
     min_cluster_size?: number;

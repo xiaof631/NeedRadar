@@ -86,6 +86,31 @@
     </el-card>
 
     <el-card shadow="never">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <span>{{ t('candidates.reviewGuide.title') }}</span>
+            <p class="section-subtitle">{{ t('candidates.reviewGuide.subtitle') }}</p>
+          </div>
+        </div>
+      </template>
+      <div class="review-guide">
+        <div class="review-guide__item">
+          <strong>{{ t('candidates.reviewGuide.approve.title') }}</strong>
+          <p>{{ t('candidates.reviewGuide.approve.description') }}</p>
+        </div>
+        <div class="review-guide__item">
+          <strong>{{ t('candidates.reviewGuide.reject.title') }}</strong>
+          <p>{{ t('candidates.reviewGuide.reject.description') }}</p>
+        </div>
+        <div class="review-guide__item">
+          <strong>{{ t('candidates.reviewGuide.discovery.title') }}</strong>
+          <p>{{ t('candidates.reviewGuide.discovery.description') }}</p>
+        </div>
+      </div>
+    </el-card>
+
+    <el-card shadow="never">
       <div class="filters">
         <el-input
           v-model="searchInput"
@@ -115,8 +140,15 @@
         row-key="id"
         v-loading="needsQuery.isFetching.value"
         :empty-text="t('candidates.table.empty')"
+        @row-click="openNeedDetail"
       >
-        <el-table-column prop="summary" :label="t('candidates.table.summary')" min-width="220" show-overflow-tooltip />
+        <el-table-column :label="t('candidates.table.summary')" min-width="240">
+          <template #default="{ row }">
+            <el-button link type="primary" @click.stop="openNeedDetail(row)">
+              {{ row.summary }}
+            </el-button>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('candidates.table.source')" min-width="200">
           <template #default="{ row }">
             <div class="source-cell">
@@ -152,6 +184,13 @@
         </el-table-column>
         <el-table-column :label="t('candidates.table.updated')" min-width="180">
           <template #default="{ row }">{{ formatDate(row.updated_at) }}</template>
+        </el-table-column>
+        <el-table-column :label="t('candidates.table.actions')" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click.stop="openNeedDetail(row)">
+              {{ t('actions.view') }}
+            </el-button>
+          </template>
         </el-table-column>
       </el-table>
       <div class="pagination-row">
@@ -256,6 +295,83 @@
         </span>
       </template>
     </el-dialog>
+
+    <el-drawer
+      v-model="detailDrawerVisible"
+      :title="t('candidates.detail.title')"
+      size="640px"
+      destroy-on-close
+    >
+      <div v-if="detailQuery.data.value" class="detail-panel">
+        <div class="detail-panel__header">
+          <div>
+            <h3>{{ detailQuery.data.value.summary }}</h3>
+            <div class="detail-panel__meta">
+              <el-tag :type="statusTag(detailQuery.data.value.status)">
+                {{ statusLabel(detailQuery.data.value.status) }}
+              </el-tag>
+              <el-tag effect="plain">{{ sourceTypeLabel(detailQuery.data.value.source_type) }}</el-tag>
+              <span>{{ detailQuery.data.value.source_name || '—' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-panel__section">
+          <strong>{{ t('candidates.detail.review.title') }}</strong>
+          <p>{{ reviewHint(detailQuery.data.value) }}</p>
+          <div class="detail-panel__actions">
+            <el-button
+              v-for="action in nextStatusOptions(detailQuery.data.value)"
+              :key="action.status"
+              :type="action.type"
+              :plain="action.plain"
+              :loading="statusMutation.isPending.value"
+              @click="changeNeedStatus(action.status)"
+            >
+              {{ action.label }}
+            </el-button>
+          </div>
+        </div>
+
+        <div class="detail-panel__grid">
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.problem') }}</span>
+            <p>{{ detailQuery.data.value.problem_statement || '—' }}</p>
+          </div>
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.targetUsers') }}</span>
+            <p>{{ detailQuery.data.value.target_users || '—' }}</p>
+          </div>
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.value') }}</span>
+            <p>{{ detailQuery.data.value.value_proposition || '—' }}</p>
+          </div>
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.competition') }}</span>
+            <p>{{ detailQuery.data.value.competition || '—' }}</p>
+          </div>
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.ruleScore') }}</span>
+            <p>{{ formatScore(detailQuery.data.value.rule_score) }}</p>
+          </div>
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.confidence') }}</span>
+            <p>{{ formatScore(detailQuery.data.value.confidence) }}</p>
+          </div>
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.rawEntryId') }}</span>
+            <p>#{{ detailQuery.data.value.raw_entry_id }}</p>
+          </div>
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.updatedAt') }}</span>
+            <p>{{ formatDate(detailQuery.data.value.updated_at) }}</p>
+          </div>
+        </div>
+      </div>
+      <div v-else class="detail-panel detail-panel--loading">
+        <el-skeleton :rows="6" animated />
+      </div>
+    </el-drawer>
   </section>
 </template>
 
@@ -268,9 +384,11 @@ import type { AxiosError } from 'axios';
 
 import {
   createCandidateNeedExportJob,
+  fetchCandidateNeed,
   fetchCandidateNeedClusters,
   fetchCandidateNeedExportJobs,
   fetchCandidateNeeds,
+  updateCandidateNeedStatus,
   type CandidateNeedCluster,
   type CandidateNeed,
   type CandidateNeedSourceType,
@@ -361,6 +479,8 @@ const exportJobsQuery = useQuery({
 });
 
 const exportJobs = computed(() => exportJobsQuery.data.value?.items ?? []);
+const detailDrawerVisible = ref(false);
+const selectedNeedId = ref<number | null>(null);
 
 watch([statusFilter, syncFilter, sourceTypeFilter], () => {
   page.value = 1;
@@ -382,6 +502,11 @@ const handleClearSearch = () => {
 
 const refreshNeeds = () => {
   needsQuery.refetch();
+};
+
+const openNeedDetail = (need: CandidateNeed) => {
+  selectedNeedId.value = need.id;
+  detailDrawerVisible.value = true;
 };
 
 const statusLabel = (status: CandidateNeed['status']) => {
@@ -470,6 +595,73 @@ const formatDate = (value: string) => {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+};
+
+const detailQuery = useQuery({
+  queryKey: computed(() => ['candidate-need-detail', selectedNeedId.value]),
+  queryFn: () => fetchCandidateNeed(selectedNeedId.value as number),
+  enabled: computed(() => detailDrawerVisible.value && selectedNeedId.value !== null),
+  refetchOnWindowFocus: false,
+});
+
+const statusMutation = useMutation({
+  mutationFn: (status: CandidateNeed['status']) =>
+    updateCandidateNeedStatus(selectedNeedId.value as number, status),
+  onSuccess: async () => {
+    ElMessage.success(t('candidates.detail.feedback.updated'));
+    await Promise.all([detailQuery.refetch(), needsQuery.refetch(), clustersQuery.refetch()]);
+  },
+  onError: (error: unknown) => {
+    const err = error as AxiosError<{ detail?: string }>;
+    ElMessage.error(err.response?.data?.detail ?? t('feedback.genericError'));
+  },
+});
+
+const changeNeedStatus = (status: CandidateNeed['status']) => {
+  if (selectedNeedId.value === null) {
+    return;
+  }
+  statusMutation.mutate(status);
+};
+
+const reviewHint = (need: CandidateNeed) => {
+  if (need.source_type === 'github_issues') {
+    return t('candidates.detail.reviewHints.github');
+  }
+  if (need.source_type === 'rss' || need.source_type === 'hacker_news') {
+    return t('candidates.detail.reviewHints.community');
+  }
+  return t('candidates.detail.reviewHints.default');
+};
+
+const nextStatusOptions = (need: CandidateNeed) => {
+  switch (need.status) {
+    case 'pending_review':
+      return [
+        { status: 'approved' as const, label: t('candidates.detail.review.approve'), type: 'success' as const, plain: false },
+        { status: 'rejected' as const, label: t('candidates.detail.review.reject'), type: 'danger' as const, plain: false },
+      ];
+    case 'approved':
+      return [
+        { status: 'in_discovery' as const, label: t('candidates.detail.review.discovery'), type: 'primary' as const, plain: true },
+        { status: 'rejected' as const, label: t('candidates.detail.review.reject'), type: 'danger' as const, plain: false },
+      ];
+    case 'rejected':
+      return [
+        { status: 'pending_review' as const, label: t('candidates.detail.review.reopen'), type: 'warning' as const, plain: true },
+      ];
+    case 'in_discovery':
+      return [
+        { status: 'completed' as const, label: t('candidates.detail.review.complete'), type: 'success' as const, plain: false },
+        { status: 'rejected' as const, label: t('candidates.detail.review.reject'), type: 'danger' as const, plain: false },
+      ];
+    case 'completed':
+      return [
+        { status: 'in_discovery' as const, label: t('candidates.detail.review.discovery'), type: 'primary' as const, plain: true },
+      ];
+    default:
+      return [];
+  }
 };
 
 const exportDialogVisible = ref(false);
@@ -616,6 +808,96 @@ const submitExport = () => {
 .cluster-summary p {
   margin: 0;
   color: #6b7280;
+}
+
+.review-guide {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.review-guide__item {
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #fafafa;
+}
+
+.review-guide__item p {
+  margin: 0.5rem 0 0;
+  color: #6b7280;
+}
+
+.detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detail-panel__header h3 {
+  margin: 0;
+}
+
+.detail-panel__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  color: #6b7280;
+}
+
+.detail-panel__section {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+}
+
+.detail-panel__section p {
+  margin: 0.5rem 0 0;
+  color: #475569;
+}
+
+.detail-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.detail-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.detail-field {
+  padding: 0.875rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+}
+
+.detail-field span {
+  display: block;
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.detail-field p {
+  margin: 0;
+  color: #111827;
+  word-break: break-word;
+}
+
+.detail-panel--loading {
+  padding-top: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .detail-panel__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .priority-cell {
