@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -35,14 +36,38 @@ class HeuristicLLMClient:
     """无需外部依赖的启发式 LLM 客户端。"""
 
     _USER_KEYWORDS: dict[str, tuple[str, ...]] = {
-        "开发者": ("开发者", "程序员", "工程师"),
-        "产品经理": ("产品经理", "PM"),
-        "设计师": ("设计师", "UX", "UI"),
-        "运营": ("运营", "市场", "营销"),
-        "学生": ("学生", "高校", "大学"),
+        "开发者": ("开发者", "程序员", "工程师", "developer", "developers", "engineer", "engineers"),
+        "产品经理": ("产品经理", "product manager", "product managers"),
+        "设计师": ("设计师", "designer", "designers", "ux designer", "ui designer"),
+        "运营": ("运营", "市场", "营销", "operator", "operators", "marketer", "marketers"),
+        "学生": ("学生", "高校", "大学", "student", "students"),
     }
-    _VALUE_PATTERNS: tuple[str, ...] = ("可以", "能够", "提供", "让", "支持")
-    _PROBLEM_PATTERNS: tuple[str, ...] = ("难", "痛点", "缺乏", "需要", "困扰")
+    _VALUE_PATTERNS: tuple[str, ...] = (
+        "可以",
+        "能够",
+        "提供",
+        "让",
+        "支持",
+        "helps",
+        "help",
+        "lets",
+        "allow",
+        "allows",
+        "make it easier",
+    )
+    _PROBLEM_PATTERNS: tuple[str, ...] = (
+        "难",
+        "痛点",
+        "缺乏",
+        "需要",
+        "困扰",
+        "manual",
+        "painful",
+        "friction",
+        "slow",
+        "tedious",
+        "annoying",
+    )
     _COMPETITORS: dict[str, tuple[str, ...]] = {
         "Notion": ("Notion", "Evernote"),
         "飞书": ("飞书", "钉钉"),
@@ -68,11 +93,10 @@ class HeuristicLLMClient:
         )
 
     def _detect_target_users(self, text: str) -> str | None:
-        lowered = text.lower()
         hits: list[str] = []
         for label, keywords in self._USER_KEYWORDS.items():
             for keyword in keywords:
-                if keyword.lower() in lowered:
+                if _contains_keyword(text, keyword):
                     hits.append(label)
                     break
         if not hits:
@@ -117,13 +141,13 @@ def _compose_text(entry: RawEntry) -> str:
     parts: list[str] = []
     for value in (entry.title, entry.summary, entry.content):
         if value:
-            parts.append(value)
+            parts.append(_clean_text(value))
     return "\n".join(parts)
 
 
 def _split_sentences(text: str) -> list[str]:
-    raw = re.split(r"[。！？!?\n]+", text)
-    return [sentence.strip() for sentence in raw if sentence.strip()]
+    raw = re.split(r"[。！？!?\n]+|(?<=[.;:])\s+", text)
+    return [sentence.strip(" \t\r\n.;:") for sentence in raw if sentence.strip()]
 
 
 def _pick_sentence(sentences: Sequence[str], patterns: Sequence[str]) -> str | None:
@@ -136,13 +160,40 @@ def _pick_sentence(sentences: Sequence[str], patterns: Sequence[str]) -> str | N
 
 
 def _build_summary(entry: RawEntry, sentences: Sequence[str]) -> str:
-    if entry.summary:
-        return entry.summary.strip()
     if entry.title:
-        return entry.title.strip()
+        if not entry.summary:
+            return entry.title.strip()
+        cleaned_summary = _clean_text(entry.summary)
+        if (
+            not cleaned_summary
+            or len(cleaned_summary) > 180
+            or cleaned_summary.count(" ") > 24
+        ):
+            return entry.title.strip()
+        return cleaned_summary
+    if entry.summary:
+        return _clean_text(entry.summary)
     if sentences:
         return sentences[0]
-    return entry.content.strip() if entry.content else "未命名需求"
+    return _clean_text(entry.content) if entry.content else "未命名需求"
+
+
+def _clean_text(value: str | None) -> str:
+    if not value:
+        return ""
+    text = html.unescape(value)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _contains_keyword(text: str, keyword: str) -> bool:
+    if not text:
+        return False
+    if re.search(r"[a-zA-Z]", keyword):
+        pattern = re.compile(rf"(?<![a-z0-9]){re.escape(keyword.lower())}(?![a-z0-9])")
+        return bool(pattern.search(text.lower()))
+    return keyword.lower() in text.lower()
 
 
 @lru_cache

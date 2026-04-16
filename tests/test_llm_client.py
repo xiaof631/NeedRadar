@@ -41,3 +41,42 @@ def test_heuristic_llm_fallback_summary_and_missing_targets() -> None:
     assert result.summary == entry.title
     assert result.target_users is None
     assert 0.4 < result.confidence <= 0.95
+
+
+def test_heuristic_llm_prefers_title_when_summary_is_long_html() -> None:
+    client = HeuristicLLMClient()
+    entry = _entry(
+        title="Calendly alternative worth switching to",
+        summary="<p>" + ("Calendly is reliable but clunky for growing teams. " * 20) + "</p>",
+        content=None,
+    )
+
+    result = client.analyze_entry(entry)
+
+    assert result.summary == entry.title
+
+
+def test_heuristic_llm_does_not_match_short_ascii_substrings_as_roles() -> None:
+    client = HeuristicLLMClient()
+    entry = _entry(
+        title="Ask HN: Can anyone suggest me a SaaS product idea?",
+        summary="Simple prompt with no explicit role mentions.",
+        content=None,
+    )
+
+    result = client.analyze_entry(entry)
+
+    assert result.target_users is None
+
+
+def test_heuristic_llm_splits_english_sentences_for_problem_statement() -> None:
+    client = HeuristicLLMClient()
+    entry = _entry(
+        title="Calendly alternative worth switching to",
+        summary="Calendly works. The friction gets painful when teams scale. Slotably makes scheduling simpler.",
+        content=None,
+    )
+
+    result = client.analyze_entry(entry)
+
+    assert result.problem_statement == "The friction gets painful when teams scale"

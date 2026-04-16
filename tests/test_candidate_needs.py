@@ -680,3 +680,60 @@ def test_candidate_clusters_api_exposes_signal_counts(client: TestClient) -> Non
     assert cluster["alternative_request_count"] == 1
     assert cluster["reddit_comment_count"] == 1
     assert cluster["priority_score"] > 0.5
+
+
+def test_candidate_clusters_skip_generic_false_positive_overlap() -> None:
+    source_a = rss_sources.create_source(
+        {
+            "name": "Ask HN",
+            "url": "https://news.ycombinator.com/ask",
+            "frequency": 900,
+            "source_type": SourceType.HACKER_NEWS,
+        }
+    )
+    source_b = rss_sources.create_source(
+        {
+            "name": "ERP Blog",
+            "url": "https://example.com/erp.xml",
+            "frequency": 3600,
+            "source_type": SourceType.RSS,
+        }
+    )
+    entry_a = raw_entries.create_entry(
+        {
+            "source_id": source_a.id,
+            "guid": "ask-hn-saas",
+            "title": "Ask HN: Can anyone suggest me a SaaS product idea?",
+            "summary": "Looking for a good SaaS idea to build.",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+    entry_b = raw_entries.create_entry(
+        {
+            "source_id": source_b.id,
+            "guid": "erp-offline",
+            "title": "Offline ERP resilience for global businesses",
+            "summary": "Cloud ERP systems need continuity when connectivity is unavailable.",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": entry_a.id,
+            "summary": "Ask HN: Can anyone suggest me a SaaS product idea?",
+            "status": CandidateNeedStatus.PENDING_REVIEW,
+            "rule_score": 0.53,
+        }
+    )
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": entry_b.id,
+            "summary": "Offline ERP resilience for global businesses",
+            "status": CandidateNeedStatus.PENDING_REVIEW,
+            "rule_score": 0.35,
+        }
+    )
+
+    clusters = candidate_clusters.summarize_clusters(limit=20, min_cluster_size=2)
+
+    assert clusters == []

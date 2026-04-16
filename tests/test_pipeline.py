@@ -91,3 +91,73 @@ def test_promote_entry_boosts_scores_for_reddit_signal_tags() -> None:
     assert result.rule_match.score == pytest.approx(1.0)
     assert result.candidate_need.rule_score == pytest.approx(1.0)
     assert result.candidate_need.confidence == pytest.approx(0.96)
+
+
+def test_promote_entry_normalizes_html_summary() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Feed",
+            "url": "https://example.com/feed.xml",
+            "frequency": 3600,
+            "status": SourceStatus.ACTIVE,
+        }
+    )
+    entry = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "entry-html",
+            "title": "HTML summary",
+            "summary": "<p>manual triage &amp; repetitive onboarding tasks</p>",
+        }
+    )
+    filter_rules.create_rule(
+        {
+            "name": "Pain",
+            "keywords": ["manual", "onboarding"],
+            "patterns": [],
+            "min_score": 0.3,
+            "enabled": True,
+        }
+    )
+
+    result = pipeline.promote_entry(entry.id, llm_client=DummyClient())
+
+    assert result.candidate_need.summary == "分析 HTML summary"
+
+
+def test_promote_entry_truncates_long_summary_to_fit_column() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Long Feed",
+            "url": "https://example.com/long.xml",
+            "frequency": 3600,
+            "status": SourceStatus.ACTIVE,
+        }
+    )
+    entry = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "entry-long",
+            "title": "Automation request",
+            "summary": "manual workflow " * 80,
+        }
+    )
+    filter_rules.create_rule(
+        {
+            "name": "Automation",
+            "keywords": ["manual", "workflow"],
+            "patterns": [],
+            "min_score": 0.3,
+            "enabled": True,
+        }
+    )
+
+    class LongSummaryClient:
+        def analyze_entry(self, entry) -> StructuredNeed:  # type: ignore[override]
+            return StructuredNeed(summary="<div>" + ("manual workflow " * 80) + "</div>")
+
+    result = pipeline.promote_entry(entry.id, llm_client=LongSummaryClient())
+
+    assert len(result.candidate_need.summary) == 500
+    assert "<" not in result.candidate_need.summary
+    assert result.candidate_need.summary.endswith("…")

@@ -14,6 +14,58 @@ import app.services.candidate_needs as candidate_needs
 
 _LATIN_TOKEN_RE = re.compile(r"[a-z0-9]{2,}")
 _CJK_TOKEN_RE = re.compile(r"[\u4e00-\u9fff]{2,}")
+_LATIN_STOPWORDS = {
+    "the",
+    "and",
+    "for",
+    "with",
+    "from",
+    "that",
+    "this",
+    "have",
+    "has",
+    "into",
+    "your",
+    "you",
+    "are",
+    "was",
+    "were",
+    "but",
+    "how",
+    "what",
+    "when",
+    "who",
+    "why",
+    "can",
+    "any",
+    "ask",
+    "show",
+    "hn",
+    "tool",
+    "tools",
+    "app",
+    "apps",
+    "idea",
+    "ideas",
+    "product",
+    "products",
+    "build",
+    "built",
+    "using",
+    "used",
+    "need",
+    "needs",
+    "looking",
+    "faster",
+    "better",
+    "local",
+}
+_CJK_STOPWORDS = {
+    "分享创造",
+    "分享发现",
+    "程序员",
+    "问与答",
+}
 
 
 @dataclass(slots=True)
@@ -89,9 +141,7 @@ def summarize_clusters(
             if source is not None:
                 source_name = source.name
                 source_type = source.source_type.value
-            supporting_text = " ".join(
-                part for part in (raw_entry.title, raw_entry.summary, raw_entry.content) if part
-            )
+            supporting_text = " ".join(part for part in (raw_entry.title, raw_entry.summary) if part)
         contexts.append(
             _NeedContext(
                 need=need,
@@ -221,8 +271,12 @@ def _tokenize(text: str) -> set[str]:
     normalized = _normalize_text(text)
     if not normalized:
         return set()
-    tokens = {_normalize_latin_token(token) for token in _LATIN_TOKEN_RE.findall(normalized)}
-    tokens.update(_CJK_TOKEN_RE.findall(normalized))
+    tokens = {
+        normalized_token
+        for token in _LATIN_TOKEN_RE.findall(normalized)
+        if (normalized_token := _normalize_latin_token(token)) not in _LATIN_STOPWORDS
+    }
+    tokens.update(token for token in _CJK_TOKEN_RE.findall(normalized) if token not in _CJK_STOPWORDS)
     return tokens
 
 

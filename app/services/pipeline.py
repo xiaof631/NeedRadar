@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+import re
 from dataclasses import dataclass
 
 from app.core import metrics
@@ -19,6 +21,7 @@ _TAG_CONFIDENCE_BOOSTS: dict[str, float] = {
     "alternative_request": 0.08,
     "reddit_comment": 0.02,
 }
+_SUMMARY_MAX_LENGTH = 500
 
 
 class EntryNotQualifiedError(Exception):
@@ -62,11 +65,12 @@ def promote_entry(
 
     client = llm_client or get_default_llm_client()
     structured = client.analyze_entry(entry)
-    summary = structured.summary.strip() if structured.summary else ""
+    summary = _normalize_summary(structured.summary) if structured.summary else ""
     if not summary:
         for candidate in (entry.title, entry.summary, entry.content):
             if candidate:
-                summary = candidate.strip()
+                summary = _normalize_summary(candidate)
+            if summary:
                 break
     if not summary:
         summary = "自动生成的候选需求"
@@ -101,3 +105,12 @@ def _signal_boost(entry: RawEntry, weights: dict[str, float]) -> float:
         return 0.0
     unique_tags = set(entry.tags)
     return sum(weight for tag, weight in weights.items() if tag in unique_tags)
+
+
+def _normalize_summary(value: str) -> str:
+    text = html.unescape(value)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= _SUMMARY_MAX_LENGTH:
+        return text
+    return text[: _SUMMARY_MAX_LENGTH - 1].rstrip() + "…"
