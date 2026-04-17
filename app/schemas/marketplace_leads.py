@@ -27,6 +27,7 @@ class MarketplaceLeadRead(BaseModel):
     tags: list[str] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     link: str | None = None
+    lead_kind: str
     lead_tier: str
     tier_reason: str
     lead_status: str
@@ -41,6 +42,7 @@ class MarketplaceLeadRead(BaseModel):
 class MarketplaceLeadList(BaseModel):
     total: int
     tier_breakdown: dict[str, int] = Field(default_factory=dict)
+    kind_breakdown: dict[str, int] = Field(default_factory=dict)
     status_breakdown: dict[str, int] = Field(default_factory=dict)
     items: list[MarketplaceLeadRead]
 

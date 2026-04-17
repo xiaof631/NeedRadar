@@ -18,21 +18,28 @@ async def list_marketplace_leads(
     tier: marketplace_leads.MarketplaceLeadTier | None = Query(
         default=None, description="按线索层级过滤"
     ),
+    lead_kind: marketplace_leads.MarketplaceLeadKind | None = Query(
+        default=None, description="按线索类型过滤"
+    ),
+    reviewable_only: bool = Query(default=False, description="仅保留项目型与合同型线索"),
     lead_status: marketplace_leads.MarketplaceLeadStatus | None = Query(
         default=None, description="按跟进状态过滤"
     ),
 ) -> MarketplaceLeadList:
-    total, items, tier_breakdown, status_breakdown = marketplace_leads.list_leads(
+    total, items, tier_breakdown, kind_breakdown, status_breakdown = marketplace_leads.list_leads(
         skip=skip,
         limit=limit,
         source_id=source_id,
         search=search,
         tier=tier,
+        lead_kind=lead_kind,
+        reviewable_only=reviewable_only,
         lead_status=lead_status,
     )
     return MarketplaceLeadList(
         total=total,
         tier_breakdown=tier_breakdown,
+        kind_breakdown=kind_breakdown,
         status_breakdown=status_breakdown,
         items=[MarketplaceLeadRead.model_validate(item) for item in items],
     )

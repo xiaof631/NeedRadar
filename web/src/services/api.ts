@@ -279,6 +279,7 @@ export interface MarketplaceLead {
   tags: string[];
   skills: string[];
   link: string | null;
+  lead_kind: 'project' | 'contract_role' | 'full_time_job';
   lead_tier: 'high_purity' | 'expanded';
   tier_reason: string;
   lead_status: 'new' | 'watching' | 'contacted' | 'ignored';
@@ -291,6 +292,7 @@ export interface MarketplaceLead {
 export interface MarketplaceLeadListResponse {
   total: number;
   tier_breakdown: Record<string, number>;
+  kind_breakdown: Record<string, number>;
   status_breakdown: Record<string, number>;
   items: MarketplaceLead[];
 }
@@ -301,6 +303,8 @@ export interface MarketplaceLeadQueryParams {
   source_id?: number;
   search?: string;
   tier?: 'high_purity' | 'expanded';
+  lead_kind?: 'project' | 'contract_role' | 'full_time_job';
+  reviewable_only?: boolean;
   lead_status?: 'new' | 'watching' | 'contacted' | 'ignored';
 }
 

@@ -111,7 +111,9 @@
     "metrics": {
       "total": "线索总数",
       "highPurity": "高纯度线索",
+      "reviewable": "可跟进线索",
       "expanded": "扩展线索",
+      "fullTimeJobs": "全职招聘",
       "watching": "已关注",
       "contacted": "已联系",
       "activeSources": "活跃项目源",
@@ -124,6 +126,14 @@
     "filters": {
       "searchPlaceholder": "输入标题或描述关键词",
       "source": "项目源",
+      "leadKind": "线索类型",
+      "leadKindOptions": {
+        "reviewable": "默认可跟进",
+        "project": "项目型",
+        "contract_role": "合同型角色",
+        "full_time_job": "全职招聘",
+        "all": "全部类型"
+      },
       "queueOptions": {
         "high_purity": "高纯度",
         "expanded": "扩展线索",
@@ -148,6 +158,7 @@
       "timeline": "周期/时效",
       "skills": "技能/分类",
       "source": "数据源",
+      "leadKind": "线索类型",
       "queue": "队列",
       "status": "状态",
       "published": "发布时间",

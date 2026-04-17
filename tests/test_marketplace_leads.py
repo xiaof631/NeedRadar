@@ -66,9 +66,11 @@ def test_list_marketplace_leads_returns_structured_fields(client: TestClient) ->
     assert item["timeline"] == "6 days left"
     assert item["normalized_timeline"] == "6 days"
     assert item["skills"] == ["Web Development", "Laravel"]
+    assert item["lead_kind"] == "project"
     assert item["lead_tier"] == "high_purity"
     assert item["lead_status"] == "new"
     assert item["duplicate_count"] == 1
+    assert payload["kind_breakdown"]["project"] == 1
     assert payload["status_breakdown"]["new"] == 1
 
 
@@ -128,13 +130,14 @@ def test_list_marketplace_leads_diversifies_sources() -> None:
         }
     )
 
-    total, items, tier_breakdown, _ = marketplace_leads.list_leads(limit=3)
+    total, items, tier_breakdown, kind_breakdown, _ = marketplace_leads.list_leads(limit=3)
 
     assert total == 3
     source_ids = [item.source_id for item in items]
     assert source_ids == [sxsoft.id, zbj.id, zbj.id]
     assert tier_breakdown["high_purity"] == 3
     assert tier_breakdown["expanded"] == 0
+    assert kind_breakdown["project"] == 3
 
 
 def test_list_marketplace_leads_supports_tier_filtering() -> None:
@@ -172,7 +175,7 @@ def test_list_marketplace_leads_supports_tier_filtering() -> None:
         }
     )
 
-    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.EXPANDED
     )
 
@@ -221,7 +224,7 @@ def test_list_marketplace_leads_merges_duplicates_across_sources() -> None:
             }
         )
 
-    total, items, _, status_breakdown = marketplace_leads.list_leads()
+    total, items, _, _, status_breakdown = marketplace_leads.list_leads()
 
     assert total == 1
     assert items[0].duplicate_count == 2
@@ -297,7 +300,7 @@ def test_peopleperhour_frontend_project_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -336,7 +339,7 @@ def test_peopleperhour_full_stack_project_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -375,7 +378,7 @@ def test_peopleperhour_hubspot_cms_project_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -415,7 +418,7 @@ def test_remotive_full_stack_react_contract_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -456,7 +459,7 @@ def test_jobicy_python_developer_contract_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -496,7 +499,7 @@ def test_peopleperhour_kiosk_project_stays_expanded() -> None:
         }
     )
 
-    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.EXPANDED
     )
 
@@ -504,3 +507,133 @@ def test_peopleperhour_kiosk_project_stays_expanded() -> None:
     assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.EXPANDED
     assert tier_breakdown["high_purity"] == 0
     assert tier_breakdown["expanded"] == 1
+
+
+def test_list_marketplace_leads_supports_lead_kind_filtering() -> None:
+    remotive = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=40",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "remotive_api"},
+        }
+    )
+    job_board = rss_sources.create_source(
+        {
+            "name": "Generic Remote Jobs",
+            "url": "https://example.com/jobs",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "generic_remote"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": remotive.id,
+            "guid": "remotive-contract-role",
+            "title": "Senior Full-stack React Developer",
+            "summary": "Senior Full-stack React Developer | Americas",
+            "content": "Contract software development role covering React and Python delivery.",
+            "link": "https://remotive.com/remote-jobs/1",
+            "tags": ["marketplace", "remotive", "remote"],
+            "metadata": {
+                "platform": "Remotive",
+                "category": "Software Development",
+                "engagement": "contract",
+                "location": "Americas",
+                "skills": ["react", "python"],
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": job_board.id,
+            "guid": "full-time-role",
+            "title": "Senior Backend Engineer",
+            "summary": "Senior Backend Engineer | Remote",
+            "content": "Employment type: full-time. Build backend APIs and services.",
+            "link": "https://example.com/full-time-role",
+            "tags": ["marketplace", "remote"],
+            "metadata": {
+                "platform": "Example Jobs",
+                "category": "Software Development",
+                "engagement": "full-time",
+                "location": "Remote",
+                "skills": ["python", "api"],
+            },
+        }
+    )
+
+    total, items, _, kind_breakdown, _ = marketplace_leads.list_leads(
+        lead_kind=marketplace_leads.MarketplaceLeadKind.CONTRACT_ROLE
+    )
+
+    assert total == 1
+    assert items[0].lead_kind == marketplace_leads.MarketplaceLeadKind.CONTRACT_ROLE
+    assert kind_breakdown["contract_role"] == 1
+    assert kind_breakdown["full_time_job"] == 1
+
+
+def test_list_marketplace_leads_supports_reviewable_only() -> None:
+    freelancer = rss_sources.create_source(
+        {
+            "name": "Freelancer Web Development Jobs",
+            "url": "https://www.freelancer.com/jobs/web-development/",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "freelancer_jobs"},
+        }
+    )
+    job_board = rss_sources.create_source(
+        {
+            "name": "Generic Remote Jobs",
+            "url": "https://example.com/jobs",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "generic_remote"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": freelancer.id,
+            "guid": "project-lead",
+            "title": "Build a responsive booking portal",
+            "summary": "Build a responsive booking portal | $500 Avg Bid | 6 days left",
+            "content": "Need a modern booking system with admin dashboard.",
+            "link": "https://www.freelancer.com/projects/example",
+            "tags": ["marketplace", "freelancer"],
+            "metadata": {
+                "platform": "Freelancer",
+                "budget": "$500 Avg Bid",
+                "timeline": "6 days left",
+                "engagement": "fixed-price",
+                "skills": ["Web Development"],
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": job_board.id,
+            "guid": "full-time-role-2",
+            "title": "Full-time Staff Software Engineer",
+            "summary": "Full-time Staff Software Engineer | Remote",
+            "content": "Employment type: full-time. Platform engineering role.",
+            "link": "https://example.com/full-time-role-2",
+            "tags": ["marketplace", "remote"],
+            "metadata": {
+                "platform": "Example Jobs",
+                "category": "Software Development",
+                "engagement": "full-time",
+                "location": "Remote",
+                "skills": ["go", "platform"],
+            },
+        }
+    )
+
+    total, items, _, kind_breakdown, _ = marketplace_leads.list_leads(reviewable_only=True)
+
+    assert total == 1
+    assert items[0].lead_kind == marketplace_leads.MarketplaceLeadKind.PROJECT
+    assert kind_breakdown["project"] == 1
+    assert kind_breakdown["full_time_job"] == 1

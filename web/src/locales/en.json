@@ -108,7 +108,9 @@
     "metrics": {
       "total": "Total leads",
       "highPurity": "High-purity leads",
+      "reviewable": "Reviewable leads",
       "expanded": "Expanded leads",
+      "fullTimeJobs": "Full-time jobs",
       "watching": "Watching",
       "contacted": "Contacted",
       "activeSources": "Active sources",
@@ -121,6 +123,14 @@
     "filters": {
       "searchPlaceholder": "Search by title or description",
       "source": "Source",
+      "leadKind": "Lead kind",
+      "leadKindOptions": {
+        "reviewable": "Default reviewable",
+        "project": "Project",
+        "contract_role": "Contract role",
+        "full_time_job": "Full-time job",
+        "all": "All kinds"
+      },
       "queueOptions": {
         "high_purity": "High purity",
         "expanded": "Expanded",
@@ -145,6 +155,7 @@
       "timeline": "Timeline",
       "skills": "Skills / category",
       "source": "Source",
+      "leadKind": "Lead kind",
       "queue": "Queue",
       "status": "Status",
       "published": "Published at",

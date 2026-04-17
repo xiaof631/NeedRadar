@@ -29,6 +29,12 @@ class MarketplaceLeadTier(StrEnum):
     EXPANDED = "expanded"
 
 
+class MarketplaceLeadKind(StrEnum):
+    PROJECT = "project"
+    CONTRACT_ROLE = "contract_role"
+    FULL_TIME_JOB = "full_time_job"
+
+
 class MarketplaceLeadStatus(StrEnum):
     NEW = "new"
     WATCHING = "watching"
@@ -57,6 +63,7 @@ class MarketplaceLead:
     tags: list[str]
     skills: list[str]
     link: str | None
+    lead_kind: MarketplaceLeadKind
     lead_tier: MarketplaceLeadTier
     tier_reason: str
     lead_status: MarketplaceLeadStatus
@@ -71,10 +78,12 @@ def list_leads(
     search: str | None = None,
     source_id: int | None = None,
     tier: MarketplaceLeadTier | None = None,
+    lead_kind: MarketplaceLeadKind | None = None,
+    reviewable_only: bool = False,
     lead_status: MarketplaceLeadStatus | None = None,
     skip: int = 0,
     limit: int = 20,
-) -> tuple[int, list[MarketplaceLead], dict[str, int], dict[str, int]]:
+) -> tuple[int, list[MarketplaceLead], dict[str, int], dict[str, int], dict[str, int]]:
     _, items = raw_entries.list_entries(
         source_id=source_id,
         source_type=SourceType.FREELANCE_MARKETPLACE,
@@ -84,16 +93,21 @@ def list_leads(
     )
     leads = _merge_duplicate_leads([_to_marketplace_lead(item) for item in items])
     tier_breakdown = _count_tiers(leads)
+    kind_breakdown = _count_kinds(leads)
     status_breakdown = _count_statuses(leads)
     if tier is not None:
         leads = [lead for lead in leads if lead.lead_tier == tier]
+    if lead_kind is not None:
+        leads = [lead for lead in leads if lead.lead_kind == lead_kind]
+    if reviewable_only:
+        leads = [lead for lead in leads if lead.lead_kind in _REVIEWABLE_LEAD_KINDS]
     if lead_status is not None:
         leads = [lead for lead in leads if lead.lead_status == lead_status]
     if source_id is None:
         leads = _diversify_by_source(leads)
     total = len(leads)
     leads = leads[skip : skip + limit]
-    return total, leads, tier_breakdown, status_breakdown
+    return total, leads, tier_breakdown, kind_breakdown, status_breakdown
 
 
 def update_lead_status(entry_id: int, status: MarketplaceLeadStatus) -> MarketplaceLead:
@@ -116,6 +130,7 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
     if source is None:
         raise ValueError(f"source #{item.source_id} not found")
     metadata = dict(item.metadata or {})
+    lead_kind = _classify_lead_kind(source.name, item, metadata)
     lead_tier, tier_reason = _classify_lead_tier(source.name, item, metadata)
     budget = _to_string(metadata.get("budget"))
     timeline = _to_string(metadata.get("timeline"))
@@ -139,6 +154,7 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         tags=list(item.tags),
         skills=_to_string_list(metadata.get("skills")),
         link=item.link,
+        lead_kind=lead_kind,
         lead_tier=lead_tier,
         tier_reason=tier_reason,
         lead_status=_to_lead_status(metadata.get("lead_status")),
@@ -248,6 +264,7 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         tags=list(dict.fromkeys([*representative.tags, *alternate.tags])),
         skills=list(dict.fromkeys([*representative.skills, *alternate.skills])),
         link=representative.link or alternate.link,
+        lead_kind=representative.lead_kind,
         lead_tier=representative.lead_tier,
         tier_reason=representative.tier_reason,
         lead_status=status,
@@ -260,6 +277,7 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
 
 def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, datetime]:
     return (
+        1 if lead.lead_kind in _REVIEWABLE_LEAD_KINDS else 0,
         1 if lead.lead_tier == MarketplaceLeadTier.HIGH_PURITY else 0,
         _lead_status_rank(lead.lead_status),
         lead.published_at or lead.created_at,
@@ -291,6 +309,13 @@ def _count_tiers(leads: list[MarketplaceLead]) -> dict[str, int]:
         MarketplaceLeadTier.EXPANDED.value: sum(
             1 for lead in leads if lead.lead_tier == MarketplaceLeadTier.EXPANDED
         ),
+    }
+
+
+def _count_kinds(leads: list[MarketplaceLead]) -> dict[str, int]:
+    return {
+        kind.value: sum(1 for lead in leads if lead.lead_kind == kind)
+        for kind in MarketplaceLeadKind
     }
 
 
@@ -409,6 +434,43 @@ def _diversify_by_source(items: list[MarketplaceLead]) -> list[MarketplaceLead]:
     return diversified
 
 
+def _classify_lead_kind(
+    source_name: str,
+    item: RawEntry,
+    metadata: dict[str, object],
+) -> MarketplaceLeadKind:
+    title_haystack = " ".join(
+        filter(
+            None,
+            [
+                item.title.lower(),
+                (item.summary or "").lower(),
+                _to_string(metadata.get("category")) and str(metadata.get("category")).lower(),
+            ],
+        )
+    )
+    detail_haystack = " ".join(
+        filter(
+            None,
+            [
+                title_haystack,
+                (item.content or "").lower(),
+                _to_string(metadata.get("engagement")) and str(metadata.get("engagement")).lower(),
+            ],
+        )
+    )
+    normalized_source = source_name.lower()
+    if any(marker in normalized_source for marker in _PROJECT_SOURCE_MARKERS):
+        return MarketplaceLeadKind.PROJECT
+    if any(marker in detail_haystack for marker in _FULL_TIME_MARKERS):
+        return MarketplaceLeadKind.FULL_TIME_JOB
+    if any(marker in detail_haystack for marker in _CONTRACT_ROLE_MARKERS):
+        return MarketplaceLeadKind.CONTRACT_ROLE
+    if any(marker in detail_haystack for marker in _PROJECT_MARKERS):
+        return MarketplaceLeadKind.PROJECT
+    return MarketplaceLeadKind.FULL_TIME_JOB
+
+
 _STRONG_HIGH_PURITY_KEYWORDS = (
     "frontend developer",
     "frontend engineer",
@@ -474,4 +536,48 @@ _EXPANDED_KEYWORDS = (
     "数字化",
     "识别",
     "rk3568",
+)
+
+_PROJECT_SOURCE_MARKERS = (
+    "peopleperhour",
+    "freelancer",
+    "contra featured",
+    "猪八戒",
+    "软件项目交易网",
+)
+
+_CONTRACT_ROLE_MARKERS = (
+    "contract",
+    "freelance",
+    "project-based",
+    "hourly-contract",
+    "contract-like",
+    "b2b",
+    "part-time, non-permanent",
+    "non-permanent projects",
+    "hours per week",
+    "hour equivalent",
+)
+
+_FULL_TIME_MARKERS = (
+    "full-time",
+    "full time",
+    "employment type: full-time",
+    "employment type: full time",
+)
+
+_PROJECT_MARKERS = (
+    "fixed-price",
+    "proposal",
+    "proposals",
+    "bid",
+    "bids",
+    "deliverable",
+    "交付",
+    "选标中",
+)
+
+_REVIEWABLE_LEAD_KINDS = (
+    MarketplaceLeadKind.PROJECT,
+    MarketplaceLeadKind.CONTRACT_ROLE,
 )

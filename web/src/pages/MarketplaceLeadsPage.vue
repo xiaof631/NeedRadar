@@ -17,6 +17,13 @@
             {{ t('marketplace.filters.queueOptions.all') }}
           </el-radio-button>
         </el-radio-group>
+        <el-select v-model="leadKindView" class="kind-select" :placeholder="t('marketplace.filters.leadKind')">
+          <el-option :label="t('marketplace.filters.leadKindOptions.reviewable')" value="reviewable" />
+          <el-option :label="t('marketplace.filters.leadKindOptions.project')" value="project" />
+          <el-option :label="t('marketplace.filters.leadKindOptions.contract_role')" value="contract_role" />
+          <el-option :label="t('marketplace.filters.leadKindOptions.full_time_job')" value="full_time_job" />
+          <el-option :label="t('marketplace.filters.leadKindOptions.all')" value="all" />
+        </el-select>
         <el-input
           v-model="search"
           class="search-input"
@@ -57,8 +64,16 @@
         <div class="metric-value">{{ highPurityCount }}</div>
       </el-card>
       <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.reviewable') }}</div>
+        <div class="metric-value">{{ reviewableCount }}</div>
+      </el-card>
+      <el-card shadow="never">
         <div class="metric-label">{{ t('marketplace.metrics.expanded') }}</div>
         <div class="metric-value">{{ expandedCount }}</div>
+      </el-card>
+      <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.fullTimeJobs') }}</div>
+        <div class="metric-value">{{ fullTimeJobCount }}</div>
       </el-card>
       <el-card shadow="never">
         <div class="metric-label">{{ t('marketplace.metrics.watching') }}</div>
@@ -163,6 +178,16 @@
         <el-table-column :label="t('marketplace.table.source')" min-width="180">
           <template #default="{ row }">{{ row.source_name }}</template>
         </el-table-column>
+        <el-table-column :label="t('marketplace.table.leadKind')" width="170">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.lead_kind === 'project' ? 'success' : row.lead_kind === 'contract_role' ? 'warning' : 'info'"
+              effect="plain"
+            >
+              {{ t(`marketplace.filters.leadKindOptions.${row.lead_kind}`) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('marketplace.table.queue')" width="160">
           <template #default="{ row }">
             <el-tag :type="row.lead_tier === 'high_purity' ? 'success' : 'warning'" effect="plain">
@@ -224,7 +249,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useMutation, useQuery } from '@tanstack/vue-query';
 import { ElMessage } from 'element-plus/es/components/message/index';
 import { useI18n } from 'vue-i18n';
@@ -242,6 +267,7 @@ const search = ref('');
 const sourceId = ref<'all' | string>('all');
 const statusFilter = ref<'all' | MarketplaceLead['lead_status']>('all');
 const queueView = ref<'high_purity' | 'expanded' | 'all'>('high_purity');
+const leadKindView = ref<'reviewable' | 'project' | 'contract_role' | 'full_time_job' | 'all'>('reviewable');
 
 const leadStatusOptions = computed(() => [
   { value: 'new' as const, label: t('marketplace.filters.statusOptions.new') },
@@ -274,6 +300,13 @@ const queryParams = computed(() => ({
   search: search.value.trim() || undefined,
   source_id: sourceId.value === 'all' ? undefined : Number(sourceId.value),
   tier: queueView.value === 'all' ? undefined : queueView.value,
+  lead_kind:
+    leadKindView.value === 'project' ||
+    leadKindView.value === 'contract_role' ||
+    leadKindView.value === 'full_time_job'
+      ? leadKindView.value
+      : undefined,
+  reviewable_only: leadKindView.value === 'reviewable' ? true : undefined,
   lead_status: statusFilter.value === 'all' ? undefined : statusFilter.value
 }));
 
@@ -304,8 +337,16 @@ const leads = computed(() => leadsQuery.data.value?.items ?? []);
 const total = computed(() => leadsQuery.data.value?.total ?? 0);
 const highPurityCount = computed(() => leadsQuery.data.value?.tier_breakdown?.high_purity ?? 0);
 const expandedCount = computed(() => leadsQuery.data.value?.tier_breakdown?.expanded ?? 0);
+const projectCount = computed(() => leadsQuery.data.value?.kind_breakdown?.project ?? 0);
+const contractRoleCount = computed(() => leadsQuery.data.value?.kind_breakdown?.contract_role ?? 0);
+const reviewableCount = computed(() => projectCount.value + contractRoleCount.value);
+const fullTimeJobCount = computed(() => leadsQuery.data.value?.kind_breakdown?.full_time_job ?? 0);
 const watchingCount = computed(() => leadsQuery.data.value?.status_breakdown?.watching ?? 0);
 const contactedCount = computed(() => leadsQuery.data.value?.status_breakdown?.contacted ?? 0);
+
+watch([search, sourceId, statusFilter, queueView, leadKindView], () => {
+  page.value = 1;
+});
 
 const handlePageChange = (value: number) => {
   page.value = value;
@@ -378,7 +419,8 @@ const formatDate = (value: string | null) => {
 }
 
 .source-select,
-.status-select {
+.status-select,
+.kind-select {
   width: 220px;
 }
 
@@ -490,7 +532,8 @@ const formatDate = (value: string | null) => {
 
   .search-input,
   .source-select,
-  .status-select {
+  .status-select,
+  .kind-select {
     width: 100%;
   }
 }
