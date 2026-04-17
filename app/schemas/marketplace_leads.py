@@ -32,6 +32,16 @@ class MarketplaceLeadReminderRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MarketplaceSourceRecommendationRead(BaseModel):
+    source_id: int
+    source_name: str
+    action: str
+    severity: str
+    reason: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MarketplaceLeadRead(BaseModel):
     id: int
     source_id: int
@@ -90,6 +100,7 @@ class MarketplaceLeadList(BaseModel):
     status_breakdown: dict[str, int] = Field(default_factory=dict)
     todo_breakdown: dict[str, int] = Field(default_factory=dict)
     source_breakdown: list[MarketplaceLeadSourceMetricRead] = Field(default_factory=list)
+    source_recommendations: list[MarketplaceSourceRecommendationRead] = Field(default_factory=list)
     todo_queue: list[MarketplaceLeadReminderRead] = Field(default_factory=list)
     items: list[MarketplaceLeadRead]
 

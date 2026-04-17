@@ -327,6 +327,14 @@ export interface MarketplaceLeadReminder {
   stale_days: number;
 }
 
+export interface MarketplaceSourceRecommendation {
+  source_id: number;
+  source_name: string;
+  action: 'keep' | 'expand_similar' | 'lower_frequency' | 'pause_candidate' | string;
+  severity: 'high' | 'medium' | 'low' | string;
+  reason: string;
+}
+
 export interface MarketplaceLeadListResponse {
   total: number;
   tier_breakdown: Record<string, number>;
@@ -334,6 +342,7 @@ export interface MarketplaceLeadListResponse {
   status_breakdown: Record<string, number>;
   todo_breakdown: Record<string, number>;
   source_breakdown: MarketplaceLeadSourceMetric[];
+  source_recommendations: MarketplaceSourceRecommendation[];
   todo_queue: MarketplaceLeadReminder[];
   items: MarketplaceLead[];
 }

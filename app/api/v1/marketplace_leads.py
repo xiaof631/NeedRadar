@@ -11,6 +11,7 @@ from app.schemas import (
     MarketplaceLeadSourceMetricRead,
     MarketplaceLeadStatusUpdate,
 )
+from app.schemas.marketplace_leads import MarketplaceSourceRecommendationRead
 from app.services import marketplace_leads
 from fastapi import APIRouter, HTTPException, Query
 
@@ -52,6 +53,10 @@ async def list_marketplace_leads(
         todo_breakdown=result.todo_breakdown,
         source_breakdown=[
             MarketplaceLeadSourceMetricRead.model_validate(item) for item in result.source_breakdown
+        ],
+        source_recommendations=[
+            MarketplaceSourceRecommendationRead.model_validate(item)
+            for item in result.source_recommendations
         ],
         todo_queue=[
             MarketplaceLeadReminderRead.model_validate(item) for item in result.todo_queue

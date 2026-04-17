@@ -174,6 +174,81 @@ def test_marketplace_leads_returns_todo_queue(client: TestClient) -> None:
     }
 
 
+def test_marketplace_leads_returns_source_recommendations(client: TestClient) -> None:
+    good_source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    noisy_source = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/remote-jobs/software-dev",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "remotive_contracts"},
+        }
+    )
+    for index, title in enumerate(
+        [
+            "Frontend Developer (React / Next.js)",
+            "Full-Stack Web Developer",
+            "HubSpot CMS (HubL) Developer – Custom Quote Template",
+        ],
+        start=1,
+    ):
+        raw_entries.create_entry(
+            {
+                "source_id": good_source.id,
+                "guid": f"good-{index}",
+                "title": title,
+                "summary": f"{title} | $1200 | 2 days",
+                "content": "Build a software product.",
+                "link": f"https://example.com/good-{index}",
+                "tags": ["marketplace"],
+                "metadata": {
+                    "platform": "PeoplePerHour",
+                    "budget": "$1200",
+                    "timeline": "2 days",
+                },
+            }
+        )
+    for index, title in enumerate(
+        [
+            "Senior Backend Engineer",
+            "Platform Engineer",
+        ],
+        start=1,
+    ):
+        raw_entries.create_entry(
+            {
+                "source_id": noisy_source.id,
+                "guid": f"noisy-{index}",
+                "title": title,
+                "summary": f"{title} | Full-time | Remote",
+                "content": "Employment type: full-time",
+                "link": f"https://example.com/noisy-{index}",
+                "tags": ["marketplace"],
+                "metadata": {
+                    "platform": "Remotive",
+                    "engagement": "full-time",
+                },
+            }
+        )
+
+    response = client.get("/api/v1/marketplace-leads/")
+    assert response.status_code == 200
+    payload = response.json()
+
+    recommendations = {item["source_name"]: item for item in payload["source_recommendations"]}
+    assert recommendations["PeoplePerHour Technology Projects"]["action"] == "expand_similar"
+    assert recommendations["Remotive Software Contracts"]["action"] == "pause_candidate"
+
+
 def test_list_marketplace_leads_diversifies_sources() -> None:
     sxsoft = rss_sources.create_source(
         {

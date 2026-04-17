@@ -132,6 +132,21 @@
         "contacted": "Contacted"
       }
     },
+    "recommendations": {
+      "title": "Source tuning recommendations",
+      "empty": "No clear source recommendations right now",
+      "severity": {
+        "high": "Act now",
+        "medium": "Recommended",
+        "low": "Observe"
+      },
+      "actions": {
+        "keep": "Keep",
+        "expand_similar": "Expand similar sources",
+        "lower_frequency": "Lower frequency",
+        "pause_candidate": "Pause candidate"
+      }
+    },
     "todo": {
       "title": "Today’s queue",
       "subtitle": "Handle new high-priority leads and stale follow-ups first",

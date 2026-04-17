@@ -116,6 +116,15 @@ class MarketplaceLeadReminder:
 
 
 @dataclass(slots=True)
+class MarketplaceSourceRecommendation:
+    source_id: int
+    source_name: str
+    action: str
+    severity: str
+    reason: str
+
+
+@dataclass(slots=True)
 class MarketplacePriorityContext:
     source_history: dict[int, MarketplaceLeadSourceMetric]
     now: datetime
@@ -129,6 +138,7 @@ class MarketplaceLeadQueryResult:
     kind_breakdown: dict[str, int]
     status_breakdown: dict[str, int]
     source_breakdown: list[MarketplaceLeadSourceMetric]
+    source_recommendations: list[MarketplaceSourceRecommendation]
     todo_breakdown: dict[str, int]
     todo_queue: list[MarketplaceLeadReminder]
 
@@ -210,6 +220,7 @@ def query_leads(
         leads = [lead for lead in leads if lead.lead_status == lead_status]
     todo_queue = _build_todo_queue(leads, priority_context.now)
     todo_breakdown = _count_todo_queue(todo_queue)
+    source_recommendations = _build_source_recommendations(source_breakdown)
     total = len(leads)
     leads = leads[skip : skip + limit]
     return MarketplaceLeadQueryResult(
@@ -219,6 +230,7 @@ def query_leads(
         kind_breakdown=kind_breakdown,
         status_breakdown=status_breakdown,
         source_breakdown=source_breakdown,
+        source_recommendations=source_recommendations,
         todo_breakdown=todo_breakdown,
         todo_queue=todo_queue[:8],
     )
@@ -782,6 +794,77 @@ def _build_todo_queue(leads: list[MarketplaceLead], now: datetime) -> list[Marke
     return reminders
 
 
+def _build_source_recommendations(
+    metrics: list[MarketplaceLeadSourceMetric],
+) -> list[MarketplaceSourceRecommendation]:
+    recommendations: list[MarketplaceSourceRecommendation] = []
+    for item in metrics:
+        total = max(item.total, 1)
+        high_purity_ratio = item.high_purity / total
+        reviewable_ratio = item.reviewable / total
+        full_time_ratio = item.full_time_job / total
+
+        if item.total >= 2 and full_time_ratio >= 0.5:
+            recommendations.append(
+                MarketplaceSourceRecommendation(
+                    source_id=item.source_id,
+                    source_name=item.source_name,
+                    action="pause_candidate",
+                    severity="high",
+                    reason="全职招聘噪音占比过高，建议暂停或大幅收紧过滤规则。",
+                )
+            )
+            continue
+        if item.total >= 3 and item.high_purity == 0:
+            recommendations.append(
+                MarketplaceSourceRecommendation(
+                    source_id=item.source_id,
+                    source_name=item.source_name,
+                    action="pause_candidate",
+                    severity="high",
+                    reason="连续产出但没有高纯度线索，建议暂停并寻找替代来源。",
+                )
+            )
+            continue
+        if item.total >= 3 and high_purity_ratio >= 0.6 and reviewable_ratio >= 0.8:
+            recommendations.append(
+                MarketplaceSourceRecommendation(
+                    source_id=item.source_id,
+                    source_name=item.source_name,
+                    action="expand_similar",
+                    severity="high",
+                    reason="高纯度和可跟进占比都高，值得扩同类平台或关键词。",
+                )
+            )
+            continue
+        if item.total >= 3 and reviewable_ratio < 0.6:
+            recommendations.append(
+                MarketplaceSourceRecommendation(
+                    source_id=item.source_id,
+                    source_name=item.source_name,
+                    action="lower_frequency",
+                    severity="medium",
+                    reason="可跟进占比偏低，建议降频抓取并继续观察。",
+                )
+            )
+            continue
+        if item.high_purity >= 1 and item.reviewable >= 1:
+            recommendations.append(
+                MarketplaceSourceRecommendation(
+                    source_id=item.source_id,
+                    source_name=item.source_name,
+                    action="keep",
+                    severity="medium",
+                    reason="当前产出稳定，可继续保留并观察后续转化。",
+                )
+            )
+    recommendations.sort(
+        key=lambda item: (_recommendation_severity_rank(item.severity), _recommendation_action_rank(item.action)),
+        reverse=True,
+    )
+    return recommendations[:6]
+
+
 def _count_todo_queue(reminders: list[MarketplaceLeadReminder]) -> dict[str, int]:
     return {
         "total": len(reminders),
@@ -805,6 +888,23 @@ def _reminder_severity_rank(value: str) -> int:
         "high": 2,
         "medium": 1,
         "low": 0,
+    }.get(value, 0)
+
+
+def _recommendation_severity_rank(value: str) -> int:
+    return {
+        "high": 2,
+        "medium": 1,
+        "low": 0,
+    }.get(value, 0)
+
+
+def _recommendation_action_rank(value: str) -> int:
+    return {
+        "expand_similar": 3,
+        "pause_candidate": 3,
+        "lower_frequency": 2,
+        "keep": 1,
     }.get(value, 0)
 
 

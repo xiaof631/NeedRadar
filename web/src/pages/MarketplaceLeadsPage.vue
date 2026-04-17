@@ -178,6 +178,35 @@
     </el-card>
 
     <el-card shadow="never">
+      <template #header>
+        <div class="source-health-title">{{ t('marketplace.recommendations.title') }}</div>
+      </template>
+      <div v-if="sourceRecommendations.length" class="recommendation-list">
+        <div
+          v-for="item in sourceRecommendations"
+          :key="`${item.source_id}-${item.action}`"
+          class="recommendation-item"
+        >
+          <div class="recommendation-main">
+            <div class="recommendation-title-row">
+              <span class="source-health-name">{{ item.source_name }}</span>
+              <div class="tag-list">
+                <el-tag size="small" :type="recommendationSeverityTagType(item.severity)" effect="plain">
+                  {{ t(`marketplace.recommendations.severity.${item.severity}`) }}
+                </el-tag>
+                <el-tag size="small" effect="plain">
+                  {{ t(`marketplace.recommendations.actions.${item.action}`) }}
+                </el-tag>
+              </div>
+            </div>
+            <div class="summary-text">{{ item.reason }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="todo-empty">{{ t('marketplace.recommendations.empty') }}</div>
+    </el-card>
+
+    <el-card shadow="never">
       <el-table :data="leads" v-loading="leadsQuery.isFetching.value" :empty-text="t('marketplace.table.empty')">
         <el-table-column prop="platform" :label="t('marketplace.table.platform')" width="170" />
         <el-table-column :label="t('marketplace.table.title')" min-width="340">
@@ -494,7 +523,8 @@ import {
   updateMarketplaceLeadStatus,
   type MarketplaceLead,
   type MarketplaceLeadEvent,
-  type MarketplaceLeadReminder
+  type MarketplaceLeadReminder,
+  type MarketplaceSourceRecommendation
 } from '../services/api';
 
 const { t } = useI18n();
@@ -600,6 +630,7 @@ const leads = computed(() => leadsQuery.data.value?.items ?? []);
 const selectedLead = computed(() => detailsQuery.data.value ?? null);
 const total = computed(() => leadsQuery.data.value?.total ?? 0);
 const sourceBreakdown = computed(() => leadsQuery.data.value?.source_breakdown ?? []);
+const sourceRecommendations = computed(() => leadsQuery.data.value?.source_recommendations ?? []);
 const todoQueue = computed(() => leadsQuery.data.value?.todo_queue ?? []);
 const highPurityCount = computed(() => leadsQuery.data.value?.tier_breakdown?.high_purity ?? 0);
 const expandedCount = computed(() => leadsQuery.data.value?.tier_breakdown?.expanded ?? 0);
@@ -669,6 +700,12 @@ const reminderTypeLabel = (value: MarketplaceLeadReminder['reminder_type']) =>
   t(`marketplace.todo.types.${value}`);
 
 const reminderSeverityTagType = (value: MarketplaceLeadReminder['severity']) => {
+  if (value === 'high') return 'danger';
+  if (value === 'medium') return 'warning';
+  return 'info';
+};
+
+const recommendationSeverityTagType = (value: MarketplaceSourceRecommendation['severity']) => {
   if (value === 'high') return 'danger';
   if (value === 'medium') return 'warning';
   return 'info';
@@ -845,6 +882,32 @@ const formatDate = (value: string | null) => {
   font-size: 0.95rem;
 }
 
+.recommendation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recommendation-item {
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+}
+
+.recommendation-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.recommendation-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
 .source-health-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1006,7 +1069,8 @@ const formatDate = (value: string | null) => {
 
   .todo-header,
   .todo-item,
-  .todo-title-row {
+  .todo-title-row,
+  .recommendation-title-row {
     flex-direction: column;
     align-items: stretch;
   }
