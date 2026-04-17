@@ -99,6 +99,7 @@ class RawEntryEntity(TimestampMixin, Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     author: Mapped[str | None] = mapped_column(String(200))
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    details: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     status: Mapped[str] = mapped_column(String(32), default=RawEntryStatus.PENDING.value)
 
     source: Mapped[RssSourceEntity] = relationship(back_populates="raw_entries")

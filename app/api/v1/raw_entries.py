@@ -14,6 +14,7 @@ from app.schemas import (
     RawEntryRuleMatch,
     RawEntryStatusEnum,
     RawEntryStatusUpdate,
+    RawEntrySourceTypeEnum,
 )
 from app.services import filter_engine, raw_entries
 from fastapi import APIRouter, HTTPException, Query, status
@@ -26,6 +27,7 @@ async def list_raw_entries(
     skip: int = Query(default=0, ge=0, description="跳过的记录数量"),
     limit: int = Query(default=20, ge=1, le=200, description="返回的记录数量"),
     source_id: int | None = Query(default=None, description="按数据源过滤"),
+    source_type: RawEntrySourceTypeEnum | None = Query(default=None, description="按来源类型过滤"),
     status: RawEntryStatusEnum | None = Query(default=None, description="按状态过滤"),
     search: str | None = Query(default=None, description="标题/摘要关键字"),
     start_published_at: datetime | None = Query(default=None, description="发布时间起始（包含）"),
@@ -33,6 +35,7 @@ async def list_raw_entries(
 ) -> RawEntryList:
     total, items = raw_entries.list_entries(
         source_id=source_id,
+        source_type=_convert_source_type(source_type),
         status=_convert_status(status),
         search=search,
         start_published_at=_parse_datetime(start_published_at),
@@ -100,6 +103,7 @@ async def bulk_update_raw_entry_status(payload: RawEntryBulkStatusUpdate) -> lis
 async def export_raw_entries(
     format: str = Query(default="json", pattern="^(json|csv)$", description="导出格式"),
     source_id: int | None = Query(default=None, description="按数据源过滤"),
+    source_type: RawEntrySourceTypeEnum | None = Query(default=None, description="按来源类型过滤"),
     status: RawEntryStatusEnum | None = Query(default=None, description="按状态过滤"),
     search: str | None = Query(default=None, description="标题/摘要关键字"),
     start_published_at: datetime | None = Query(default=None, description="发布时间起始（包含）"),
@@ -108,6 +112,7 @@ async def export_raw_entries(
 ) -> dict:
     entries = raw_entries.export_entries(
         source_id=source_id,
+        source_type=_convert_source_type(source_type),
         status=_convert_status(status),
         search=search,
         start_published_at=_parse_datetime(start_published_at),
@@ -174,6 +179,15 @@ def _convert_status(
     else:
         raw = value
     return RawEntryStatus(raw)
+
+
+def _convert_source_type(value: RawEntrySourceTypeEnum | str | None):
+    if value is None:
+        return None
+    raw = value.value if isinstance(value, RawEntrySourceTypeEnum) else value
+    from app.models import SourceType
+
+    return SourceType(raw)
 
 
 def _parse_datetime(value: datetime | str | None) -> datetime | None:

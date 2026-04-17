@@ -46,6 +46,13 @@ export async function fetchRecentAlerts(): Promise<AlertItem[]> {
 }
 
 export type SourceStatus = 'active' | 'paused' | 'disabled';
+export type SourceType =
+  | 'rss'
+  | 'hacker_news'
+  | 'github_issues'
+  | 'reddit'
+  | 'youtube'
+  | 'freelance_marketplace';
 
 export interface RssSource {
   id: number;
@@ -53,6 +60,7 @@ export interface RssSource {
   url: string;
   category: string | null;
   frequency: number;
+  source_type: SourceType;
   status: SourceStatus;
   last_fetched_at: string | null;
   created_at: string;
@@ -68,6 +76,7 @@ export interface RssSourceQueryParams {
   skip?: number;
   limit?: number;
   status?: SourceStatus;
+  source_type?: SourceType;
   category?: string;
   search?: string;
 }
@@ -95,6 +104,7 @@ export interface RawEntry {
   published_at: string | null;
   author: string | null;
   tags: string[];
+  metadata: Record<string, unknown>;
   status: RawEntryStatus;
   created_at: string;
   updated_at: string;
@@ -109,6 +119,7 @@ export interface RawEntryQueryParams {
   skip?: number;
   limit?: number;
   source_id?: number;
+  source_type?: SourceType;
   status?: RawEntryStatus;
   search?: string;
 }
@@ -246,11 +257,54 @@ export type CandidateNeedStatus =
   | 'completed';
 
 export type CandidateNeedSourceType =
-  | 'rss'
-  | 'hacker_news'
-  | 'github_issues'
-  | 'reddit'
-  | 'youtube';
+  | SourceType;
+
+export interface MarketplaceLead {
+  id: number;
+  source_id: number;
+  source_name: string;
+  platform: string;
+  title: string;
+  summary: string | null;
+  description: string | null;
+  category: string | null;
+  budget: string | null;
+  engagement: string | null;
+  timeline: string | null;
+  location: string | null;
+  published_at: string | null;
+  author: string | null;
+  tags: string[];
+  skills: string[];
+  link: string | null;
+  lead_tier: 'high_purity' | 'expanded';
+  tier_reason: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarketplaceLeadListResponse {
+  total: number;
+  tier_breakdown: Record<string, number>;
+  items: MarketplaceLead[];
+}
+
+export interface MarketplaceLeadQueryParams {
+  skip?: number;
+  limit?: number;
+  source_id?: number;
+  search?: string;
+  tier?: 'high_purity' | 'expanded';
+}
+
+export async function fetchMarketplaceLeads(
+  params: MarketplaceLeadQueryParams = {}
+): Promise<MarketplaceLeadListResponse> {
+  const response = await apiClient.get('/api/v1/marketplace-leads/', {
+    params
+  });
+  return response.data;
+}
 
 export type CandidateNeedType =
   | 'workflow_pain'

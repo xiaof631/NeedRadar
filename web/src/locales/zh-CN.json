@@ -2,6 +2,7 @@
   "nav": {
     "dashboard": "仪表盘",
     "sources": "RSS 源管理",
+    "marketplace": "外包项目线索",
     "entries": "原始内容",
     "filter": "筛选监控",
     "candidates": "候选需求",
@@ -102,6 +103,44 @@
       "published": "发布时间",
       "ingested": "入库时间",
       "empty": "暂无条目"
+    }
+  },
+  "marketplace": {
+    "title": "外包项目线索",
+    "subtitle": "独立查看公开外包/自由职业平台上的真实项目需求",
+    "metrics": {
+      "total": "线索总数",
+      "highPurity": "高纯度线索",
+      "expanded": "扩展线索",
+      "activeSources": "活跃项目源",
+      "pausedSources": "暂停项目源"
+    },
+    "sourceHealth": {
+      "title": "项目源状态",
+      "lastFetched": "最近抓取"
+    },
+    "filters": {
+      "searchPlaceholder": "输入标题或描述关键词",
+      "source": "项目源",
+      "queueOptions": {
+        "high_purity": "高纯度",
+        "expanded": "扩展线索",
+        "all": "全部线索"
+      },
+      "sourceOptions": {
+        "all": "全部项目源"
+      }
+    },
+    "table": {
+      "platform": "平台",
+      "title": "项目标题",
+      "budget": "预算",
+      "timeline": "周期/时效",
+      "skills": "技能/分类",
+      "source": "数据源",
+      "queue": "队列",
+      "published": "发布时间",
+      "empty": "暂无外包项目线索"
     }
   },
   "filterMonitor": {
@@ -214,7 +253,8 @@
         "rss": "RSS",
         "hacker_news": "Hacker News",
         "reddit": "Reddit",
-        "youtube": "YouTube"
+        "youtube": "YouTube",
+        "freelance_marketplace": "外包项目"
       },
       "candidateTypeOptions": {
         "all": "全部类型",

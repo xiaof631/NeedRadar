@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 from app.models import SourceStatus, SourceType
-from app.schemas import RssSourceCreate, RssSourceList, RssSourceRead, RssSourceUpdate
-from app.services import rss_sources
+from app.schemas import (
+    FetchResultRead,
+    RssSourceCreate,
+    RssSourceList,
+    RssSourceRead,
+    RssSourceUpdate,
+)
+from app.services import rss_fetcher, rss_sources
 from fastapi import APIRouter, HTTPException, Query, status
 
 router = APIRouter(prefix="/rss-sources", tags=["RSS Sources"])
@@ -74,3 +80,20 @@ async def delete_rss_source(source_id: int) -> None:
         rss_sources.delete_source(source_id)
     except rss_sources.RssSourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RSS 源不存在") from exc
+
+
+@router.post("/{source_id}/fetch", response_model=FetchResultRead, summary="手动触发抓取")
+async def fetch_rss_source_now(source_id: int) -> FetchResultRead:
+    try:
+        rss_sources.get_source(source_id)
+    except rss_sources.RssSourceNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="RSS 源不存在") from exc
+
+    result = await rss_fetcher.fetch_rss_source(source_id)
+    return FetchResultRead(
+        source_id=result.source_id,
+        fetched_entries=result.fetched_entries,
+        new_entries=result.new_entries,
+        status=result.status,
+        error_message=result.error_message,
+    )

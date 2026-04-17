@@ -25,6 +25,7 @@ class SourceType(str, Enum):
     GITHUB_ISSUES = "github_issues"
     REDDIT = "reddit"
     YOUTUBE = "youtube"
+    FREELANCE_MARKETPLACE = "freelance_marketplace"
 
 
 class FetchStatus(str, Enum):
@@ -105,6 +106,7 @@ class RawEntry:
     published_at: datetime | None = None
     author: str | None = None
     tags: Sequence[str] = field(default_factory=tuple)
+    metadata: dict[str, Any] = field(default_factory=dict)
     status: RawEntryStatus = RawEntryStatus.PENDING
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))

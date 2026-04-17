@@ -315,7 +315,7 @@ def seed_source_catalog(
         str,
         typer.Option(
             "--profile",
-            help="预置数据源目录名称，可选值: github-public-expanded",
+            help="预置数据源目录名称，例如 github-public-expanded / marketplace-public-baseline",
         ),
     ] = "github-public-expanded",
     status: Annotated[

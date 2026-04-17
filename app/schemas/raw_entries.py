@@ -6,6 +6,7 @@ from datetime import datetime
 from enum import Enum
 
 from app.models import RawEntryStatus
+from app.models.rss import SourceType
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -32,6 +33,7 @@ class RawEntryRead(BaseModel):
     published_at: datetime | None = None
     author: str | None = None
     tags: list[str] = Field(default_factory=list)
+    metadata: dict[str, str | int | float | bool | None | list[str]] = Field(default_factory=dict)
     status: RawEntryStatusEnum
     created_at: datetime
     updated_at: datetime
@@ -44,6 +46,15 @@ class RawEntryList(BaseModel):
 
     total: int
     items: list[RawEntryRead]
+
+
+class RawEntrySourceTypeEnum(str, Enum):
+    RSS = SourceType.RSS.value
+    HACKER_NEWS = SourceType.HACKER_NEWS.value
+    GITHUB_ISSUES = SourceType.GITHUB_ISSUES.value
+    REDDIT = SourceType.REDDIT.value
+    YOUTUBE = SourceType.YOUTUBE.value
+    FREELANCE_MARKETPLACE = SourceType.FREELANCE_MARKETPLACE.value
 
 
 class RawEntryRuleMatch(BaseModel):

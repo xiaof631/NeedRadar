@@ -2,6 +2,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "sources": "Sources",
+    "marketplace": "Marketplace Leads",
     "entries": "Raw Entries",
     "filter": "Filter Monitor",
     "candidates": "Candidate Needs",
@@ -99,6 +100,44 @@
       "published": "Published at",
       "ingested": "Ingested at",
       "empty": "No entries"
+    }
+  },
+  "marketplace": {
+    "title": "Marketplace Leads",
+    "subtitle": "Review real small-project demand from public outsourcing and freelance marketplaces",
+    "metrics": {
+      "total": "Total leads",
+      "highPurity": "High-purity leads",
+      "expanded": "Expanded leads",
+      "activeSources": "Active sources",
+      "pausedSources": "Paused sources"
+    },
+    "sourceHealth": {
+      "title": "Source health",
+      "lastFetched": "Last fetched"
+    },
+    "filters": {
+      "searchPlaceholder": "Search by title or description",
+      "source": "Source",
+      "queueOptions": {
+        "high_purity": "High purity",
+        "expanded": "Expanded",
+        "all": "All leads"
+      },
+      "sourceOptions": {
+        "all": "All marketplace sources"
+      }
+    },
+    "table": {
+      "platform": "Platform",
+      "title": "Project title",
+      "budget": "Budget",
+      "timeline": "Timeline",
+      "skills": "Skills / category",
+      "source": "Source",
+      "queue": "Queue",
+      "published": "Published at",
+      "empty": "No marketplace leads"
     }
   },
   "filterMonitor": {
@@ -214,7 +253,8 @@
         "rss": "RSS",
         "hacker_news": "Hacker News",
         "reddit": "Reddit",
-        "youtube": "YouTube"
+        "youtube": "YouTube",
+        "freelance_marketplace": "Marketplace"
       },
       "candidateTypeOptions": {
         "all": "All types",

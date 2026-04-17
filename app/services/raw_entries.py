@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.db.storage import db
-from app.models import RawEntry, RawEntryStatus
+from app.models import RawEntry, RawEntryStatus, SourceType
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
@@ -68,6 +68,7 @@ def list_entries(
     source_id: int | None = None,
     status: RawEntryStatus | None = None,
     search: str | None = None,
+    source_type: SourceType | None = None,
     start_published_at: datetime | None = None,
     end_published_at: datetime | None = None,
     skip: int = 0,
@@ -81,6 +82,7 @@ def list_entries(
         source_id=source_id,
         status=status,
         search=search,
+        source_type=source_type,
         start_published_at=start,
         end_published_at=end,
         skip=skip,
@@ -90,6 +92,7 @@ def list_entries(
         source_id=source_id,
         status=status,
         search=search,
+        source_type=source_type,
         start_published_at=start,
         end_published_at=end,
     )
@@ -123,6 +126,7 @@ def export_entries(
     source_id: int | None = None,
     status: RawEntryStatus | None = None,
     search: str | None = None,
+    source_type: SourceType | None = None,
     start_published_at: datetime | None = None,
     end_published_at: datetime | None = None,
     limit: int | None = None,
@@ -133,6 +137,7 @@ def export_entries(
         source_id=source_id,
         status=status,
         search=search,
+        source_type=source_type,
         start_published_at=start_published_at,
         end_published_at=end_published_at,
         skip=0,

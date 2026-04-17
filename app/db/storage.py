@@ -247,6 +247,7 @@ class SQLDatabase:
     def create_raw_entry(self, data: dict) -> RawEntry:
         payload = {**data}
         payload["tags"] = list(payload.get("tags", ()))
+        payload["details"] = dict(payload.pop("metadata", {}) or {})
         payload["status"] = RawEntryStatus(payload.get("status", RawEntryStatus.PENDING)).value
         with self._session() as session:
             entity = RawEntryEntity(**payload)
@@ -293,6 +294,7 @@ class SQLDatabase:
         source_id: int | None = None,
         status: RawEntryStatus | None = None,
         search: str | None = None,
+        source_type: SourceType | None = None,
         start_published_at: datetime | None = None,
         end_published_at: datetime | None = None,
         skip: int = 0,
@@ -302,6 +304,10 @@ class SQLDatabase:
             stmt = select(RawEntryEntity)
             if source_id is not None:
                 stmt = stmt.where(RawEntryEntity.source_id == source_id)
+            if source_type is not None:
+                stmt = stmt.join(RssSourceEntity, RawEntryEntity.source_id == RssSourceEntity.id).where(
+                    RssSourceEntity.source_type == source_type.value
+                )
             if status is not None:
                 stmt = stmt.where(RawEntryEntity.status == status.value)
             if search:
@@ -339,6 +345,7 @@ class SQLDatabase:
         source_id: int | None = None,
         status: RawEntryStatus | None = None,
         search: str | None = None,
+        source_type: SourceType | None = None,
         start_published_at: datetime | None = None,
         end_published_at: datetime | None = None,
     ) -> int:
@@ -346,6 +353,10 @@ class SQLDatabase:
             stmt = select(func.count(RawEntryEntity.id))
             if source_id is not None:
                 stmt = stmt.where(RawEntryEntity.source_id == source_id)
+            if source_type is not None:
+                stmt = stmt.join(RssSourceEntity, RawEntryEntity.source_id == RssSourceEntity.id).where(
+                    RssSourceEntity.source_type == source_type.value
+                )
             if status is not None:
                 stmt = stmt.where(RawEntryEntity.status == status.value)
             if search:
@@ -809,6 +820,7 @@ def _to_raw_entry(entity: RawEntryEntity) -> RawEntry:
         published_at=entity.published_at,
         author=entity.author,
         tags=tuple(entity.tags or []),
+        metadata=dict(entity.details or {}),
         status=RawEntryStatus(entity.status),
         created_at=entity.created_at,
         updated_at=entity.updated_at,
@@ -826,6 +838,7 @@ def _apply_raw_entry(entity: RawEntryEntity, model: RawEntry) -> None:
     entity.published_at = model.published_at
     entity.author = model.author
     entity.tags = list(model.tags)
+    entity.details = dict(model.metadata or {})
     entity.status = model.status.value
     entity.updated_at = datetime.now(UTC)
 

@@ -29,6 +29,7 @@ describe('App', () => {
                 nav: {
                   dashboard: '仪表盘',
                   sources: '数据源',
+                  marketplace: '外包项目线索',
                   entries: '原始内容',
                   filter: '筛选监控',
                   candidates: '候选需求',

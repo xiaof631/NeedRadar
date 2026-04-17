@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,15 +12,26 @@ from app.services import rss_sources, source_catalog
 
 @pytest.fixture(autouse=True)
 def _reset_db() -> None:
-    os.environ.pop("NEEDRADAR_GITHUB_ACCESS_TOKEN", None)
+    os.environ["NEEDRADAR_GITHUB_ACCESS_TOKEN"] = ""
     config_module.get_settings.cache_clear()
+    config_module.settings = config_module.get_settings(
+        database_url=config_module.settings.database_url,
+        alembic_database_url=config_module.settings.alembic_database_url,
+        github_access_token="",
+    )
     rss_sources.reset_storage()
     yield
     rss_sources.reset_storage()
     config_module.get_settings.cache_clear()
+    config_module.settings = config_module.get_settings(
+        database_url=config_module.settings.database_url,
+        alembic_database_url=config_module.settings.alembic_database_url,
+        github_access_token="",
+    )
 
 
-def test_seed_github_public_expanded_catalog_creates_sources() -> None:
+def test_seed_github_public_expanded_catalog_creates_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(source_catalog, "get_settings", lambda: SimpleNamespace(github_access_token=None))
     created, skipped = source_catalog.seed_catalog("github-public-expanded")
 
     assert skipped == []
@@ -53,9 +65,15 @@ def test_seed_catalog_skips_existing_urls() -> None:
     assert len(created) + len(skipped) == len(source_catalog.get_catalog("github-public-expanded"))
 
 
-def test_seed_catalog_activates_when_token_configured() -> None:
+def test_seed_catalog_activates_when_token_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     os.environ["NEEDRADAR_GITHUB_ACCESS_TOKEN"] = "token"
     config_module.get_settings.cache_clear()
+    config_module.settings = config_module.get_settings(
+        database_url=config_module.settings.database_url,
+        alembic_database_url=config_module.settings.alembic_database_url,
+        github_access_token="token",
+    )
+    monkeypatch.setattr(source_catalog, "get_settings", lambda: SimpleNamespace(github_access_token="token"))
 
     created, skipped = source_catalog.seed_catalog("github-public-expanded")
 
@@ -67,3 +85,19 @@ def test_seed_catalog_activates_when_token_configured() -> None:
 def test_unknown_catalog_raises() -> None:
     with pytest.raises(source_catalog.SourceCatalogNotFoundError):
         source_catalog.get_catalog("unknown-profile")
+
+
+def test_seed_marketplace_catalog_pauses_freelancer_source_by_default() -> None:
+    created, skipped = source_catalog.seed_catalog("marketplace-public-baseline")
+
+    assert skipped == []
+    assert len(created) == 4
+
+    by_name = {source.name: source for source in created}
+    assert by_name["Freelancer Web Development Jobs"].status == SourceStatus.PAUSED
+    assert by_name["软件项目交易网最新外包项目"].status == SourceStatus.ACTIVE
+    assert by_name["Contra Featured Remote Jobs"].status == SourceStatus.PAUSED
+    assert by_name["猪八戒需求大厅精选任务"].status == SourceStatus.ACTIVE
+    assert "软件" in by_name["软件项目交易网最新外包项目"].config["include_keywords"]
+    assert "脚本" in by_name["软件项目交易网最新外包项目"].config["exclude_keywords"]
+    assert "qt" in by_name["软件项目交易网最新外包项目"].config["include_keywords"]

@@ -7,7 +7,7 @@ import pytest
 from app.core import config as config_module
 from app.db.storage import db
 from app.models import FetchStatus, RawEntryStatus, SourceType
-from app.services import raw_entries, rss_fetcher, rss_sources
+from app.services import marketplace_fetcher, raw_entries, rss_fetcher, rss_sources
 
 
 @pytest.fixture(autouse=True)
@@ -65,6 +65,89 @@ DUPLICATE_CONTENT_RSS = """<?xml version=\"1.0\"?>
     </item>
   </channel>
 </rss>
+"""
+
+SAMPLE_SXSOFT_HTML = """
+<html>
+  <body>
+    <h2>最新外包项目</h2>
+    <table>
+      <tr><th>标题</th><th>项目预算</th><th>开发周期</th><th>发布日期</th><th>已有竞标</th></tr>
+      <tr>
+        <td><a href="/project/1">数据采集分析后台</a></td>
+        <td>1千~5千</td>
+        <td>7</td>
+        <td>2026-04-16</td>
+        <td>4</td>
+        <td>竞标中</td>
+      </tr>
+    </table>
+    <div>标题 项目预算 开发周期 发布日期 已有竞标</div>
+    <div>数据采集与分析</div>
+    <div>数据采集分析后台</div>
+    <div>1千~5千</div>
+    <div>7</div>
+    <div>2026-04-16</div>
+    <div>4</div>
+    <div>竞标中</div>
+    <div>标题 项目资金 接包方 开发周期 开工日期</div>
+  </body>
+</html>
+"""
+
+SAMPLE_SXSOFT_FILTER_HTML = """
+<html>
+  <body>
+    <div>标题 项目预算 开发周期 发布日期 已有竞标</div>
+    <div>企业应用</div>
+    <div>小程序订餐系统开发</div>
+    <div>5千~1万</div>
+    <div>15</div>
+    <div>2026-04-16</div>
+    <div>3</div>
+    <div>竞标中</div>
+    <div>创意设计</div>
+    <div>品牌 LOGO 设计</div>
+    <div>8百~2千</div>
+    <div>5</div>
+    <div>2026-04-15</div>
+    <div>6</div>
+    <div>竞标中</div>
+    <div>脚本开发</div>
+    <div>游戏脚本代写</div>
+    <div>1千~3千</div>
+    <div>7</div>
+    <div>2026-04-14</div>
+    <div>2</div>
+    <div>竞标中</div>
+    <div>嵌入式与智能硬件</div>
+    <div>基于RK3568的openEuler Embedded版本编译java/mysql/qt</div>
+    <div>待商议</div>
+    <div>20</div>
+    <div>2026-04-13</div>
+    <div>1</div>
+    <div>竞标中</div>
+    <div>标题 项目资金 接包方 开发周期 开工日期</div>
+  </body>
+</html>
+"""
+
+SAMPLE_ZBJ_HTML = """
+<div class="task-list-content j-scrollcontent">
+  <div class="task-list-item" data-tid="1920346">
+    <p class="task-title"><span class="orange">￥4320</span> 重庆：游轮公司征集LOGO设计</p>
+    <p class="task-detail"><span class="fr">24天完成</span><span class="fl">326个服务商参与</span></p>
+  </div>
+</div>
+<ul>
+  <li>
+    <a href="//task.zbj.com/5771984/" title="易债中国—民间债权登记系统开发" target="_blank"></a>
+    <div class="hall-floor-main-footer">
+      <p class="title"><span class="orange">￥100000</span>&nbsp;&nbsp;<a href="//task.zbj.com/5771984/" title="易债中国—民间债权登记系统开发" target="_blank">易债中国—民间债权登记...</a></p>
+      <p class="state"><span class="state state-choosing">选标中</span><span class="time"></span></p>
+    </div>
+  </li>
+</ul>
 """
 
 
@@ -128,6 +211,54 @@ def test_fetch_rss_source_success_and_deduplicate() -> None:
         assert logs[0].http_status == 304
 
     asyncio.run(_run())
+
+
+@pytest.mark.parametrize(
+    ("detail", "expected_budget", "expected_timeline"),
+    [
+        ("$25 - $50/hr45 hrs/wkDuration: Ongoing", "$25 - $50/hr", "45 hrs/wk | Duration: Ongoing"),
+        ("$500 - $1,000One-timeDelivery time: 1 week", "$500 - $1,000", "One-time | Delivery time: 1 week"),
+        ("$5,000 - $10,000/moDuration: Ongoing(GMT -5) EST", "$5,000 - $10,000/mo", "Duration: Ongoing (GMT -5) EST"),
+    ],
+)
+def test_split_budget_timeline_for_contra(detail: str, expected_budget: str, expected_timeline: str) -> None:
+    budget, timeline = marketplace_fetcher._split_budget_timeline(detail)
+
+    assert budget == expected_budget
+    assert timeline == expected_timeline
+
+
+def test_parse_zbj_marketplace_listing() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "猪八戒需求大厅精选任务",
+            "url": "https://task.zbj.com/index/",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {
+                "adapter": "zbj_hall_scroll",
+                "item_limit": 10,
+                "include_keywords": "开发,搭建,定制,实现,对接,小程序,网站,系统,平台,插件,程序,前端,后端,数据库,进销存,erp,crm,saas,web,软件,app,android,ios,管理软件",
+                "exclude_keywords": "logo,海报,文案,命名,台标,梳子,造句,展区设计,外观设计,广告,节目方案,创意设计,包装设计,活动,征集,大赛,推广,运营",
+            },
+        }
+    )
+
+    items = marketplace_fetcher._filter_marketplace_items(
+        source,
+        marketplace_fetcher._parse_marketplace_page(source, SAMPLE_ZBJ_HTML),
+    )
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.guid == "zbj:5771984"
+    assert item.title == "易债中国—民间债权登记系统开发"
+    assert item.link == "https://task.zbj.com/5771984/"
+    assert item.metadata["platform"] == "猪八戒"
+    assert item.metadata["budget"] == "￥100000"
+    assert item.metadata["timeline"] == "选标中"
+    assert item.metadata["location"] is None
+    assert item.description == "选标中"
 
 
 def test_fetch_rss_source_http_failure() -> None:
@@ -379,6 +510,73 @@ def test_fetch_github_issues_source_rate_limit_failure() -> None:
         assert logs[0].http_status == 403
 
     asyncio.run(_run())
+
+
+def test_fetch_marketplace_source_success() -> None:
+    async def _run() -> None:
+        source = rss_sources.create_source(
+            {
+                "name": "软件项目交易网最新外包项目",
+                "url": "https://www.sxsoft.com/",
+                "frequency": 3600,
+                "source_type": SourceType.FREELANCE_MARKETPLACE,
+                "config": {"adapter": "sxsoft_latest", "item_limit": 5},
+            }
+        )
+
+        def handler(_: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, text=SAMPLE_SXSOFT_HTML)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert result.status == FetchStatus.SUCCESS
+        assert result.fetched_entries == 1
+        assert result.new_entries == 1
+
+        total, entries = raw_entries.list_entries(source_id=source.id)
+        assert total == 1
+        assert entries[0].title == "数据采集分析后台"
+        assert entries[0].metadata["platform"] == "软件项目交易网"
+        assert entries[0].metadata["budget"] == "1千~5千"
+        assert entries[0].metadata["category"] == "数据采集与分析"
+        assert entries[0].link == "https://www.sxsoft.com/project/1"
+
+    asyncio.run(_run())
+
+
+def test_parse_sxsoft_marketplace_listing_filters_non_software_projects() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "软件项目交易网最新外包项目",
+            "url": "https://www.sxsoft.com/",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {
+                "adapter": "sxsoft_latest",
+                "item_limit": 12,
+                "topic": "software-development",
+                "include_keywords": "开发,搭建,定制,实现,对接,小程序,网站,系统,平台,插件,程序,前端,后端,后台,数据库,进销存,erp,crm,saas,web,软件,app,android,ios,管理软件,qt,java,mysql",
+                "exclude_keywords": "logo,海报,文案,命名,广告,创意设计,包装设计,活动,征集,大赛,推广,运营,设计,ui,优化,协议,脚本,代付",
+            },
+        }
+    )
+
+    items = marketplace_fetcher._filter_marketplace_items(
+        source,
+        marketplace_fetcher._parse_marketplace_page(source, SAMPLE_SXSOFT_FILTER_HTML),
+    )
+
+    assert len(items) == 2
+    titles = [item.title for item in items]
+    assert titles == ["小程序订餐系统开发", "基于RK3568的openEuler Embedded版本编译java/mysql/qt"]
+    assert items[0].metadata["category"] == "企业应用"
+
+
+def test_normalize_keywords_lowercases_values() -> None:
+    keywords = marketplace_fetcher._normalize_keywords("Web,APP,嵌入式")
+
+    assert keywords == ["web", "app", "嵌入式"]
 
 
 def test_fetch_reddit_source_success() -> None:

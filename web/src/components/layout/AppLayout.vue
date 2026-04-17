@@ -12,6 +12,7 @@
       >
         <el-menu-item index="/">{{ t('nav.dashboard') }}</el-menu-item>
         <el-menu-item index="/sources">{{ t('nav.sources') }}</el-menu-item>
+        <el-menu-item index="/marketplace">{{ t('nav.marketplace') }}</el-menu-item>
         <el-menu-item index="/entries">{{ t('nav.entries') }}</el-menu-item>
         <el-menu-item index="/filter">{{ t('nav.filter') }}</el-menu-item>
         <el-menu-item index="/candidates">{{ t('nav.candidates') }}</el-menu-item>

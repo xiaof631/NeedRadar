@@ -77,3 +77,13 @@ class FetchLogList(BaseModel):
 
     total: int
     items: list[FetchLogRead]
+
+
+class FetchResultRead(BaseModel):
+    """手动触发抓取的结果。"""
+
+    source_id: int
+    fetched_entries: int
+    new_entries: int
+    status: FetchStatus
+    error_message: str | None = None

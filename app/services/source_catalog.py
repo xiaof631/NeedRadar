@@ -101,12 +101,71 @@ _GITHUB_PUBLIC_EXPANDED: tuple[CatalogEntry, ...] = (
     },
 )
 
+_MARKETPLACE_PUBLIC_BASELINE: tuple[CatalogEntry, ...] = (
+    {
+        "name": "软件项目交易网最新外包项目",
+        "url": "https://www.sxsoft.com/",
+        "category": "freelance-marketplace",
+        "frequency": 3600,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "sxsoft_latest",
+            "item_limit": 12,
+            "topic": "software-development",
+            "include_keywords": "开发,搭建,定制,实现,对接,小程序,网站,系统,平台,插件,程序,前端,后端,后台,数据库,进销存,erp,crm,saas,web,软件,app,android,ios,管理软件,qt,java,mysql",
+            "exclude_keywords": "logo,海报,文案,命名,广告,创意设计,包装设计,活动,征集,大赛,推广,运营,设计,ui,优化,协议,脚本,代付",
+        },
+    },
+    {
+        "name": "Freelancer Web Development Jobs",
+        "url": "https://www.freelancer.com/jobs/web-development/",
+        "category": "freelance-marketplace",
+        "frequency": 5400,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "status": SourceStatus.PAUSED,
+        "config": {
+            "adapter": "freelancer_jobs",
+            "item_limit": 12,
+            "topic": "web-development",
+        },
+    },
+    {
+        "name": "Contra Featured Remote Jobs",
+        "url": "https://contra.com/featured-jobs/freelance-creative-jobs",
+        "category": "freelance-marketplace",
+        "frequency": 7200,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "status": SourceStatus.PAUSED,
+        "config": {
+            "adapter": "contra_featured_jobs",
+            "item_limit": 10,
+            "topic": "creative-and-web",
+        },
+    },
+    {
+        "name": "猪八戒需求大厅精选任务",
+        "url": "https://task.zbj.com/index/",
+        "category": "freelance-marketplace",
+        "frequency": 7200,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "zbj_hall_scroll",
+            "item_limit": 15,
+            "topic": "software-development",
+            "include_keywords": "开发,搭建,定制,实现,对接,小程序,网站,系统,平台,插件,程序,前端,后端,数据库,进销存,erp,crm,saas,web,软件,app,android,ios,管理软件",
+            "exclude_keywords": "logo,海报,文案,命名,台标,梳子,造句,展区设计,外观设计,广告,节目方案,创意设计,包装设计,活动,征集,大赛,推广,运营,设计,ui,优化",
+        },
+    },
+)
+
 _CATALOGS: dict[str, tuple[CatalogEntry, ...]] = {
     "github-public-expanded": _GITHUB_PUBLIC_EXPANDED,
+    "marketplace-public-baseline": _MARKETPLACE_PUBLIC_BASELINE,
 }
 
 _CATALOG_DESCRIPTIONS: dict[str, str] = {
     "github-public-expanded": "长期扩源用的 GitHub public repo issue 源目录，覆盖 AI、开发工具、自动化与排期场景。",
+    "marketplace-public-baseline": "公开外包/自由职业项目线索目录，优先接入可公开浏览的真实项目列表。",
 }
 
 

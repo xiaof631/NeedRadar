@@ -6,6 +6,7 @@ from app.api.v1 import (
     fetch_logs,
     filter_metrics,
     filter_rules,
+    marketplace_leads,
     raw_entries,
     rss_sources,
 )
@@ -13,6 +14,7 @@ from fastapi import APIRouter
 
 router = APIRouter()
 router.include_router(rss_sources.router)
+router.include_router(marketplace_leads.router)
 router.include_router(raw_entries.router)
 router.include_router(filter_rules.router)
 router.include_router(filter_metrics.router)

@@ -16,6 +16,7 @@ from app.models import FetchStatus, RssSource, SourceType
 from app.services import (
     github_fetcher,
     hacker_news_fetcher,
+    marketplace_fetcher,
     raw_entries,
     reddit_fetcher,
     rss_sources,
@@ -71,6 +72,7 @@ def _get_source_fetcher(source_type: SourceType):
         SourceType.GITHUB_ISSUES: github_fetcher.fetch_github_issues_source,
         SourceType.REDDIT: reddit_fetcher.fetch_reddit_source,
         SourceType.YOUTUBE: youtube_fetcher.fetch_youtube_source,
+        SourceType.FREELANCE_MARKETPLACE: marketplace_fetcher.fetch_marketplace_source,
     }
     return registry.get(source_type, _fetch_with_source)
 
