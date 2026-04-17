@@ -43,12 +43,21 @@ class MarketplaceLeadStatus(StrEnum):
     IGNORED = "ignored"
 
 
+class MarketplaceLeadOutcome(StrEnum):
+    WON = "won"
+    LOST = "lost"
+    NO_RESPONSE = "no_response"
+    NOT_FIT = "not_fit"
+
+
 @dataclass(slots=True)
 class MarketplaceLeadEvent:
     event_type: str
     created_at: datetime
     status_from: str | None = None
     status_to: str | None = None
+    outcome_from: str | None = None
+    outcome_to: str | None = None
     note: str | None = None
 
 
@@ -77,6 +86,7 @@ class MarketplaceLead:
     lead_tier: MarketplaceLeadTier
     tier_reason: str
     lead_status: MarketplaceLeadStatus
+    lead_outcome: MarketplaceLeadOutcome | None
     notes: str | None
     priority_score: int
     priority_reason: str
@@ -137,6 +147,7 @@ class MarketplaceLeadQueryResult:
     tier_breakdown: dict[str, int]
     kind_breakdown: dict[str, int]
     status_breakdown: dict[str, int]
+    outcome_breakdown: dict[str, int]
     source_breakdown: list[MarketplaceLeadSourceMetric]
     source_recommendations: list[MarketplaceSourceRecommendation]
     todo_breakdown: dict[str, int]
@@ -151,6 +162,7 @@ def list_leads(
     lead_kind: MarketplaceLeadKind | None = None,
     reviewable_only: bool = False,
     lead_status: MarketplaceLeadStatus | None = None,
+    lead_outcome: MarketplaceLeadOutcome | None = None,
     skip: int = 0,
     limit: int = 20,
 ) -> tuple[
@@ -168,6 +180,7 @@ def list_leads(
         lead_kind=lead_kind,
         reviewable_only=reviewable_only,
         lead_status=lead_status,
+        lead_outcome=lead_outcome,
         skip=skip,
         limit=limit,
     )
@@ -189,6 +202,7 @@ def query_leads(
     lead_kind: MarketplaceLeadKind | None = None,
     reviewable_only: bool = False,
     lead_status: MarketplaceLeadStatus | None = None,
+    lead_outcome: MarketplaceLeadOutcome | None = None,
     skip: int = 0,
     limit: int = 20,
 ) -> MarketplaceLeadQueryResult:
@@ -203,6 +217,7 @@ def query_leads(
     tier_breakdown = _count_tiers(leads)
     kind_breakdown = _count_kinds(leads)
     status_breakdown = _count_statuses(leads)
+    outcome_breakdown = _count_outcomes(leads)
     source_breakdown = _build_source_breakdown(leads)
     priority_context = MarketplacePriorityContext(
         source_history={item.source_id: item for item in source_breakdown},
@@ -218,6 +233,8 @@ def query_leads(
         leads = [lead for lead in leads if lead.lead_kind in _REVIEWABLE_LEAD_KINDS]
     if lead_status is not None:
         leads = [lead for lead in leads if lead.lead_status == lead_status]
+    if lead_outcome is not None:
+        leads = [lead for lead in leads if lead.lead_outcome == lead_outcome]
     todo_queue = _build_todo_queue(leads, priority_context.now)
     todo_breakdown = _count_todo_queue(todo_queue)
     source_recommendations = _build_source_recommendations(source_breakdown)
@@ -229,6 +246,7 @@ def query_leads(
         tier_breakdown=tier_breakdown,
         kind_breakdown=kind_breakdown,
         status_breakdown=status_breakdown,
+        outcome_breakdown=outcome_breakdown,
         source_breakdown=source_breakdown,
         source_recommendations=source_recommendations,
         todo_breakdown=todo_breakdown,
@@ -270,6 +288,32 @@ def get_lead(entry_id: int) -> MarketplaceLead:
         if item.id == entry_id:
             return item
     return _to_marketplace_lead(entry)
+
+
+def update_lead_outcome(entry_id: int, outcome: MarketplaceLeadOutcome | None) -> MarketplaceLead:
+    entry = raw_entries.get_entry(entry_id)
+    source = rss_sources.get_source(entry.source_id)
+    if source is None or source.source_type != SourceType.FREELANCE_MARKETPLACE:
+        raise ValueError("marketplace lead not found")
+
+    def _apply(model: RawEntry) -> None:
+        metadata = dict(model.metadata or {})
+        previous_outcome = _to_lead_outcome(metadata.get("lead_outcome"))
+        if outcome is None:
+            metadata.pop("lead_outcome", None)
+        else:
+            metadata["lead_outcome"] = outcome.value
+        if previous_outcome != outcome:
+            metadata["lead_events"] = _append_lead_event(
+                metadata.get("lead_events"),
+                event_type="outcome_updated",
+                outcome_from=previous_outcome.value if previous_outcome else None,
+                outcome_to=outcome.value if outcome else None,
+            )
+        model.metadata = metadata
+
+    db.update_raw_entry(entry_id, _apply)
+    return get_lead(entry_id)
 
 
 def update_lead_notes(entry_id: int, notes: str | None) -> MarketplaceLead:
@@ -336,6 +380,7 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         lead_tier=lead_tier,
         tier_reason=tier_reason,
         lead_status=_to_lead_status(metadata.get("lead_status")),
+        lead_outcome=_to_lead_outcome(metadata.get("lead_outcome")),
         notes=_to_string(metadata.get("lead_notes")),
         priority_score=0,
         priority_reason="尚未计算优先级。",
@@ -455,6 +500,7 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         lead_tier=representative.lead_tier,
         tier_reason=representative.tier_reason,
         lead_status=status,
+        lead_outcome=representative.lead_outcome or alternate.lead_outcome,
         notes=representative.notes or alternate.notes,
         priority_score=max(left.priority_score, right.priority_score),
         priority_reason=representative.priority_reason or alternate.priority_reason,
@@ -515,6 +561,19 @@ def _calculate_priority(lead: MarketplaceLead, context: MarketplacePriorityConte
     else:
         score -= 24
         reasons.append("已忽略")
+
+    if lead.lead_outcome == MarketplaceLeadOutcome.WON:
+        score -= 60
+        reasons.append("已成交")
+    elif lead.lead_outcome == MarketplaceLeadOutcome.LOST:
+        score -= 45
+        reasons.append("已失败")
+    elif lead.lead_outcome == MarketplaceLeadOutcome.NO_RESPONSE:
+        score -= 36
+        reasons.append("无回复")
+    elif lead.lead_outcome == MarketplaceLeadOutcome.NOT_FIT:
+        score -= 40
+        reasons.append("不匹配")
 
     published_at = _ensure_utc(lead.published_at or lead.created_at)
     age_days = max((context.now - published_at).days, 0)
@@ -635,12 +694,25 @@ def _count_statuses(leads: list[MarketplaceLead]) -> dict[str, int]:
     }
 
 
+def _count_outcomes(leads: list[MarketplaceLead]) -> dict[str, int]:
+    breakdown = {outcome.value: 0 for outcome in MarketplaceLeadOutcome}
+    breakdown["unresolved"] = 0
+    for lead in leads:
+        if lead.lead_outcome is None:
+            breakdown["unresolved"] += 1
+        else:
+            breakdown[lead.lead_outcome.value] += 1
+    return breakdown
+
+
 def _append_lead_event(
     raw_events: object,
     *,
     event_type: str,
     status_from: str | None = None,
     status_to: str | None = None,
+    outcome_from: str | None = None,
+    outcome_to: str | None = None,
     note: str | None = None,
 ) -> list[dict[str, object]]:
     events = list(raw_events) if isinstance(raw_events, list) else []
@@ -652,6 +724,10 @@ def _append_lead_event(
         event["status_from"] = status_from
     if status_to:
         event["status_to"] = status_to
+    if outcome_from:
+        event["outcome_from"] = outcome_from
+    if outcome_to:
+        event["outcome_to"] = outcome_to
     if note:
         event["note"] = note
     events.append(event)
@@ -685,6 +761,8 @@ def _to_lead_events(item: RawEntry, metadata: dict[str, object]) -> list[Marketp
                 created_at=created_at,
                 status_from=_to_string(raw_event.get("status_from")),
                 status_to=_to_string(raw_event.get("status_to")),
+                outcome_from=_to_string(raw_event.get("outcome_from")),
+                outcome_to=_to_string(raw_event.get("outcome_to")),
                 note=_to_string(raw_event.get("note")),
             )
         )
@@ -693,9 +771,20 @@ def _to_lead_events(item: RawEntry, metadata: dict[str, object]) -> list[Marketp
 
 
 def _merge_lead_events(left: list[MarketplaceLeadEvent], right: list[MarketplaceLeadEvent]) -> list[MarketplaceLeadEvent]:
-    merged: dict[tuple[str, datetime, str | None, str | None, str | None], MarketplaceLeadEvent] = {}
+    merged: dict[
+        tuple[str, datetime, str | None, str | None, str | None, str | None, str | None],
+        MarketplaceLeadEvent,
+    ] = {}
     for event in [*left, *right]:
-        key = (event.event_type, event.created_at, event.status_from, event.status_to, event.note)
+        key = (
+            event.event_type,
+            event.created_at,
+            event.status_from,
+            event.status_to,
+            event.outcome_from,
+            event.outcome_to,
+            event.note,
+        )
         merged[key] = event
     return sorted(merged.values(), key=lambda item: item.created_at, reverse=True)
 
@@ -731,7 +820,11 @@ def _build_source_breakdown(leads: list[MarketplaceLead]) -> list[MarketplaceLea
 def _build_todo_queue(leads: list[MarketplaceLead], now: datetime) -> list[MarketplaceLeadReminder]:
     reminders: list[MarketplaceLeadReminder] = []
     for lead in leads:
-        if lead.lead_kind not in _REVIEWABLE_LEAD_KINDS or lead.lead_status == MarketplaceLeadStatus.IGNORED:
+        if (
+            lead.lead_kind not in _REVIEWABLE_LEAD_KINDS
+            or lead.lead_status == MarketplaceLeadStatus.IGNORED
+            or lead.lead_outcome is not None
+        ):
             continue
         reminder_anchor = _last_follow_up_at(lead)
         stale_days = max((now - reminder_anchor).days, 0)
@@ -915,6 +1008,15 @@ def _to_lead_status(value: object) -> MarketplaceLeadStatus:
         return MarketplaceLeadStatus(str(value))
     except ValueError:
         return MarketplaceLeadStatus.NEW
+
+
+def _to_lead_outcome(value: object) -> MarketplaceLeadOutcome | None:
+    if value is None:
+        return None
+    try:
+        return MarketplaceLeadOutcome(str(value))
+    except ValueError:
+        return None
 
 
 def _normalize_budget(value: str | None, engagement: str | None) -> str | None:

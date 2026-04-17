@@ -39,6 +39,15 @@
             :value="option.value"
           />
         </el-select>
+        <el-select v-model="outcomeFilter" class="status-select" :placeholder="t('marketplace.filters.outcome')">
+          <el-option :label="t('marketplace.filters.outcomeOptions.all')" value="all" />
+          <el-option
+            v-for="option in leadOutcomeOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
         <el-select v-model="sourceId" class="source-select" :placeholder="t('marketplace.filters.source')">
           <el-option :label="t('marketplace.filters.sourceOptions.all')" value="all" />
           <el-option
@@ -82,6 +91,14 @@
       <el-card shadow="never">
         <div class="metric-label">{{ t('marketplace.metrics.contacted') }}</div>
         <div class="metric-value">{{ contactedCount }}</div>
+      </el-card>
+      <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.won') }}</div>
+        <div class="metric-value">{{ wonCount }}</div>
+      </el-card>
+      <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.noResponse') }}</div>
+        <div class="metric-value">{{ noResponseCount }}</div>
       </el-card>
       <el-card shadow="never">
         <div class="metric-label">{{ t('marketplace.metrics.activeSources') }}</div>
@@ -305,6 +322,18 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column :label="t('marketplace.table.outcome')" width="170">
+          <template #default="{ row }">
+            <el-tag
+              v-if="row.lead_outcome"
+              :type="leadOutcomeTagType(row.lead_outcome)"
+              effect="plain"
+            >
+              {{ leadOutcomeLabel(row.lead_outcome) }}
+            </el-tag>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('marketplace.table.published')" width="190">
           <template #default="{ row }">{{ formatDate(row.published_at || row.created_at) }}</template>
         </el-table-column>
@@ -424,6 +453,10 @@
               <span class="detail-label">{{ t('marketplace.details.lastActionAt') }}</span>
               <span>{{ formatDate(selectedLead.last_action_at) }}</span>
             </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.outcome') }}</span>
+              <span>{{ selectedLead.lead_outcome ? leadOutcomeLabel(selectedLead.lead_outcome) : '—' }}</span>
+            </div>
           </div>
 
           <div class="details-section">
@@ -437,6 +470,33 @@
               {{ t('marketplace.details.priorityScore', { score: selectedLead.priority_score }) }}
             </p>
             <p class="detail-paragraph">{{ selectedLead.priority_reason }}</p>
+          </div>
+
+          <div class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.outcome') }}</div>
+            <el-select
+              v-model="outcomeDraft"
+              clearable
+              class="outcome-select"
+              :placeholder="t('marketplace.details.outcomePlaceholder')"
+            >
+              <el-option
+                v-for="option in leadOutcomeOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <div class="details-actions">
+              <el-button
+                type="primary"
+                size="small"
+                :loading="outcomeMutation.isPending.value"
+                @click="saveLeadOutcome"
+              >
+                {{ t('marketplace.details.saveOutcome') }}
+              </el-button>
+            </div>
           </div>
 
           <div v-if="selectedLead.skills.length" class="details-section">
@@ -520,6 +580,7 @@ import {
   fetchMarketplaceLeads,
   fetchRssSources,
   updateMarketplaceLeadNotes,
+  updateMarketplaceLeadOutcome,
   updateMarketplaceLeadStatus,
   type MarketplaceLead,
   type MarketplaceLeadEvent,
@@ -533,17 +594,26 @@ const page = ref(1);
 const search = ref('');
 const sourceId = ref<'all' | string>('all');
 const statusFilter = ref<'all' | MarketplaceLead['lead_status']>('all');
+const outcomeFilter = ref<'all' | NonNullable<MarketplaceLead['lead_outcome']>>('all');
 const queueView = ref<'high_purity' | 'expanded' | 'all'>('high_purity');
 const leadKindView = ref<'reviewable' | 'project' | 'contract_role' | 'full_time_job' | 'all'>('reviewable');
 const detailsVisible = ref(false);
 const selectedLeadId = ref<number | null>(null);
 const notesDraft = ref('');
+const outcomeDraft = ref<MarketplaceLead['lead_outcome']>(null);
 
 const leadStatusOptions = computed(() => [
   { value: 'new' as const, label: t('marketplace.filters.statusOptions.new') },
   { value: 'watching' as const, label: t('marketplace.filters.statusOptions.watching') },
   { value: 'contacted' as const, label: t('marketplace.filters.statusOptions.contacted') },
   { value: 'ignored' as const, label: t('marketplace.filters.statusOptions.ignored') }
+]);
+
+const leadOutcomeOptions = computed(() => [
+  { value: 'won' as const, label: t('marketplace.filters.outcomeOptions.won') },
+  { value: 'lost' as const, label: t('marketplace.filters.outcomeOptions.lost') },
+  { value: 'no_response' as const, label: t('marketplace.filters.outcomeOptions.no_response') },
+  { value: 'not_fit' as const, label: t('marketplace.filters.outcomeOptions.not_fit') }
 ]);
 
 const sourcesQuery = useQuery({
@@ -577,7 +647,8 @@ const queryParams = computed(() => ({
       ? leadKindView.value
       : undefined,
   reviewable_only: leadKindView.value === 'reviewable' ? true : undefined,
-  lead_status: statusFilter.value === 'all' ? undefined : statusFilter.value
+  lead_status: statusFilter.value === 'all' ? undefined : statusFilter.value,
+  lead_outcome: outcomeFilter.value === 'all' ? undefined : outcomeFilter.value
 }));
 
 const leadsQuery = useQuery({
@@ -626,6 +697,19 @@ const notesMutation = useMutation({
   }
 });
 
+const outcomeMutation = useMutation({
+  mutationFn: ({ leadId, outcome }: { leadId: number; outcome: MarketplaceLead['lead_outcome'] }) =>
+    updateMarketplaceLeadOutcome(leadId, outcome),
+  onSuccess: async (lead) => {
+    outcomeDraft.value = lead.lead_outcome;
+    ElMessage.success(t('marketplace.feedback.outcomeUpdated'));
+    await Promise.all([leadsQuery.refetch(), detailsQuery.refetch()]);
+  },
+  onError: () => {
+    ElMessage.error(t('feedback.genericError'));
+  }
+});
+
 const leads = computed(() => leadsQuery.data.value?.items ?? []);
 const selectedLead = computed(() => detailsQuery.data.value ?? null);
 const total = computed(() => leadsQuery.data.value?.total ?? 0);
@@ -640,10 +724,12 @@ const reviewableCount = computed(() => projectCount.value + contractRoleCount.va
 const fullTimeJobCount = computed(() => leadsQuery.data.value?.kind_breakdown?.full_time_job ?? 0);
 const watchingCount = computed(() => leadsQuery.data.value?.status_breakdown?.watching ?? 0);
 const contactedCount = computed(() => leadsQuery.data.value?.status_breakdown?.contacted ?? 0);
+const wonCount = computed(() => leadsQuery.data.value?.outcome_breakdown?.won ?? 0);
+const noResponseCount = computed(() => leadsQuery.data.value?.outcome_breakdown?.no_response ?? 0);
 const highSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.high ?? 0);
 const mediumSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.medium ?? 0);
 
-watch([search, sourceId, statusFilter, queueView, leadKindView], () => {
+watch([search, sourceId, statusFilter, outcomeFilter, queueView, leadKindView], () => {
   page.value = 1;
 });
 
@@ -651,6 +737,7 @@ watch(
   () => detailsQuery.data.value,
   (value) => {
     notesDraft.value = value?.notes ?? '';
+    outcomeDraft.value = value?.lead_outcome ?? null;
   },
   { immediate: true }
 );
@@ -680,6 +767,16 @@ const leadStatusTagType = (status: MarketplaceLead['lead_status']) => {
 const leadStatusLabel = (status: MarketplaceLead['lead_status']) =>
   t(`marketplace.filters.statusOptions.${status}`);
 
+const leadOutcomeLabel = (outcome: NonNullable<MarketplaceLead['lead_outcome']>) =>
+  t(`marketplace.filters.outcomeOptions.${outcome}`);
+
+const leadOutcomeTagType = (outcome: NonNullable<MarketplaceLead['lead_outcome']>) => {
+  if (outcome === 'won') return 'success';
+  if (outcome === 'lost') return 'danger';
+  if (outcome === 'no_response') return 'warning';
+  return 'info';
+};
+
 const formatLeadEvent = (event: MarketplaceLeadEvent) => {
   if (event.event_type === 'captured') {
     return t('marketplace.activity.captured');
@@ -692,6 +789,12 @@ const formatLeadEvent = (event: MarketplaceLeadEvent) => {
   }
   if (event.event_type === 'notes_updated') {
     return t('marketplace.activity.notesUpdated');
+  }
+  if (event.event_type === 'outcome_updated') {
+    return t('marketplace.activity.outcomeUpdated', {
+      from: event.outcome_from ? leadOutcomeLabel(event.outcome_from) : '—',
+      to: event.outcome_to ? leadOutcomeLabel(event.outcome_to) : '—'
+    });
   }
   return event.event_type;
 };
@@ -728,6 +831,14 @@ const saveLeadNotes = () => {
   void notesMutation.mutate({
     leadId: selectedLeadId.value,
     notes: notesDraft.value.trim() || null
+  });
+};
+
+const saveLeadOutcome = () => {
+  if (selectedLeadId.value === null) return;
+  void outcomeMutation.mutate({
+    leadId: selectedLeadId.value,
+    outcome: outcomeDraft.value
   });
 };
 
@@ -1034,6 +1145,10 @@ const formatDate = (value: string | null) => {
 .details-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.outcome-select {
+  width: 240px;
 }
 
 .activity-timeline {

@@ -447,6 +447,46 @@ def test_update_marketplace_lead_status(client: TestClient) -> None:
     assert list_response.json()["total"] == 1
 
 
+def test_update_marketplace_lead_outcome(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-outcome",
+            "title": "Full-Stack Web Developer",
+            "summary": "Full-Stack Web Developer | $2K | 7 days",
+            "content": "Build a full-stack web application.",
+            "link": "https://example.com/full-stack-outcome",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$2K",
+                "timeline": "7 days",
+                "skills": ["Python", "Django"],
+            },
+        }
+    )
+
+    response = client.put(f"/api/v1/marketplace-leads/{lead.id}/outcome", json={"outcome": "won"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["lead_outcome"] == "won"
+    assert any(
+        _event_value(event, "event_type") == "outcome_updated"
+        and _event_value(event, "outcome_to") == "won"
+        for event in payload["lead_events"]
+    )
+
+
 def test_get_marketplace_lead_detail_and_update_notes(client: TestClient) -> None:
     source = rss_sources.create_source(
         {
@@ -558,6 +598,56 @@ def test_marketplace_lead_history_tracks_status_and_notes_updates(client: TestCl
         and _event_value(event, "note") == "Review outreach plan before contacting"
         for event in payload["lead_events"]
     )
+
+
+def test_marketplace_lead_list_supports_outcome_filtering(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    won_lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-won",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $1200 | 2 days",
+            "content": "Build a frontend app.",
+            "link": "https://example.com/lead-won",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "lead_outcome": "won",
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-open",
+            "title": "CRM 后台开发",
+            "summary": "CRM 后台开发 | 5千~1万 | 15天",
+            "content": "Need a backend system.",
+            "link": "https://example.com/lead-open",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+            },
+        }
+    )
+
+    response = client.get("/api/v1/marketplace-leads/", params={"lead_outcome": "won"})
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["total"] == 1
+    assert payload["items"][0]["id"] == won_lead.id
+    assert payload["outcome_breakdown"]["won"] == 1
+    assert payload["outcome_breakdown"]["unresolved"] == 1
 
 
 def test_peopleperhour_frontend_project_is_high_purity() -> None:

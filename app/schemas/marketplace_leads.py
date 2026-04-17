@@ -12,6 +12,8 @@ class MarketplaceLeadEventRead(BaseModel):
     created_at: datetime
     status_from: str | None = None
     status_to: str | None = None
+    outcome_from: str | None = None
+    outcome_to: str | None = None
     note: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -66,6 +68,7 @@ class MarketplaceLeadRead(BaseModel):
     lead_tier: str
     tier_reason: str
     lead_status: str
+    lead_outcome: str | None = None
     notes: str | None = None
     priority_score: int
     priority_reason: str
@@ -98,6 +101,7 @@ class MarketplaceLeadList(BaseModel):
     tier_breakdown: dict[str, int] = Field(default_factory=dict)
     kind_breakdown: dict[str, int] = Field(default_factory=dict)
     status_breakdown: dict[str, int] = Field(default_factory=dict)
+    outcome_breakdown: dict[str, int] = Field(default_factory=dict)
     todo_breakdown: dict[str, int] = Field(default_factory=dict)
     source_breakdown: list[MarketplaceLeadSourceMetricRead] = Field(default_factory=list)
     source_recommendations: list[MarketplaceSourceRecommendationRead] = Field(default_factory=list)
@@ -107,6 +111,10 @@ class MarketplaceLeadList(BaseModel):
 
 class MarketplaceLeadStatusUpdate(BaseModel):
     status: str
+
+
+class MarketplaceLeadOutcomeUpdate(BaseModel):
+    outcome: str | None = None
 
 
 class MarketplaceLeadNotesUpdate(BaseModel):

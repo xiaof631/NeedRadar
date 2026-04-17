@@ -113,6 +113,8 @@
       "fullTimeJobs": "Full-time jobs",
       "watching": "Watching",
       "contacted": "Contacted",
+      "won": "Won",
+      "noResponse": "No response",
       "activeSources": "Active sources",
       "pausedSources": "Paused sources"
     },
@@ -176,6 +178,7 @@
       "published": "Published",
       "updated": "Updated",
       "lastActionAt": "Last action",
+      "outcome": "Outcome",
       "reason": "Why it entered the queue",
       "priority": "Priority",
       "priorityScore": "Current priority score: {score}",
@@ -184,7 +187,9 @@
       "summary": "Summary",
       "description": "Original description",
       "notes": "Follow-up notes",
+      "outcomePlaceholder": "Select final outcome",
       "notesPlaceholder": "Capture your judgement, outreach, or next action",
+      "saveOutcome": "Save outcome",
       "saveNotes": "Save notes"
     },
     "activity": {
@@ -192,12 +197,14 @@
       "empty": "No follow-up history yet",
       "captured": "Lead captured",
       "statusChanged": "Status changed from {from} to {to}",
+      "outcomeUpdated": "Outcome changed from {from} to {to}",
       "notesUpdated": "Follow-up notes updated"
     },
     "filters": {
       "searchPlaceholder": "Search by title or description",
       "source": "Source",
       "leadKind": "Lead kind",
+      "outcome": "Outcome",
       "leadKindOptions": {
         "reviewable": "Default reviewable",
         "project": "Project",
@@ -218,6 +225,13 @@
         "contacted": "Contacted",
         "ignored": "Ignored"
       },
+      "outcomeOptions": {
+        "all": "All outcomes",
+        "won": "Won",
+        "lost": "Lost",
+        "no_response": "No response",
+        "not_fit": "Not fit"
+      },
       "sourceOptions": {
         "all": "All marketplace sources"
       }
@@ -233,6 +247,7 @@
       "queue": "Queue",
       "priority": "Priority",
       "status": "Status",
+      "outcome": "Outcome",
       "published": "Published at",
       "actions": "Actions",
       "details": "Details",
@@ -243,6 +258,7 @@
     },
     "feedback": {
       "statusUpdated": "Updated to {status}",
+      "outcomeUpdated": "Outcome saved",
       "notesUpdated": "Notes saved"
     }
   },

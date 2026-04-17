@@ -116,6 +116,8 @@
       "fullTimeJobs": "全职招聘",
       "watching": "已关注",
       "contacted": "已联系",
+      "won": "已成交",
+      "noResponse": "无回复",
       "activeSources": "活跃项目源",
       "pausedSources": "暂停项目源"
     },
@@ -179,6 +181,7 @@
       "published": "发布时间",
       "updated": "最近更新",
       "lastActionAt": "最近操作",
+      "outcome": "跟进结果",
       "reason": "入队原因",
       "priority": "优先级",
       "priorityScore": "当前优先级分数：{score}",
@@ -187,7 +190,9 @@
       "summary": "摘要",
       "description": "原始正文",
       "notes": "跟进备注",
+      "outcomePlaceholder": "选择最终结果",
       "notesPlaceholder": "记录你的判断、联系动作或下一步计划",
+      "saveOutcome": "保存结果",
       "saveNotes": "保存备注"
     },
     "activity": {
@@ -195,12 +200,14 @@
       "empty": "暂无跟进记录",
       "captured": "线索入库",
       "statusChanged": "状态从“{from}”更新为“{to}”",
+      "outcomeUpdated": "结果从“{from}”更新为“{to}”",
       "notesUpdated": "更新了跟进备注"
     },
     "filters": {
       "searchPlaceholder": "输入标题或描述关键词",
       "source": "项目源",
       "leadKind": "线索类型",
+      "outcome": "跟进结果",
       "leadKindOptions": {
         "reviewable": "默认可跟进",
         "project": "项目型",
@@ -221,6 +228,13 @@
         "contacted": "已联系",
         "ignored": "已忽略"
       },
+      "outcomeOptions": {
+        "all": "全部结果",
+        "won": "已成交",
+        "lost": "已失败",
+        "no_response": "无回复",
+        "not_fit": "不匹配"
+      },
       "sourceOptions": {
         "all": "全部项目源"
       }
@@ -236,6 +250,7 @@
       "queue": "队列",
       "priority": "优先级",
       "status": "状态",
+      "outcome": "结果",
       "published": "发布时间",
       "actions": "操作",
       "details": "详情",
@@ -246,6 +261,7 @@
     },
     "feedback": {
       "statusUpdated": "已更新为“{status}”",
+      "outcomeUpdated": "结果已更新",
       "notesUpdated": "备注已保存"
     }
   },

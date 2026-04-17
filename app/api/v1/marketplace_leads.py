@@ -6,6 +6,7 @@ from app.schemas import (
     MarketplaceLeadEventRead,
     MarketplaceLeadList,
     MarketplaceLeadNotesUpdate,
+    MarketplaceLeadOutcomeUpdate,
     MarketplaceLeadReminderRead,
     MarketplaceLeadRead,
     MarketplaceLeadSourceMetricRead,
@@ -34,6 +35,9 @@ async def list_marketplace_leads(
     lead_status: marketplace_leads.MarketplaceLeadStatus | None = Query(
         default=None, description="按跟进状态过滤"
     ),
+    lead_outcome: marketplace_leads.MarketplaceLeadOutcome | None = Query(
+        default=None, description="按跟进结果过滤"
+    ),
 ) -> MarketplaceLeadList:
     result = marketplace_leads.query_leads(
         skip=skip,
@@ -44,12 +48,14 @@ async def list_marketplace_leads(
         lead_kind=lead_kind,
         reviewable_only=reviewable_only,
         lead_status=lead_status,
+        lead_outcome=lead_outcome,
     )
     return MarketplaceLeadList(
         total=result.total,
         tier_breakdown=result.tier_breakdown,
         kind_breakdown=result.kind_breakdown,
         status_breakdown=result.status_breakdown,
+        outcome_breakdown=result.outcome_breakdown,
         todo_breakdown=result.todo_breakdown,
         source_breakdown=[
             MarketplaceLeadSourceMetricRead.model_validate(item) for item in result.source_breakdown
@@ -76,6 +82,26 @@ async def update_marketplace_lead_status(
         raise HTTPException(status_code=400, detail="unsupported marketplace lead status") from exc
     try:
         item = marketplace_leads.update_lead_status(lead_id, status)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
+    return _to_marketplace_lead_read(item)
+
+
+@router.put("/{lead_id}/outcome", response_model=MarketplaceLeadRead, summary="更新外包项目线索结果")
+async def update_marketplace_lead_outcome(
+    lead_id: int,
+    payload: MarketplaceLeadOutcomeUpdate,
+) -> MarketplaceLeadRead:
+    try:
+        outcome = (
+            marketplace_leads.MarketplaceLeadOutcome(payload.outcome)
+            if payload.outcome is not None
+            else None
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="unsupported marketplace lead outcome") from exc
+    try:
+        item = marketplace_leads.update_lead_outcome(lead_id, outcome)
     except Exception as exc:
         raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
     return _to_marketplace_lead_read(item)

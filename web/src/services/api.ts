@@ -264,6 +264,8 @@ export interface MarketplaceLeadEvent {
   created_at: string;
   status_from: MarketplaceLead['lead_status'] | null;
   status_to: MarketplaceLead['lead_status'] | null;
+  outcome_from: MarketplaceLead['lead_outcome'] | null;
+  outcome_to: MarketplaceLead['lead_outcome'] | null;
   note: string | null;
 }
 
@@ -291,6 +293,7 @@ export interface MarketplaceLead {
   lead_tier: 'high_purity' | 'expanded';
   tier_reason: string;
   lead_status: 'new' | 'watching' | 'contacted' | 'ignored';
+  lead_outcome: 'won' | 'lost' | 'no_response' | 'not_fit' | null;
   notes: string | null;
   priority_score: number;
   priority_reason: string;
@@ -340,6 +343,7 @@ export interface MarketplaceLeadListResponse {
   tier_breakdown: Record<string, number>;
   kind_breakdown: Record<string, number>;
   status_breakdown: Record<string, number>;
+  outcome_breakdown: Record<string, number>;
   todo_breakdown: Record<string, number>;
   source_breakdown: MarketplaceLeadSourceMetric[];
   source_recommendations: MarketplaceSourceRecommendation[];
@@ -356,6 +360,7 @@ export interface MarketplaceLeadQueryParams {
   lead_kind?: 'project' | 'contract_role' | 'full_time_job';
   reviewable_only?: boolean;
   lead_status?: 'new' | 'watching' | 'contacted' | 'ignored';
+  lead_outcome?: 'won' | 'lost' | 'no_response' | 'not_fit';
 }
 
 export async function fetchMarketplaceLeads(
@@ -379,6 +384,16 @@ export async function updateMarketplaceLeadStatus(
 
 export async function fetchMarketplaceLead(leadId: number): Promise<MarketplaceLead> {
   const response = await apiClient.get(`/api/v1/marketplace-leads/${leadId}`);
+  return response.data;
+}
+
+export async function updateMarketplaceLeadOutcome(
+  leadId: number,
+  outcome: MarketplaceLead['lead_outcome']
+): Promise<MarketplaceLead> {
+  const response = await apiClient.put(`/api/v1/marketplace-leads/${leadId}/outcome`, {
+    outcome
+  });
   return response.data;
 }
 
