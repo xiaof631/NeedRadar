@@ -95,6 +95,53 @@
 
     <el-card shadow="never">
       <template #header>
+        <div class="todo-header">
+          <div>
+            <div class="source-health-title">{{ t('marketplace.todo.title') }}</div>
+            <div class="todo-subtitle">{{ t('marketplace.todo.subtitle') }}</div>
+          </div>
+          <div class="tag-list">
+            <el-tag type="danger" effect="plain">
+              {{ t('marketplace.todo.highSeverity', { count: highSeverityTodoCount }) }}
+            </el-tag>
+            <el-tag type="warning" effect="plain">
+              {{ t('marketplace.todo.mediumSeverity', { count: mediumSeverityTodoCount }) }}
+            </el-tag>
+          </div>
+        </div>
+      </template>
+      <div v-if="todoQueue.length" class="todo-list">
+        <div v-for="item in todoQueue" :key="`${item.lead_id}-${item.reminder_type}`" class="todo-item">
+          <div class="todo-main">
+            <div class="todo-title-row">
+              <button class="todo-link" type="button" @click="openLeadDetails(item.lead_id)">
+                {{ item.title }}
+              </button>
+              <div class="tag-list">
+                <el-tag size="small" :type="reminderSeverityTagType(item.severity)" effect="plain">
+                  {{ t(`marketplace.todo.severity.${item.severity}`) }}
+                </el-tag>
+                <el-tag size="small" effect="plain">
+                  {{ reminderTypeLabel(item.reminder_type) }}
+                </el-tag>
+              </div>
+            </div>
+            <div class="summary-text">{{ item.source_name }} · {{ item.message }}</div>
+            <div class="summary-text">
+              {{ t('marketplace.todo.lastActionAt') }}: {{ formatDate(item.last_action_at) }}
+            </div>
+          </div>
+          <div class="todo-side">
+            <span class="priority-score">{{ item.priority_score }}</span>
+            <span class="summary-text">{{ leadStatusLabel(item.lead_status) }}</span>
+          </div>
+        </div>
+      </div>
+      <div v-else class="todo-empty">{{ t('marketplace.todo.empty') }}</div>
+    </el-card>
+
+    <el-card shadow="never">
+      <template #header>
         <div class="source-health-title">{{ t('marketplace.sourceHealth.title') }}</div>
       </template>
       <div class="source-health-list">
@@ -446,7 +493,8 @@ import {
   updateMarketplaceLeadNotes,
   updateMarketplaceLeadStatus,
   type MarketplaceLead,
-  type MarketplaceLeadEvent
+  type MarketplaceLeadEvent,
+  type MarketplaceLeadReminder
 } from '../services/api';
 
 const { t } = useI18n();
@@ -552,6 +600,7 @@ const leads = computed(() => leadsQuery.data.value?.items ?? []);
 const selectedLead = computed(() => detailsQuery.data.value ?? null);
 const total = computed(() => leadsQuery.data.value?.total ?? 0);
 const sourceBreakdown = computed(() => leadsQuery.data.value?.source_breakdown ?? []);
+const todoQueue = computed(() => leadsQuery.data.value?.todo_queue ?? []);
 const highPurityCount = computed(() => leadsQuery.data.value?.tier_breakdown?.high_purity ?? 0);
 const expandedCount = computed(() => leadsQuery.data.value?.tier_breakdown?.expanded ?? 0);
 const projectCount = computed(() => leadsQuery.data.value?.kind_breakdown?.project ?? 0);
@@ -560,6 +609,8 @@ const reviewableCount = computed(() => projectCount.value + contractRoleCount.va
 const fullTimeJobCount = computed(() => leadsQuery.data.value?.kind_breakdown?.full_time_job ?? 0);
 const watchingCount = computed(() => leadsQuery.data.value?.status_breakdown?.watching ?? 0);
 const contactedCount = computed(() => leadsQuery.data.value?.status_breakdown?.contacted ?? 0);
+const highSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.high ?? 0);
+const mediumSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.medium ?? 0);
 
 watch([search, sourceId, statusFilter, queueView, leadKindView], () => {
   page.value = 1;
@@ -612,6 +663,15 @@ const formatLeadEvent = (event: MarketplaceLeadEvent) => {
     return t('marketplace.activity.notesUpdated');
   }
   return event.event_type;
+};
+
+const reminderTypeLabel = (value: MarketplaceLeadReminder['reminder_type']) =>
+  t(`marketplace.todo.types.${value}`);
+
+const reminderSeverityTagType = (value: MarketplaceLeadReminder['severity']) => {
+  if (value === 'high') return 'danger';
+  if (value === 'medium') return 'warning';
+  return 'info';
 };
 
 const handleStatusChange = (leadId: number, value: string) => {
@@ -712,6 +772,77 @@ const formatDate = (value: string | null) => {
 .source-health-title {
   font-weight: 600;
   color: #0f172a;
+}
+
+.todo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.todo-subtitle {
+  margin-top: 0.3rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.todo-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+}
+
+.todo-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.todo-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.todo-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.98rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.todo-link:hover {
+  text-decoration: underline;
+}
+
+.todo-side {
+  display: flex;
+  min-width: 72px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.todo-empty {
+  color: #64748b;
+  font-size: 0.95rem;
 }
 
 .source-health-list {
@@ -871,6 +1002,17 @@ const formatDate = (value: string | null) => {
 
   .details-grid {
     grid-template-columns: 1fr;
+  }
+
+  .todo-header,
+  .todo-item,
+  .todo-title-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .todo-side {
+    align-items: flex-start;
   }
 }
 </style>

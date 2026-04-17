@@ -132,6 +132,24 @@
         "contacted": "Contacted"
       }
     },
+    "todo": {
+      "title": "Today’s queue",
+      "subtitle": "Handle new high-priority leads and stale follow-ups first",
+      "empty": "No priority reminders right now",
+      "highSeverity": "High priority {count}",
+      "mediumSeverity": "Medium priority {count}",
+      "lastActionAt": "Last action",
+      "severity": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
+      "types": {
+        "new_high_priority": "New high-priority lead",
+        "watching_stale": "Watching overdue",
+        "contacted_stale": "Contact follow-up due"
+      }
+    },
     "details": {
       "title": "Lead details",
       "platform": "Platform",

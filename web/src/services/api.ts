@@ -314,12 +314,27 @@ export interface MarketplaceLeadSourceMetric {
   contacted: number;
 }
 
+export interface MarketplaceLeadReminder {
+  lead_id: number;
+  title: string;
+  source_name: string;
+  lead_status: MarketplaceLead['lead_status'];
+  priority_score: number;
+  reminder_type: 'new_high_priority' | 'watching_stale' | 'contacted_stale' | string;
+  severity: 'high' | 'medium' | 'low' | string;
+  message: string;
+  last_action_at: string;
+  stale_days: number;
+}
+
 export interface MarketplaceLeadListResponse {
   total: number;
   tier_breakdown: Record<string, number>;
   kind_breakdown: Record<string, number>;
   status_breakdown: Record<string, number>;
+  todo_breakdown: Record<string, number>;
   source_breakdown: MarketplaceLeadSourceMetric[];
+  todo_queue: MarketplaceLeadReminder[];
   items: MarketplaceLead[];
 }
 

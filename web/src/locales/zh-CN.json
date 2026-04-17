@@ -135,6 +135,24 @@
         "contacted": "已联系"
       }
     },
+    "todo": {
+      "title": "今日待办",
+      "subtitle": "优先处理高优先级新线索和超时未跟进项",
+      "empty": "当前没有需要优先处理的提醒",
+      "highSeverity": "高优先级 {count}",
+      "mediumSeverity": "中优先级 {count}",
+      "lastActionAt": "最近操作",
+      "severity": {
+        "high": "高优先级",
+        "medium": "中优先级",
+        "low": "低优先级"
+      },
+      "types": {
+        "new_high_priority": "新高优先级线索",
+        "watching_stale": "已关注超时",
+        "contacted_stale": "已联系待跟进"
+      }
+    },
     "details": {
       "title": "线索详情",
       "platform": "平台",

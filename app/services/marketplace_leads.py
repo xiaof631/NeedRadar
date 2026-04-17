@@ -102,9 +102,35 @@ class MarketplaceLeadSourceMetric:
 
 
 @dataclass(slots=True)
+class MarketplaceLeadReminder:
+    lead_id: int
+    title: str
+    source_name: str
+    lead_status: MarketplaceLeadStatus
+    priority_score: int
+    reminder_type: str
+    severity: str
+    message: str
+    last_action_at: datetime
+    stale_days: int
+
+
+@dataclass(slots=True)
 class MarketplacePriorityContext:
     source_history: dict[int, MarketplaceLeadSourceMetric]
     now: datetime
+
+
+@dataclass(slots=True)
+class MarketplaceLeadQueryResult:
+    total: int
+    items: list[MarketplaceLead]
+    tier_breakdown: dict[str, int]
+    kind_breakdown: dict[str, int]
+    status_breakdown: dict[str, int]
+    source_breakdown: list[MarketplaceLeadSourceMetric]
+    todo_breakdown: dict[str, int]
+    todo_queue: list[MarketplaceLeadReminder]
 
 
 def list_leads(
@@ -125,6 +151,37 @@ def list_leads(
     dict[str, int],
     list[MarketplaceLeadSourceMetric],
 ]:
+    result = query_leads(
+        search=search,
+        source_id=source_id,
+        tier=tier,
+        lead_kind=lead_kind,
+        reviewable_only=reviewable_only,
+        lead_status=lead_status,
+        skip=skip,
+        limit=limit,
+    )
+    return (
+        result.total,
+        result.items,
+        result.tier_breakdown,
+        result.kind_breakdown,
+        result.status_breakdown,
+        result.source_breakdown,
+    )
+
+
+def query_leads(
+    *,
+    search: str | None = None,
+    source_id: int | None = None,
+    tier: MarketplaceLeadTier | None = None,
+    lead_kind: MarketplaceLeadKind | None = None,
+    reviewable_only: bool = False,
+    lead_status: MarketplaceLeadStatus | None = None,
+    skip: int = 0,
+    limit: int = 20,
+) -> MarketplaceLeadQueryResult:
     _, items = raw_entries.list_entries(
         source_id=source_id,
         source_type=SourceType.FREELANCE_MARKETPLACE,
@@ -151,9 +208,20 @@ def list_leads(
         leads = [lead for lead in leads if lead.lead_kind in _REVIEWABLE_LEAD_KINDS]
     if lead_status is not None:
         leads = [lead for lead in leads if lead.lead_status == lead_status]
+    todo_queue = _build_todo_queue(leads, priority_context.now)
+    todo_breakdown = _count_todo_queue(todo_queue)
     total = len(leads)
     leads = leads[skip : skip + limit]
-    return total, leads, tier_breakdown, kind_breakdown, status_breakdown, source_breakdown
+    return MarketplaceLeadQueryResult(
+        total=total,
+        items=leads,
+        tier_breakdown=tier_breakdown,
+        kind_breakdown=kind_breakdown,
+        status_breakdown=status_breakdown,
+        source_breakdown=source_breakdown,
+        todo_breakdown=todo_breakdown,
+        todo_queue=todo_queue[:8],
+    )
 
 
 def update_lead_status(entry_id: int, status: MarketplaceLeadStatus) -> MarketplaceLead:
@@ -646,6 +714,98 @@ def _build_source_breakdown(leads: list[MarketplaceLead]) -> list[MarketplaceLea
         reverse=True,
     )
     return metrics
+
+
+def _build_todo_queue(leads: list[MarketplaceLead], now: datetime) -> list[MarketplaceLeadReminder]:
+    reminders: list[MarketplaceLeadReminder] = []
+    for lead in leads:
+        if lead.lead_kind not in _REVIEWABLE_LEAD_KINDS or lead.lead_status == MarketplaceLeadStatus.IGNORED:
+            continue
+        reminder_anchor = _last_follow_up_at(lead)
+        stale_days = max((now - reminder_anchor).days, 0)
+        if lead.lead_status == MarketplaceLeadStatus.NEW and lead.priority_score >= 85:
+            reminders.append(
+                MarketplaceLeadReminder(
+                    lead_id=lead.id,
+                    title=lead.title,
+                    source_name=lead.source_name,
+                    lead_status=lead.lead_status,
+                    priority_score=lead.priority_score,
+                    reminder_type="new_high_priority",
+                    severity="high",
+                    message="高优先级新线索，建议今天查看。",
+                    last_action_at=reminder_anchor,
+                    stale_days=stale_days,
+                )
+            )
+            continue
+        if lead.lead_status == MarketplaceLeadStatus.WATCHING and stale_days >= 3:
+            reminders.append(
+                MarketplaceLeadReminder(
+                    lead_id=lead.id,
+                    title=lead.title,
+                    source_name=lead.source_name,
+                    lead_status=lead.lead_status,
+                    priority_score=lead.priority_score,
+                    reminder_type="watching_stale",
+                    severity="high" if stale_days >= 7 else "medium",
+                    message=f"已关注 {stale_days} 天未更新，建议推进下一步。",
+                    last_action_at=reminder_anchor,
+                    stale_days=stale_days,
+                )
+            )
+            continue
+        if lead.lead_status == MarketplaceLeadStatus.CONTACTED and stale_days >= 5:
+            reminders.append(
+                MarketplaceLeadReminder(
+                    lead_id=lead.id,
+                    title=lead.title,
+                    source_name=lead.source_name,
+                    lead_status=lead.lead_status,
+                    priority_score=lead.priority_score,
+                    reminder_type="contacted_stale",
+                    severity="high" if stale_days >= 10 else "medium",
+                    message=f"已联系 {stale_days} 天未跟进，建议确认回复。",
+                    last_action_at=reminder_anchor,
+                    stale_days=stale_days,
+                )
+            )
+    reminders.sort(
+        key=lambda item: (
+            _reminder_severity_rank(item.severity),
+            item.priority_score,
+            item.stale_days,
+            item.last_action_at,
+        ),
+        reverse=True,
+    )
+    return reminders
+
+
+def _count_todo_queue(reminders: list[MarketplaceLeadReminder]) -> dict[str, int]:
+    return {
+        "total": len(reminders),
+        "high": sum(1 for item in reminders if item.severity == "high"),
+        "medium": sum(1 for item in reminders if item.severity == "medium"),
+        "new_high_priority": sum(1 for item in reminders if item.reminder_type == "new_high_priority"),
+        "watching_stale": sum(1 for item in reminders if item.reminder_type == "watching_stale"),
+        "contacted_stale": sum(1 for item in reminders if item.reminder_type == "contacted_stale"),
+    }
+
+
+def _last_follow_up_at(lead: MarketplaceLead) -> datetime:
+    follow_up_events = [event.created_at for event in lead.lead_events if event.event_type != "captured"]
+    if follow_up_events:
+        return max(follow_up_events)
+    return lead.last_action_at
+
+
+def _reminder_severity_rank(value: str) -> int:
+    return {
+        "high": 2,
+        "medium": 1,
+        "low": 0,
+    }.get(value, 0)
 
 
 def _to_lead_status(value: object) -> MarketplaceLeadStatus:

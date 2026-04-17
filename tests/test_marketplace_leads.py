@@ -82,6 +82,98 @@ def test_list_marketplace_leads_returns_structured_fields(client: TestClient) ->
     assert payload["source_breakdown"][0]["high_purity"] == 1
 
 
+def test_marketplace_leads_returns_todo_queue(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "todo-new",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $1200 | 2 days",
+            "content": "Build a frontend app.",
+            "published_at": datetime(2026, 4, 16, 9, 0, tzinfo=UTC),
+            "link": "https://example.com/todo-new",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$1200",
+                "timeline": "2 days",
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "todo-watching",
+            "title": "CRM 后台开发",
+            "summary": "CRM 后台开发 | 5千~1万 | 15天",
+            "content": "Need a backend system.",
+            "published_at": datetime(2026, 4, 10, 9, 0, tzinfo=UTC),
+            "link": "https://example.com/todo-watching",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "lead_status": "watching",
+                "lead_events": [
+                    {
+                        "event_type": "status_changed",
+                        "created_at": "2026-04-12T09:00:00+00:00",
+                        "status_from": "new",
+                        "status_to": "watching",
+                    }
+                ],
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "todo-contacted",
+            "title": "后台及数据库开发",
+            "summary": "后台及数据库开发 | 5千~1万 | 20",
+            "content": "Database and backend work.",
+            "published_at": datetime(2026, 4, 8, 9, 0, tzinfo=UTC),
+            "link": "https://example.com/todo-contacted",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "lead_status": "contacted",
+                "lead_events": [
+                    {
+                        "event_type": "status_changed",
+                        "created_at": "2026-04-09T09:00:00+00:00",
+                        "status_from": "new",
+                        "status_to": "contacted",
+                    }
+                ],
+            },
+        }
+    )
+
+    response = client.get("/api/v1/marketplace-leads/")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["todo_breakdown"]["total"] == 3
+    assert payload["todo_breakdown"]["high"] >= 1
+    assert payload["todo_breakdown"]["new_high_priority"] == 1
+    assert payload["todo_breakdown"]["watching_stale"] == 1
+    assert payload["todo_breakdown"]["contacted_stale"] == 1
+    assert {item["reminder_type"] for item in payload["todo_queue"]} == {
+        "new_high_priority",
+        "watching_stale",
+        "contacted_stale",
+    }
+
+
 def test_list_marketplace_leads_diversifies_sources() -> None:
     sxsoft = rss_sources.create_source(
         {
