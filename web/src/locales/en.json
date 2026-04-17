@@ -142,6 +142,7 @@
       "timeline": "Timeline",
       "published": "Published",
       "updated": "Updated",
+      "lastActionAt": "Last action",
       "reason": "Why it entered the queue",
       "priority": "Priority",
       "priorityScore": "Current priority score: {score}",
@@ -152,6 +153,13 @@
       "notes": "Follow-up notes",
       "notesPlaceholder": "Capture your judgement, outreach, or next action",
       "saveNotes": "Save notes"
+    },
+    "activity": {
+      "title": "Follow-up timeline",
+      "empty": "No follow-up history yet",
+      "captured": "Lead captured",
+      "statusChanged": "Status changed from {from} to {to}",
+      "notesUpdated": "Follow-up notes updated"
     },
     "filters": {
       "searchPlaceholder": "Search by title or description",

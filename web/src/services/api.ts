@@ -259,6 +259,14 @@ export type CandidateNeedStatus =
 export type CandidateNeedSourceType =
   | SourceType;
 
+export interface MarketplaceLeadEvent {
+  event_type: 'captured' | 'status_changed' | 'notes_updated' | string;
+  created_at: string;
+  status_from: MarketplaceLead['lead_status'] | null;
+  status_to: MarketplaceLead['lead_status'] | null;
+  note: string | null;
+}
+
 export interface MarketplaceLead {
   id: number;
   source_id: number;
@@ -288,6 +296,8 @@ export interface MarketplaceLead {
   priority_reason: string;
   duplicate_count: number;
   duplicate_sources: string[];
+  last_action_at: string;
+  lead_events: MarketplaceLeadEvent[];
   created_at: string;
   updated_at: string;
 }

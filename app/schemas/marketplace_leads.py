@@ -7,6 +7,16 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class MarketplaceLeadEventRead(BaseModel):
+    event_type: str
+    created_at: datetime
+    status_from: str | None = None
+    status_to: str | None = None
+    note: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MarketplaceLeadRead(BaseModel):
     id: int
     source_id: int
@@ -36,6 +46,8 @@ class MarketplaceLeadRead(BaseModel):
     priority_reason: str
     duplicate_count: int = 1
     duplicate_sources: list[str] = Field(default_factory=list)
+    last_action_at: datetime
+    lead_events: list[MarketplaceLeadEventRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

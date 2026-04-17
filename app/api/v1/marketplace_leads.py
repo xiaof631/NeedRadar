@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.schemas import (
+    MarketplaceLeadEventRead,
     MarketplaceLeadList,
     MarketplaceLeadNotesUpdate,
     MarketplaceLeadRead,
@@ -50,7 +51,7 @@ async def list_marketplace_leads(
         source_breakdown=[
             MarketplaceLeadSourceMetricRead.model_validate(item) for item in source_breakdown
         ],
-        items=[MarketplaceLeadRead.model_validate(item) for item in items],
+        items=[_to_marketplace_lead_read(item) for item in items],
     )
 
 
@@ -67,7 +68,7 @@ async def update_marketplace_lead_status(
         item = marketplace_leads.update_lead_status(lead_id, status)
     except Exception as exc:
         raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
-    return MarketplaceLeadRead.model_validate(item)
+    return _to_marketplace_lead_read(item)
 
 
 @router.get("/{lead_id}", response_model=MarketplaceLeadRead, summary="获取单条外包项目线索详情")
@@ -76,7 +77,7 @@ async def get_marketplace_lead(lead_id: int) -> MarketplaceLeadRead:
         item = marketplace_leads.get_lead(lead_id)
     except Exception as exc:
         raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
-    return MarketplaceLeadRead.model_validate(item)
+    return _to_marketplace_lead_read(item)
 
 
 @router.put("/{lead_id}/notes", response_model=MarketplaceLeadRead, summary="更新外包项目线索备注")
@@ -88,4 +89,13 @@ async def update_marketplace_lead_notes(
         item = marketplace_leads.update_lead_notes(lead_id, payload.notes)
     except Exception as exc:
         raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
-    return MarketplaceLeadRead.model_validate(item)
+    return _to_marketplace_lead_read(item)
+
+
+def _to_marketplace_lead_read(item: marketplace_leads.MarketplaceLead) -> MarketplaceLeadRead:
+    payload = MarketplaceLeadRead.model_validate(item).model_dump()
+    payload["lead_events"] = [
+        MarketplaceLeadEventRead.model_validate(event).model_dump()
+        for event in item.lead_events
+    ]
+    return MarketplaceLeadRead.model_validate(payload)

@@ -145,6 +145,7 @@
       "timeline": "周期/时效",
       "published": "发布时间",
       "updated": "最近更新",
+      "lastActionAt": "最近操作",
       "reason": "入队原因",
       "priority": "优先级",
       "priorityScore": "当前优先级分数：{score}",
@@ -155,6 +156,13 @@
       "notes": "跟进备注",
       "notesPlaceholder": "记录你的判断、联系动作或下一步计划",
       "saveNotes": "保存备注"
+    },
+    "activity": {
+      "title": "跟进时间线",
+      "empty": "暂无跟进记录",
+      "captured": "线索入库",
+      "statusChanged": "状态从“{from}”更新为“{to}”",
+      "notesUpdated": "更新了跟进备注"
     },
     "filters": {
       "searchPlaceholder": "输入标题或描述关键词",

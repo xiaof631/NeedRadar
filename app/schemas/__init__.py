@@ -38,6 +38,7 @@ from app.schemas.filter_rules import (
     FilterRuleUpdate,
 )
 from app.schemas.marketplace_leads import (
+    MarketplaceLeadEventRead,
     MarketplaceLeadList,
     MarketplaceLeadNotesUpdate,
     MarketplaceLeadRead,
@@ -94,6 +95,7 @@ __all__ = [
     "FilterRuleList",
     "FilterRuleRead",
     "FilterRuleUpdate",
+    "MarketplaceLeadEventRead",
     "MarketplaceLeadList",
     "MarketplaceLeadNotesUpdate",
     "MarketplaceLeadRead",

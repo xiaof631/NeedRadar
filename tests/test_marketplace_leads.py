@@ -10,6 +10,12 @@ from app.services import marketplace_leads, raw_entries, rss_sources
 from fastapi.testclient import TestClient
 
 
+def _event_value(event: object, key: str) -> object:
+    if isinstance(event, dict):
+        return event.get(key)
+    return getattr(event, key)
+
+
 @pytest.fixture(autouse=True)
 def _reset_db() -> None:
     rss_sources.reset_storage()
@@ -318,7 +324,73 @@ def test_get_marketplace_lead_detail_and_update_notes(client: TestClient) -> Non
 
     refetch_response = client.get(f"/api/v1/marketplace-leads/{lead.id}")
     assert refetch_response.status_code == 200
-    assert refetch_response.json()["notes"] == "Reached out by email on Friday"
+    payload = refetch_response.json()
+    assert payload["notes"] == "Reached out by email on Friday"
+    assert payload["last_action_at"]
+    assert any(_event_value(event, "event_type") == "captured" for event in payload["lead_events"])
+    assert any(
+        _event_value(event, "event_type") == "notes_updated"
+        and _event_value(event, "note") == "Reached out by email on Friday"
+        for event in payload["lead_events"]
+    )
+
+
+def test_marketplace_lead_history_tracks_status_and_notes_updates(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Jobicy Contract Developer Roles",
+            "url": "https://jobicy.com/?feed=job_feed&job_categories=dev",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "jobicy_api"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-history",
+            "title": "Senior Python Developer",
+            "summary": "Senior Python Developer | Remote | Contract",
+            "content": "Looking for a contract Python developer for migration work.",
+            "link": "https://example.com/senior-python-developer",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "Jobicy",
+                "skills": ["Python"],
+            },
+        }
+    )
+
+    status_response = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/status",
+        json={"status": "watching"},
+    )
+    assert status_response.status_code == 200
+
+    notes_response = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/notes",
+        json={"notes": "Review outreach plan before contacting"},
+    )
+    assert notes_response.status_code == 200
+
+    detail_response = client.get(f"/api/v1/marketplace-leads/{lead.id}")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+
+    assert payload["last_action_at"]
+    assert len(payload["lead_events"]) >= 3
+    assert any(_event_value(event, "event_type") == "captured" for event in payload["lead_events"])
+    assert any(
+        _event_value(event, "event_type") == "status_changed"
+        and _event_value(event, "status_from") == "new"
+        and _event_value(event, "status_to") == "watching"
+        for event in payload["lead_events"]
+    )
+    assert any(
+        _event_value(event, "event_type") == "notes_updated"
+        and _event_value(event, "note") == "Review outreach plan before contacting"
+        for event in payload["lead_events"]
+    )
 
 
 def test_peopleperhour_frontend_project_is_high_purity() -> None:

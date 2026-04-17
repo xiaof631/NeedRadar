@@ -44,6 +44,15 @@ class MarketplaceLeadStatus(StrEnum):
 
 
 @dataclass(slots=True)
+class MarketplaceLeadEvent:
+    event_type: str
+    created_at: datetime
+    status_from: str | None = None
+    status_to: str | None = None
+    note: str | None = None
+
+
+@dataclass(slots=True)
 class MarketplaceLead:
     id: int
     source_id: int
@@ -71,6 +80,8 @@ class MarketplaceLead:
     notes: str | None
     priority_score: int
     priority_reason: str
+    last_action_at: datetime
+    lead_events: list[MarketplaceLeadEvent]
     duplicate_count: int
     duplicate_sources: list[str]
     created_at: datetime
@@ -153,7 +164,15 @@ def update_lead_status(entry_id: int, status: MarketplaceLeadStatus) -> Marketpl
 
     def _apply(model: RawEntry) -> None:
         metadata = dict(model.metadata or {})
+        previous_status = _to_lead_status(metadata.get("lead_status"))
         metadata["lead_status"] = status.value
+        if previous_status != status:
+            metadata["lead_events"] = _append_lead_event(
+                metadata.get("lead_events"),
+                event_type="status_changed",
+                status_from=previous_status.value,
+                status_to=status.value,
+            )
         model.metadata = metadata
 
     updated = db.update_raw_entry(entry_id, _apply)
@@ -181,11 +200,18 @@ def update_lead_notes(entry_id: int, notes: str | None) -> MarketplaceLead:
 
     def _apply(model: RawEntry) -> None:
         metadata = dict(model.metadata or {})
+        previous_notes = _to_string(metadata.get("lead_notes"))
         cleaned_notes = notes.strip() if isinstance(notes, str) else ""
         if cleaned_notes:
             metadata["lead_notes"] = cleaned_notes
         else:
             metadata.pop("lead_notes", None)
+        if cleaned_notes != (previous_notes or ""):
+            metadata["lead_events"] = _append_lead_event(
+                metadata.get("lead_events"),
+                event_type="notes_updated",
+                note=cleaned_notes or None,
+            )
         model.metadata = metadata
 
     db.update_raw_entry(entry_id, _apply)
@@ -201,6 +227,11 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
     lead_tier, tier_reason = _classify_lead_tier(source.name, item, metadata)
     budget = _to_string(metadata.get("budget"))
     timeline = _to_string(metadata.get("timeline"))
+    lead_events = _to_lead_events(item, metadata)
+    last_action_at = max(
+        [event.created_at for event in lead_events],
+        default=_ensure_utc(item.updated_at),
+    )
     return MarketplaceLead(
         id=item.id,
         source_id=item.source_id,
@@ -228,6 +259,8 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         notes=_to_string(metadata.get("lead_notes")),
         priority_score=0,
         priority_reason="尚未计算优先级。",
+        last_action_at=last_action_at,
+        lead_events=lead_events,
         duplicate_count=1,
         duplicate_sources=[source.name],
         created_at=item.created_at,
@@ -345,6 +378,8 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         notes=representative.notes or alternate.notes,
         priority_score=max(left.priority_score, right.priority_score),
         priority_reason=representative.priority_reason or alternate.priority_reason,
+        last_action_at=max(left.last_action_at, right.last_action_at),
+        lead_events=_merge_lead_events(left.lead_events, right.lead_events),
         duplicate_count=left.duplicate_count + right.duplicate_count,
         duplicate_sources=duplicate_sources,
         created_at=min(left.created_at, right.created_at),
@@ -518,6 +553,71 @@ def _count_statuses(leads: list[MarketplaceLead]) -> dict[str, int]:
         status.value: sum(1 for lead in leads if lead.lead_status == status)
         for status in MarketplaceLeadStatus
     }
+
+
+def _append_lead_event(
+    raw_events: object,
+    *,
+    event_type: str,
+    status_from: str | None = None,
+    status_to: str | None = None,
+    note: str | None = None,
+) -> list[dict[str, object]]:
+    events = list(raw_events) if isinstance(raw_events, list) else []
+    event: dict[str, object] = {
+        "event_type": event_type,
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    if status_from:
+        event["status_from"] = status_from
+    if status_to:
+        event["status_to"] = status_to
+    if note:
+        event["note"] = note
+    events.append(event)
+    return events
+
+
+def _to_lead_events(item: RawEntry, metadata: dict[str, object]) -> list[MarketplaceLeadEvent]:
+    events: list[MarketplaceLeadEvent] = [
+        MarketplaceLeadEvent(
+            event_type="captured",
+            created_at=_ensure_utc(item.created_at),
+        )
+    ]
+    raw_events = metadata.get("lead_events")
+    if not isinstance(raw_events, list):
+        return events
+    for raw_event in raw_events:
+        if not isinstance(raw_event, dict):
+            continue
+        created_at_text = _to_string(raw_event.get("created_at"))
+        if not created_at_text:
+            continue
+        try:
+            created_at = _ensure_utc(datetime.fromisoformat(created_at_text))
+        except ValueError:
+            continue
+        event_type = _to_string(raw_event.get("event_type")) or "updated"
+        events.append(
+            MarketplaceLeadEvent(
+                event_type=event_type,
+                created_at=created_at,
+                status_from=_to_string(raw_event.get("status_from")),
+                status_to=_to_string(raw_event.get("status_to")),
+                note=_to_string(raw_event.get("note")),
+            )
+        )
+    events.sort(key=lambda item: item.created_at, reverse=True)
+    return events
+
+
+def _merge_lead_events(left: list[MarketplaceLeadEvent], right: list[MarketplaceLeadEvent]) -> list[MarketplaceLeadEvent]:
+    merged: dict[tuple[str, datetime, str | None, str | None, str | None], MarketplaceLeadEvent] = {}
+    for event in [*left, *right]:
+        key = (event.event_type, event.created_at, event.status_from, event.status_to, event.note)
+        merged[key] = event
+    return sorted(merged.values(), key=lambda item: item.created_at, reverse=True)
 
 
 def _build_source_breakdown(leads: list[MarketplaceLead]) -> list[MarketplaceLeadSourceMetric]:

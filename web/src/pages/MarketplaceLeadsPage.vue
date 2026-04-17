@@ -344,6 +344,10 @@
               <span class="detail-label">{{ t('marketplace.details.updated') }}</span>
               <span>{{ formatDate(selectedLead.updated_at) }}</span>
             </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.lastActionAt') }}</span>
+              <span>{{ formatDate(selectedLead.last_action_at) }}</span>
+            </div>
           </div>
 
           <div class="details-section">
@@ -391,6 +395,21 @@
           </div>
 
           <div class="details-section">
+            <div class="detail-label">{{ t('marketplace.activity.title') }}</div>
+            <el-timeline v-if="selectedLead.lead_events.length" class="activity-timeline">
+              <el-timeline-item
+                v-for="event in selectedLead.lead_events"
+                :key="`${event.event_type}-${event.created_at}-${event.status_from || ''}-${event.status_to || ''}-${event.note || ''}`"
+                :timestamp="formatDate(event.created_at)"
+              >
+                <div class="timeline-title">{{ formatLeadEvent(event) }}</div>
+                <p v-if="event.note" class="detail-paragraph timeline-note">{{ event.note }}</p>
+              </el-timeline-item>
+            </el-timeline>
+            <p v-else class="detail-paragraph">{{ t('marketplace.activity.empty') }}</p>
+          </div>
+
+          <div class="details-section">
             <div class="detail-label">{{ t('marketplace.details.notes') }}</div>
             <el-input
               v-model="notesDraft"
@@ -426,7 +445,8 @@ import {
   fetchRssSources,
   updateMarketplaceLeadNotes,
   updateMarketplaceLeadStatus,
-  type MarketplaceLead
+  type MarketplaceLead,
+  type MarketplaceLeadEvent
 } from '../services/api';
 
 const { t } = useI18n();
@@ -577,6 +597,22 @@ const leadStatusTagType = (status: MarketplaceLead['lead_status']) => {
 
 const leadStatusLabel = (status: MarketplaceLead['lead_status']) =>
   t(`marketplace.filters.statusOptions.${status}`);
+
+const formatLeadEvent = (event: MarketplaceLeadEvent) => {
+  if (event.event_type === 'captured') {
+    return t('marketplace.activity.captured');
+  }
+  if (event.event_type === 'status_changed') {
+    return t('marketplace.activity.statusChanged', {
+      from: event.status_from ? leadStatusLabel(event.status_from) : '—',
+      to: event.status_to ? leadStatusLabel(event.status_to) : '—'
+    });
+  }
+  if (event.event_type === 'notes_updated') {
+    return t('marketplace.activity.notesUpdated');
+  }
+  return event.event_type;
+};
 
 const handleStatusChange = (leadId: number, value: string) => {
   void statusMutation.mutate({
@@ -804,6 +840,19 @@ const formatDate = (value: string | null) => {
 .details-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.activity-timeline {
+  margin-top: 0.75rem;
+}
+
+.timeline-title {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.timeline-note {
+  margin-top: 0.35rem;
 }
 
 @media (max-width: 960px) {
