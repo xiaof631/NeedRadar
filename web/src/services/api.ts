@@ -283,6 +283,7 @@ export interface MarketplaceLead {
   lead_tier: 'high_purity' | 'expanded';
   tier_reason: string;
   lead_status: 'new' | 'watching' | 'contacted' | 'ignored';
+  notes: string | null;
   duplicate_count: number;
   duplicate_sources: string[];
   created_at: string;
@@ -323,6 +324,21 @@ export async function updateMarketplaceLeadStatus(
 ): Promise<MarketplaceLead> {
   const response = await apiClient.put(`/api/v1/marketplace-leads/${leadId}/status`, {
     status
+  });
+  return response.data;
+}
+
+export async function fetchMarketplaceLead(leadId: number): Promise<MarketplaceLead> {
+  const response = await apiClient.get(`/api/v1/marketplace-leads/${leadId}`);
+  return response.data;
+}
+
+export async function updateMarketplaceLeadNotes(
+  leadId: number,
+  notes: string | null
+): Promise<MarketplaceLead> {
+  const response = await apiClient.put(`/api/v1/marketplace-leads/${leadId}/notes`, {
+    notes
   });
   return response.data;
 }

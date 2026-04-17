@@ -68,6 +68,7 @@ class MarketplaceLead:
     lead_tier: MarketplaceLeadTier
     tier_reason: str
     lead_status: MarketplaceLeadStatus
+    notes: str | None
     duplicate_count: int
     duplicate_sources: list[str]
     created_at: datetime
@@ -126,6 +127,38 @@ def update_lead_status(entry_id: int, status: MarketplaceLeadStatus) -> Marketpl
     return _to_marketplace_lead(updated)
 
 
+def get_lead(entry_id: int) -> MarketplaceLead:
+    entry = raw_entries.get_entry(entry_id)
+    source = rss_sources.get_source(entry.source_id)
+    if source is None or source.source_type != SourceType.FREELANCE_MARKETPLACE:
+        raise ValueError("marketplace lead not found")
+
+    _, items, _, _, _ = list_leads(limit=1000)
+    for item in items:
+        if item.id == entry_id:
+            return item
+    return _to_marketplace_lead(entry)
+
+
+def update_lead_notes(entry_id: int, notes: str | None) -> MarketplaceLead:
+    entry = raw_entries.get_entry(entry_id)
+    source = rss_sources.get_source(entry.source_id)
+    if source is None or source.source_type != SourceType.FREELANCE_MARKETPLACE:
+        raise ValueError("marketplace lead not found")
+
+    def _apply(model: RawEntry) -> None:
+        metadata = dict(model.metadata or {})
+        cleaned_notes = notes.strip() if isinstance(notes, str) else ""
+        if cleaned_notes:
+            metadata["lead_notes"] = cleaned_notes
+        else:
+            metadata.pop("lead_notes", None)
+        model.metadata = metadata
+
+    db.update_raw_entry(entry_id, _apply)
+    return get_lead(entry_id)
+
+
 def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
     source = rss_sources.get_source(item.source_id)
     if source is None:
@@ -159,6 +192,7 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         lead_tier=lead_tier,
         tier_reason=tier_reason,
         lead_status=_to_lead_status(metadata.get("lead_status")),
+        notes=_to_string(metadata.get("lead_notes")),
         duplicate_count=1,
         duplicate_sources=[source.name],
         created_at=item.created_at,
@@ -273,6 +307,7 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         lead_tier=representative.lead_tier,
         tier_reason=representative.tier_reason,
         lead_status=status,
+        notes=representative.notes or alternate.notes,
         duplicate_count=left.duplicate_count + right.duplicate_count,
         duplicate_sources=duplicate_sources,
         created_at=min(left.created_at, right.created_at),

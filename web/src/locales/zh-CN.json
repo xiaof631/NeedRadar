@@ -123,6 +123,25 @@
       "title": "项目源状态",
       "lastFetched": "最近抓取"
     },
+    "details": {
+      "title": "线索详情",
+      "platform": "平台",
+      "source": "数据源",
+      "author": "发布方",
+      "location": "地区",
+      "budget": "预算",
+      "timeline": "周期/时效",
+      "published": "发布时间",
+      "updated": "最近更新",
+      "reason": "入队原因",
+      "skills": "技能标签",
+      "duplicates": "归并来源",
+      "summary": "摘要",
+      "description": "原始正文",
+      "notes": "跟进备注",
+      "notesPlaceholder": "记录你的判断、联系动作或下一步计划",
+      "saveNotes": "保存备注"
+    },
     "filters": {
       "searchPlaceholder": "输入标题或描述关键词",
       "source": "项目源",
@@ -163,12 +182,15 @@
       "status": "状态",
       "published": "发布时间",
       "actions": "操作",
+      "details": "详情",
+      "openLink": "原始链接",
       "duplicates": "重复线索 {count}",
       "hasLink": "原始链接",
       "empty": "暂无外包项目线索"
     },
     "feedback": {
-      "statusUpdated": "已更新为“{status}”"
+      "statusUpdated": "已更新为“{status}”",
+      "notesUpdated": "备注已保存"
     }
   },
   "filterMonitor": {

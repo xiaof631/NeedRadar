@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from app.schemas import MarketplaceLeadList, MarketplaceLeadRead, MarketplaceLeadStatusUpdate
+from app.schemas import (
+    MarketplaceLeadList,
+    MarketplaceLeadNotesUpdate,
+    MarketplaceLeadRead,
+    MarketplaceLeadStatusUpdate,
+)
 from app.services import marketplace_leads
 from fastapi import APIRouter, HTTPException, Query
 
@@ -56,6 +61,27 @@ async def update_marketplace_lead_status(
         raise HTTPException(status_code=400, detail="unsupported marketplace lead status") from exc
     try:
         item = marketplace_leads.update_lead_status(lead_id, status)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
+    return MarketplaceLeadRead.model_validate(item)
+
+
+@router.get("/{lead_id}", response_model=MarketplaceLeadRead, summary="获取单条外包项目线索详情")
+async def get_marketplace_lead(lead_id: int) -> MarketplaceLeadRead:
+    try:
+        item = marketplace_leads.get_lead(lead_id)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
+    return MarketplaceLeadRead.model_validate(item)
+
+
+@router.put("/{lead_id}/notes", response_model=MarketplaceLeadRead, summary="更新外包项目线索备注")
+async def update_marketplace_lead_notes(
+    lead_id: int,
+    payload: MarketplaceLeadNotesUpdate,
+) -> MarketplaceLeadRead:
+    try:
+        item = marketplace_leads.update_lead_notes(lead_id, payload.notes)
     except Exception as exc:
         raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
     return MarketplaceLeadRead.model_validate(item)

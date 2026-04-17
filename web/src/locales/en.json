@@ -120,6 +120,25 @@
       "title": "Source health",
       "lastFetched": "Last fetched"
     },
+    "details": {
+      "title": "Lead details",
+      "platform": "Platform",
+      "source": "Source",
+      "author": "Publisher",
+      "location": "Location",
+      "budget": "Budget",
+      "timeline": "Timeline",
+      "published": "Published",
+      "updated": "Updated",
+      "reason": "Why it entered the queue",
+      "skills": "Skill tags",
+      "duplicates": "Merged sources",
+      "summary": "Summary",
+      "description": "Original description",
+      "notes": "Follow-up notes",
+      "notesPlaceholder": "Capture your judgement, outreach, or next action",
+      "saveNotes": "Save notes"
+    },
     "filters": {
       "searchPlaceholder": "Search by title or description",
       "source": "Source",
@@ -160,12 +179,15 @@
       "status": "Status",
       "published": "Published at",
       "actions": "Actions",
+      "details": "Details",
+      "openLink": "Source link",
       "duplicates": "{count} duplicates",
       "hasLink": "Source link",
       "empty": "No marketplace leads"
     },
     "feedback": {
-      "statusUpdated": "Updated to {status}"
+      "statusUpdated": "Updated to {status}",
+      "notesUpdated": "Notes saved"
     }
   },
   "filterMonitor": {

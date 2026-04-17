@@ -271,6 +271,53 @@ def test_update_marketplace_lead_status(client: TestClient) -> None:
     assert list_response.json()["total"] == 1
 
 
+def test_get_marketplace_lead_detail_and_update_notes(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-detail",
+            "title": "Full-Stack Web Developer",
+            "summary": "Full-Stack Web Developer | $2K | 7 days",
+            "content": "Build a full-stack web application with admin tooling.",
+            "link": "https://example.com/full-stack-detail",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$2K",
+                "timeline": "7 days",
+                "skills": ["Python", "Django"],
+                "lead_notes": "Need follow-up on delivery scope",
+            },
+        }
+    )
+
+    detail_response = client.get(f"/api/v1/marketplace-leads/{lead.id}")
+
+    assert detail_response.status_code == 200
+    assert detail_response.json()["notes"] == "Need follow-up on delivery scope"
+
+    update_response = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/notes",
+        json={"notes": "Reached out by email on Friday"},
+    )
+
+    assert update_response.status_code == 200
+    assert update_response.json()["notes"] == "Reached out by email on Friday"
+
+    refetch_response = client.get(f"/api/v1/marketplace-leads/{lead.id}")
+    assert refetch_response.status_code == 200
+    assert refetch_response.json()["notes"] == "Reached out by email on Friday"
+
+
 def test_peopleperhour_frontend_project_is_high_purity() -> None:
     pph = rss_sources.create_source(
         {

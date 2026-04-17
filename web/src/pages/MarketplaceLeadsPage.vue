@@ -209,6 +209,9 @@
         <el-table-column :label="t('marketplace.table.actions')" min-width="210" fixed="right">
           <template #default="{ row }">
             <div class="actions-cell">
+              <el-button size="small" text @click="openLeadDetails(row.id)">
+                {{ t('marketplace.table.details') }}
+              </el-button>
               <el-select
                 :model-value="row.lead_status"
                 size="small"
@@ -228,7 +231,7 @@
                 text
                 @click="openExternal(row.link)"
               >
-                {{ t('actions.view') }}
+                {{ t('marketplace.table.openLink') }}
               </el-button>
             </div>
           </template>
@@ -245,6 +248,136 @@
         />
       </div>
     </el-card>
+
+    <el-drawer
+      v-model="detailsVisible"
+      :title="t('marketplace.details.title')"
+      size="40%"
+      destroy-on-close
+    >
+      <div v-loading="detailsQuery.isFetching.value" class="details-drawer">
+        <template v-if="selectedLead">
+          <div class="details-header">
+            <div>
+              <h3>{{ selectedLead.title }}</h3>
+              <div class="tag-list">
+                <el-tag
+                  :type="selectedLead.lead_kind === 'project' ? 'success' : selectedLead.lead_kind === 'contract_role' ? 'warning' : 'info'"
+                  effect="plain"
+                >
+                  {{ t(`marketplace.filters.leadKindOptions.${selectedLead.lead_kind}`) }}
+                </el-tag>
+                <el-tag :type="selectedLead.lead_tier === 'high_purity' ? 'success' : 'warning'" effect="plain">
+                  {{ t(`marketplace.filters.queueOptions.${selectedLead.lead_tier}`) }}
+                </el-tag>
+                <el-tag :type="leadStatusTagType(selectedLead.lead_status)" effect="plain">
+                  {{ leadStatusLabel(selectedLead.lead_status) }}
+                </el-tag>
+              </div>
+            </div>
+            <el-button
+              v-if="selectedLead.link"
+              text
+              type="primary"
+              @click="openExternal(selectedLead.link)"
+            >
+              {{ t('marketplace.table.openLink') }}
+            </el-button>
+          </div>
+
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.platform') }}</span>
+              <span>{{ selectedLead.platform }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.source') }}</span>
+              <span>{{ selectedLead.source_name }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.author') }}</span>
+              <span>{{ selectedLead.author || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.location') }}</span>
+              <span>{{ selectedLead.location || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.budget') }}</span>
+              <span>{{ selectedLead.normalized_budget || selectedLead.budget || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.timeline') }}</span>
+              <span>{{ selectedLead.normalized_timeline || selectedLead.timeline || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.published') }}</span>
+              <span>{{ formatDate(selectedLead.published_at || selectedLead.created_at) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.updated') }}</span>
+              <span>{{ formatDate(selectedLead.updated_at) }}</span>
+            </div>
+          </div>
+
+          <div class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.reason') }}</div>
+            <p class="detail-paragraph">{{ selectedLead.tier_reason }}</p>
+          </div>
+
+          <div v-if="selectedLead.skills.length" class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.skills') }}</div>
+            <div class="tag-list">
+              <el-tag v-for="skill in selectedLead.skills" :key="skill" size="small" effect="plain">
+                {{ skill }}
+              </el-tag>
+            </div>
+          </div>
+
+          <div v-if="selectedLead.duplicate_count > 1" class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.duplicates') }}</div>
+            <p class="detail-paragraph">
+              {{ t('marketplace.table.duplicates', { count: selectedLead.duplicate_count }) }}
+            </p>
+            <div class="tag-list">
+              <el-tag v-for="source in selectedLead.duplicate_sources" :key="source" size="small" effect="plain">
+                {{ source }}
+              </el-tag>
+            </div>
+          </div>
+
+          <div v-if="selectedLead.summary" class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.summary') }}</div>
+            <p class="detail-paragraph">{{ selectedLead.summary }}</p>
+          </div>
+
+          <div v-if="selectedLead.description" class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.description') }}</div>
+            <p class="detail-paragraph">{{ selectedLead.description }}</p>
+          </div>
+
+          <div class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.notes') }}</div>
+            <el-input
+              v-model="notesDraft"
+              type="textarea"
+              :rows="5"
+              :placeholder="t('marketplace.details.notesPlaceholder')"
+            />
+            <div class="details-actions">
+              <el-button
+                type="primary"
+                size="small"
+                :loading="notesMutation.isPending.value"
+                @click="saveLeadNotes"
+              >
+                {{ t('marketplace.details.saveNotes') }}
+              </el-button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </el-drawer>
   </section>
 </template>
 
@@ -254,8 +387,10 @@ import { useMutation, useQuery } from '@tanstack/vue-query';
 import { ElMessage } from 'element-plus/es/components/message/index';
 import { useI18n } from 'vue-i18n';
 import {
+  fetchMarketplaceLead,
   fetchMarketplaceLeads,
   fetchRssSources,
+  updateMarketplaceLeadNotes,
   updateMarketplaceLeadStatus,
   type MarketplaceLead
 } from '../services/api';
@@ -268,6 +403,9 @@ const sourceId = ref<'all' | string>('all');
 const statusFilter = ref<'all' | MarketplaceLead['lead_status']>('all');
 const queueView = ref<'high_purity' | 'expanded' | 'all'>('high_purity');
 const leadKindView = ref<'reviewable' | 'project' | 'contract_role' | 'full_time_job' | 'all'>('reviewable');
+const detailsVisible = ref(false);
+const selectedLeadId = ref<number | null>(null);
+const notesDraft = ref('');
 
 const leadStatusOptions = computed(() => [
   { value: 'new' as const, label: t('marketplace.filters.statusOptions.new') },
@@ -317,6 +455,13 @@ const leadsQuery = useQuery({
   staleTime: 30_000
 });
 
+const detailsQuery = useQuery({
+  queryKey: computed(() => ['marketplace-lead', selectedLeadId.value]),
+  queryFn: () => fetchMarketplaceLead(selectedLeadId.value as number),
+  enabled: computed(() => detailsVisible.value && selectedLeadId.value !== null),
+  staleTime: 30_000
+});
+
 const statusMutation = useMutation({
   mutationFn: ({ leadId, status }: { leadId: number; status: MarketplaceLead['lead_status'] }) =>
     updateMarketplaceLeadStatus(leadId, status),
@@ -327,6 +472,22 @@ const statusMutation = useMutation({
       })
     );
     await leadsQuery.refetch();
+    if (selectedLeadId.value === variables.leadId) {
+      await detailsQuery.refetch();
+    }
+  },
+  onError: () => {
+    ElMessage.error(t('feedback.genericError'));
+  }
+});
+
+const notesMutation = useMutation({
+  mutationFn: ({ leadId, notes }: { leadId: number; notes: string | null }) =>
+    updateMarketplaceLeadNotes(leadId, notes),
+  onSuccess: async (lead) => {
+    notesDraft.value = lead.notes ?? '';
+    ElMessage.success(t('marketplace.feedback.notesUpdated'));
+    await Promise.all([leadsQuery.refetch(), detailsQuery.refetch()]);
   },
   onError: () => {
     ElMessage.error(t('feedback.genericError'));
@@ -334,6 +495,7 @@ const statusMutation = useMutation({
 });
 
 const leads = computed(() => leadsQuery.data.value?.items ?? []);
+const selectedLead = computed(() => detailsQuery.data.value ?? null);
 const total = computed(() => leadsQuery.data.value?.total ?? 0);
 const highPurityCount = computed(() => leadsQuery.data.value?.tier_breakdown?.high_purity ?? 0);
 const expandedCount = computed(() => leadsQuery.data.value?.tier_breakdown?.expanded ?? 0);
@@ -347,6 +509,14 @@ const contactedCount = computed(() => leadsQuery.data.value?.status_breakdown?.c
 watch([search, sourceId, statusFilter, queueView, leadKindView], () => {
   page.value = 1;
 });
+
+watch(
+  () => detailsQuery.data.value,
+  (value) => {
+    notesDraft.value = value?.notes ?? '';
+  },
+  { immediate: true }
+);
 
 const handlePageChange = (value: number) => {
   page.value = value;
@@ -377,6 +547,19 @@ const handleStatusChange = (leadId: number, value: string) => {
   void statusMutation.mutate({
     leadId,
     status: value as MarketplaceLead['lead_status']
+  });
+};
+
+const openLeadDetails = (leadId: number) => {
+  selectedLeadId.value = leadId;
+  detailsVisible.value = true;
+};
+
+const saveLeadNotes = () => {
+  if (selectedLeadId.value === null) return;
+  void notesMutation.mutate({
+    leadId: selectedLeadId.value,
+    notes: notesDraft.value.trim() || null
   });
 };
 
@@ -523,6 +706,60 @@ const formatDate = (value: string | null) => {
   margin-top: 1rem;
 }
 
+.details-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.details-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.details-header h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1.25rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-paragraph {
+  margin: 0;
+  line-height: 1.6;
+  color: #0f172a;
+  white-space: pre-wrap;
+}
+
+.details-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 960px) {
   .page-header,
   .actions {
@@ -535,6 +772,10 @@ const formatDate = (value: string | null) => {
   .status-select,
   .kind-select {
     width: 100%;
+  }
+
+  .details-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
