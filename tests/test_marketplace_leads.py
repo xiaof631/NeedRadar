@@ -215,3 +215,120 @@ def test_peopleperhour_frontend_project_is_high_purity() -> None:
     assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     assert tier_breakdown["high_purity"] == 1
     assert tier_breakdown["expanded"] == 0
+
+
+def test_peopleperhour_full_stack_project_is_high_purity() -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "pph-full-stack",
+            "title": "Full Stack Developer for Online Casino Platform",
+            "summary": "Full Stack Developer for Online Casino Platform | $6.8K | a day ago",
+            "content": "Build responsive front-end interfaces, backend APIs, and database schemas.",
+            "link": "https://www.peopleperhour.com/projects/full-stack",
+            "tags": ["marketplace", "peopleperhour", "remote"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$6.8K",
+                "timeline": "a day ago",
+                "location": "Remote",
+                "skills": [],
+            },
+        }
+    )
+
+    total, items, tier_breakdown = marketplace_leads.list_leads(
+        tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    )
+
+    assert total == 1
+    assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    assert tier_breakdown["high_purity"] == 1
+    assert tier_breakdown["expanded"] == 0
+
+
+def test_peopleperhour_hubspot_cms_project_is_high_purity() -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "pph-hubspot",
+            "title": "HubSpot CMS (HubL) Developer – Custom Quote Template",
+            "summary": "HubSpot CMS (HubL) Developer – Custom Quote Template | $41 | 16 hours ago",
+            "content": "Need a custom data-driven quote template inside HubSpot CMS.",
+            "link": "https://www.peopleperhour.com/projects/hubspot",
+            "tags": ["marketplace", "peopleperhour", "remote"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$41",
+                "timeline": "16 hours ago",
+                "location": "Remote",
+                "skills": [],
+            },
+        }
+    )
+
+    total, items, tier_breakdown = marketplace_leads.list_leads(
+        tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    )
+
+    assert total == 1
+    assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    assert tier_breakdown["high_purity"] == 1
+    assert tier_breakdown["expanded"] == 0
+
+
+def test_peopleperhour_kiosk_project_stays_expanded() -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "pph-kiosk",
+            "title": "Android Device Owner/Kiosk Mode Specialist — OEM Provisioning",
+            "summary": "Android Device Owner/Kiosk Mode Specialist — OEM Provisioning | $488 | 10 hours ago",
+            "content": "Need kiosk mode, OEM provisioning, and OTA setup for dedicated tablets.",
+            "link": "https://www.peopleperhour.com/projects/kiosk",
+            "tags": ["marketplace", "peopleperhour", "remote"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$488",
+                "timeline": "10 hours ago",
+                "location": "Remote",
+                "skills": [],
+            },
+        }
+    )
+
+    total, items, tier_breakdown = marketplace_leads.list_leads(
+        tier=marketplace_leads.MarketplaceLeadTier.EXPANDED
+    )
+
+    assert total == 1
+    assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.EXPANDED
+    assert tier_breakdown["high_purity"] == 0
+    assert tier_breakdown["expanded"] == 1

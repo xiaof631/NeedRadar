@@ -102,18 +102,31 @@ def _classify_lead_tier(
     item: RawEntry,
     metadata: dict[str, object],
 ) -> tuple[MarketplaceLeadTier, str]:
-    haystack = " ".join(
+    title_haystack = " ".join(
         filter(
             None,
             [
                 item.title.lower(),
                 (item.summary or "").lower(),
                 _to_string(metadata.get("category")) and str(metadata.get("category")).lower(),
+            ],
+        )
+    )
+    detail_haystack = " ".join(
+        filter(
+            None,
+            [
+                title_haystack,
                 " ".join(text.lower() for text in _to_string_list(metadata.get("skills"))),
             ],
         )
     )
-    if any(keyword in haystack for keyword in _EXPANDED_KEYWORDS):
+    if any(keyword in title_haystack for keyword in _STRONG_HIGH_PURITY_KEYWORDS):
+        return (
+            MarketplaceLeadTier.HIGH_PURITY,
+            "标题直接体现前后端、全栈或 CMS 交付，属于明确的软件开发项目。",
+        )
+    if any(keyword in detail_haystack for keyword in _EXPANDED_KEYWORDS):
         return (
             MarketplaceLeadTier.EXPANDED,
             "技术实现类项目，适合放入扩展线索而不是默认高纯度队列。",
@@ -123,7 +136,7 @@ def _classify_lead_tier(
             MarketplaceLeadTier.HIGH_PURITY,
             "公开外包平台上的明确软件开发交付项目，可直接进入高纯度队列。",
         )
-    if any(keyword in haystack for keyword in _HIGH_PURITY_KEYWORDS):
+    if any(keyword in detail_haystack for keyword in _HIGH_PURITY_KEYWORDS):
         return (
             MarketplaceLeadTier.HIGH_PURITY,
             "标题或分类明确指向 Web/App/后台/管理系统交付，适合优先评审。",
@@ -188,6 +201,21 @@ def _diversify_by_source(items: list[MarketplaceLead]) -> list[MarketplaceLead]:
     return diversified
 
 
+_STRONG_HIGH_PURITY_KEYWORDS = (
+    "frontend developer",
+    "backend developer",
+    "full stack developer",
+    "full-stack developer",
+    "full-stack web developer",
+    "web developer",
+    "react / next.js",
+    "react/next.js",
+    "wordpress website",
+    "cms developer",
+    "hubspot cms",
+    "quote template",
+)
+
 _HIGH_PURITY_KEYWORDS = (
     "小程序",
     "公众号",
@@ -216,6 +244,11 @@ _HIGH_PURITY_KEYWORDS = (
 )
 
 _EXPANDED_KEYWORDS = (
+    "device owner",
+    "kiosk",
+    "oem",
+    "arkit",
+    "face mesh",
     "qt",
     "java",
     "mysql",
