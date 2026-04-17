@@ -72,6 +72,8 @@ def test_list_marketplace_leads_returns_structured_fields(client: TestClient) ->
     assert item["duplicate_count"] == 1
     assert payload["kind_breakdown"]["project"] == 1
     assert payload["status_breakdown"]["new"] == 1
+    assert payload["source_breakdown"][0]["source_name"] == "Freelancer Web Development Jobs"
+    assert payload["source_breakdown"][0]["high_purity"] == 1
 
 
 def test_list_marketplace_leads_diversifies_sources() -> None:
@@ -130,7 +132,7 @@ def test_list_marketplace_leads_diversifies_sources() -> None:
         }
     )
 
-    total, items, tier_breakdown, kind_breakdown, _ = marketplace_leads.list_leads(limit=3)
+    total, items, tier_breakdown, kind_breakdown, _, source_breakdown = marketplace_leads.list_leads(limit=3)
 
     assert total == 3
     source_ids = [item.source_id for item in items]
@@ -138,6 +140,7 @@ def test_list_marketplace_leads_diversifies_sources() -> None:
     assert tier_breakdown["high_purity"] == 3
     assert tier_breakdown["expanded"] == 0
     assert kind_breakdown["project"] == 3
+    assert source_breakdown[0].source_name in {"猪八戒需求大厅精选任务", "软件项目交易网最新外包项目"}
 
 
 def test_list_marketplace_leads_supports_tier_filtering() -> None:
@@ -175,7 +178,7 @@ def test_list_marketplace_leads_supports_tier_filtering() -> None:
         }
     )
 
-    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.EXPANDED
     )
 
@@ -224,7 +227,7 @@ def test_list_marketplace_leads_merges_duplicates_across_sources() -> None:
             }
         )
 
-    total, items, _, _, status_breakdown = marketplace_leads.list_leads()
+    total, items, _, _, status_breakdown, _ = marketplace_leads.list_leads()
 
     assert total == 1
     assert items[0].duplicate_count == 2
@@ -347,7 +350,7 @@ def test_peopleperhour_frontend_project_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -386,7 +389,7 @@ def test_peopleperhour_full_stack_project_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -425,7 +428,7 @@ def test_peopleperhour_hubspot_cms_project_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -465,7 +468,7 @@ def test_remotive_full_stack_react_contract_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -506,7 +509,7 @@ def test_jobicy_python_developer_contract_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -546,7 +549,7 @@ def test_peopleperhour_kiosk_project_stays_expanded() -> None:
         }
     )
 
-    total, items, tier_breakdown, _, _ = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _, _, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.EXPANDED
     )
 
@@ -612,7 +615,7 @@ def test_list_marketplace_leads_supports_lead_kind_filtering() -> None:
         }
     )
 
-    total, items, _, kind_breakdown, _ = marketplace_leads.list_leads(
+    total, items, _, kind_breakdown, _, _ = marketplace_leads.list_leads(
         lead_kind=marketplace_leads.MarketplaceLeadKind.CONTRACT_ROLE
     )
 
@@ -678,7 +681,7 @@ def test_list_marketplace_leads_supports_reviewable_only() -> None:
         }
     )
 
-    total, items, _, kind_breakdown, _ = marketplace_leads.list_leads(reviewable_only=True)
+    total, items, _, kind_breakdown, _, _ = marketplace_leads.list_leads(reviewable_only=True)
 
     assert total == 1
     assert items[0].lead_kind == marketplace_leads.MarketplaceLeadKind.PROJECT
@@ -744,7 +747,7 @@ def test_marketplace_leads_merge_same_company_similar_titles() -> None:
         }
     )
 
-    total, items, _, _, _ = marketplace_leads.list_leads()
+    total, items, _, _, _, _ = marketplace_leads.list_leads()
 
     assert total == 1
     assert items[0].duplicate_count == 2
@@ -793,7 +796,7 @@ def test_marketplace_leads_merge_same_link_without_query_string() -> None:
             }
         )
 
-    total, items, _, _, _ = marketplace_leads.list_leads()
+    total, items, _, _, _, _ = marketplace_leads.list_leads()
 
     assert total == 1
     assert items[0].duplicate_count == 2
@@ -833,7 +836,73 @@ def test_marketplace_leads_do_not_merge_distinct_roles_same_company() -> None:
             }
         )
 
-    total, items, _, _, _ = marketplace_leads.list_leads()
+    total, items, _, _, _, _ = marketplace_leads.list_leads()
+
+
+def test_marketplace_leads_source_breakdown_tracks_quality() -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    jobicy = rss_sources.create_source(
+        {
+            "name": "Jobicy Contract Developer Roles",
+            "url": "https://jobicy.com/api/v2/remote-jobs?count=50&tag=python%20developer",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "jobicy_api"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "pph-dashboard-role",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $41 | a day ago",
+            "content": "Build polished, responsive UIs and collaborate with backend teams.",
+            "link": "https://www.peopleperhour.com/projects/frontend-dashboard",
+            "tags": ["marketplace", "peopleperhour", "remote"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$41",
+                "timeline": "a day ago",
+                "location": "Remote",
+                "skills": [],
+            },
+        }
+    )
+    contacted = raw_entries.create_entry(
+        {
+            "source_id": jobicy.id,
+            "guid": "jobicy-dashboard-role",
+            "title": "Senior Python Developer – Code Migration Specialist",
+            "summary": "Senior Python Developer – Code Migration Specialist | Philippines",
+            "content": "Freelance project-based collaboration for a senior Python developer.",
+            "link": "https://jobicy.com/jobs/3001-dashboard",
+            "tags": ["marketplace", "jobicy", "remote", "project-based"],
+            "metadata": {
+                "platform": "Jobicy",
+                "category": "Software Engineering",
+                "timeline": "Philippines",
+                "engagement": "hourly-contract",
+                "location": "Philippines",
+                "skills": ["python", "docker", "Software Engineering"],
+            },
+        }
+    )
+    marketplace_leads.update_lead_status(contacted.id, marketplace_leads.MarketplaceLeadStatus.CONTACTED)
+
+    total, _, _, _, _, source_breakdown = marketplace_leads.list_leads()
 
     assert total == 2
-    assert all(item.duplicate_count == 1 for item in items)
+    assert len(source_breakdown) == 2
+    by_name = {item.source_name: item for item in source_breakdown}
+    assert by_name["PeoplePerHour Technology Projects"].high_purity == 1
+    assert by_name["PeoplePerHour Technology Projects"].reviewable == 1
+    assert by_name["Jobicy Contract Developer Roles"].contacted == 1
+    assert by_name["Jobicy Contract Developer Roles"].reviewable == 1

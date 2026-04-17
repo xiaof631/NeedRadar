@@ -120,6 +120,18 @@
       "title": "Source health",
       "lastFetched": "Last fetched"
     },
+    "effectiveness": {
+      "title": "Source effectiveness",
+      "empty": "No source effectiveness data",
+      "columns": {
+        "source": "Source",
+        "total": "Total",
+        "highPurity": "High purity",
+        "reviewable": "Reviewable",
+        "fullTime": "Full-time noise",
+        "contacted": "Contacted"
+      }
+    },
     "details": {
       "title": "Lead details",
       "platform": "Platform",

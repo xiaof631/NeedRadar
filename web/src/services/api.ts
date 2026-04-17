@@ -290,11 +290,24 @@ export interface MarketplaceLead {
   updated_at: string;
 }
 
+export interface MarketplaceLeadSourceMetric {
+  source_id: number;
+  source_name: string;
+  total: number;
+  high_purity: number;
+  expanded: number;
+  reviewable: number;
+  full_time_job: number;
+  watching: number;
+  contacted: number;
+}
+
 export interface MarketplaceLeadListResponse {
   total: number;
   tier_breakdown: Record<string, number>;
   kind_breakdown: Record<string, number>;
   status_breakdown: Record<string, number>;
+  source_breakdown: MarketplaceLeadSourceMetric[];
   items: MarketplaceLead[];
 }
 

@@ -41,6 +41,7 @@ from app.schemas.marketplace_leads import (
     MarketplaceLeadList,
     MarketplaceLeadNotesUpdate,
     MarketplaceLeadRead,
+    MarketplaceLeadSourceMetricRead,
     MarketplaceLeadStatusUpdate,
 )
 from app.schemas.raw_entries import (
@@ -96,6 +97,7 @@ __all__ = [
     "MarketplaceLeadList",
     "MarketplaceLeadNotesUpdate",
     "MarketplaceLeadRead",
+    "MarketplaceLeadSourceMetricRead",
     "MarketplaceLeadStatusUpdate",
     "SourceFilterMetricRead",
     "RawEntryBulkStatusUpdate",

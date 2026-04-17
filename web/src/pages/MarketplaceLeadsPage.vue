@@ -113,6 +113,24 @@
     </el-card>
 
     <el-card shadow="never">
+      <template #header>
+        <div class="source-health-title">{{ t('marketplace.effectiveness.title') }}</div>
+      </template>
+      <el-table
+        :data="sourceBreakdown"
+        size="small"
+        :empty-text="t('marketplace.effectiveness.empty')"
+      >
+        <el-table-column prop="source_name" :label="t('marketplace.effectiveness.columns.source')" min-width="220" />
+        <el-table-column prop="total" :label="t('marketplace.effectiveness.columns.total')" width="100" />
+        <el-table-column prop="high_purity" :label="t('marketplace.effectiveness.columns.highPurity')" width="120" />
+        <el-table-column prop="reviewable" :label="t('marketplace.effectiveness.columns.reviewable')" width="120" />
+        <el-table-column prop="full_time_job" :label="t('marketplace.effectiveness.columns.fullTime')" width="120" />
+        <el-table-column prop="contacted" :label="t('marketplace.effectiveness.columns.contacted')" width="110" />
+      </el-table>
+    </el-card>
+
+    <el-card shadow="never">
       <el-table :data="leads" v-loading="leadsQuery.isFetching.value" :empty-text="t('marketplace.table.empty')">
         <el-table-column prop="platform" :label="t('marketplace.table.platform')" width="170" />
         <el-table-column :label="t('marketplace.table.title')" min-width="340">
@@ -497,6 +515,7 @@ const notesMutation = useMutation({
 const leads = computed(() => leadsQuery.data.value?.items ?? []);
 const selectedLead = computed(() => detailsQuery.data.value ?? null);
 const total = computed(() => leadsQuery.data.value?.total ?? 0);
+const sourceBreakdown = computed(() => leadsQuery.data.value?.source_breakdown ?? []);
 const highPurityCount = computed(() => leadsQuery.data.value?.tier_breakdown?.high_purity ?? 0);
 const expandedCount = computed(() => leadsQuery.data.value?.tier_breakdown?.expanded ?? 0);
 const projectCount = computed(() => leadsQuery.data.value?.kind_breakdown?.project ?? 0);

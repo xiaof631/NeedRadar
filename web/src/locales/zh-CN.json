@@ -123,6 +123,18 @@
       "title": "项目源状态",
       "lastFetched": "最近抓取"
     },
+    "effectiveness": {
+      "title": "来源效果看板",
+      "empty": "暂无来源效果数据",
+      "columns": {
+        "source": "来源",
+        "total": "总量",
+        "highPurity": "高纯度",
+        "reviewable": "可跟进",
+        "fullTime": "全职噪音",
+        "contacted": "已联系"
+      }
+    },
     "details": {
       "title": "线索详情",
       "platform": "平台",

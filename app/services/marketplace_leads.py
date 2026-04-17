@@ -75,6 +75,19 @@ class MarketplaceLead:
     updated_at: datetime
 
 
+@dataclass(slots=True)
+class MarketplaceLeadSourceMetric:
+    source_id: int
+    source_name: str
+    total: int
+    high_purity: int
+    expanded: int
+    reviewable: int
+    full_time_job: int
+    watching: int
+    contacted: int
+
+
 def list_leads(
     *,
     search: str | None = None,
@@ -85,7 +98,14 @@ def list_leads(
     lead_status: MarketplaceLeadStatus | None = None,
     skip: int = 0,
     limit: int = 20,
-) -> tuple[int, list[MarketplaceLead], dict[str, int], dict[str, int], dict[str, int]]:
+) -> tuple[
+    int,
+    list[MarketplaceLead],
+    dict[str, int],
+    dict[str, int],
+    dict[str, int],
+    list[MarketplaceLeadSourceMetric],
+]:
     _, items = raw_entries.list_entries(
         source_id=source_id,
         source_type=SourceType.FREELANCE_MARKETPLACE,
@@ -97,6 +117,7 @@ def list_leads(
     tier_breakdown = _count_tiers(leads)
     kind_breakdown = _count_kinds(leads)
     status_breakdown = _count_statuses(leads)
+    source_breakdown = _build_source_breakdown(leads)
     if tier is not None:
         leads = [lead for lead in leads if lead.lead_tier == tier]
     if lead_kind is not None:
@@ -109,7 +130,7 @@ def list_leads(
         leads = _diversify_by_source(leads)
     total = len(leads)
     leads = leads[skip : skip + limit]
-    return total, leads, tier_breakdown, kind_breakdown, status_breakdown
+    return total, leads, tier_breakdown, kind_breakdown, status_breakdown, source_breakdown
 
 
 def update_lead_status(entry_id: int, status: MarketplaceLeadStatus) -> MarketplaceLead:
@@ -133,7 +154,7 @@ def get_lead(entry_id: int) -> MarketplaceLead:
     if source is None or source.source_type != SourceType.FREELANCE_MARKETPLACE:
         raise ValueError("marketplace lead not found")
 
-    _, items, _, _, _ = list_leads(limit=1000)
+    _, items, _, _, _, _ = list_leads(limit=1000)
     for item in items:
         if item.id == entry_id:
             return item
@@ -402,6 +423,34 @@ def _count_statuses(leads: list[MarketplaceLead]) -> dict[str, int]:
         status.value: sum(1 for lead in leads if lead.lead_status == status)
         for status in MarketplaceLeadStatus
     }
+
+
+def _build_source_breakdown(leads: list[MarketplaceLead]) -> list[MarketplaceLeadSourceMetric]:
+    grouped: dict[tuple[int, str], list[MarketplaceLead]] = {}
+    for lead in leads:
+        key = (lead.source_id, lead.source_name)
+        grouped.setdefault(key, []).append(lead)
+
+    metrics: list[MarketplaceLeadSourceMetric] = []
+    for (source_id, source_name), items in grouped.items():
+        metrics.append(
+            MarketplaceLeadSourceMetric(
+                source_id=source_id,
+                source_name=source_name,
+                total=len(items),
+                high_purity=sum(1 for item in items if item.lead_tier == MarketplaceLeadTier.HIGH_PURITY),
+                expanded=sum(1 for item in items if item.lead_tier == MarketplaceLeadTier.EXPANDED),
+                reviewable=sum(1 for item in items if item.lead_kind in _REVIEWABLE_LEAD_KINDS),
+                full_time_job=sum(1 for item in items if item.lead_kind == MarketplaceLeadKind.FULL_TIME_JOB),
+                watching=sum(1 for item in items if item.lead_status == MarketplaceLeadStatus.WATCHING),
+                contacted=sum(1 for item in items if item.lead_status == MarketplaceLeadStatus.CONTACTED),
+            )
+        )
+    metrics.sort(
+        key=lambda item: (item.high_purity, item.reviewable, item.contacted, item.total, item.source_name),
+        reverse=True,
+    )
+    return metrics
 
 
 def _to_lead_status(value: object) -> MarketplaceLeadStatus:

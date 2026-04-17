@@ -6,6 +6,7 @@ from app.schemas import (
     MarketplaceLeadList,
     MarketplaceLeadNotesUpdate,
     MarketplaceLeadRead,
+    MarketplaceLeadSourceMetricRead,
     MarketplaceLeadStatusUpdate,
 )
 from app.services import marketplace_leads
@@ -31,7 +32,7 @@ async def list_marketplace_leads(
         default=None, description="按跟进状态过滤"
     ),
 ) -> MarketplaceLeadList:
-    total, items, tier_breakdown, kind_breakdown, status_breakdown = marketplace_leads.list_leads(
+    total, items, tier_breakdown, kind_breakdown, status_breakdown, source_breakdown = marketplace_leads.list_leads(
         skip=skip,
         limit=limit,
         source_id=source_id,
@@ -46,6 +47,9 @@ async def list_marketplace_leads(
         tier_breakdown=tier_breakdown,
         kind_breakdown=kind_breakdown,
         status_breakdown=status_breakdown,
+        source_breakdown=[
+            MarketplaceLeadSourceMetricRead.model_validate(item) for item in source_breakdown
+        ],
         items=[MarketplaceLeadRead.model_validate(item) for item in items],
     )
 

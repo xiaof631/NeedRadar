@@ -40,11 +40,26 @@ class MarketplaceLeadRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MarketplaceLeadSourceMetricRead(BaseModel):
+    source_id: int
+    source_name: str
+    total: int
+    high_purity: int
+    expanded: int
+    reviewable: int
+    full_time_job: int
+    watching: int
+    contacted: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MarketplaceLeadList(BaseModel):
     total: int
     tier_breakdown: dict[str, int] = Field(default_factory=dict)
     kind_breakdown: dict[str, int] = Field(default_factory=dict)
     status_breakdown: dict[str, int] = Field(default_factory=dict)
+    source_breakdown: list[MarketplaceLeadSourceMetricRead] = Field(default_factory=list)
     items: list[MarketplaceLeadRead]
 
 
