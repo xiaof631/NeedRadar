@@ -25,6 +25,7 @@ from app.models import (
     CandidateNeed,
     CandidateNeedStatus,
     CandidateNeedStatusLog,
+    CandidateNeedType,
     DownstreamSyncLog,
     ExportJob,
     ExportJobStatus,
@@ -374,6 +375,13 @@ class SQLDatabase:
         payload["status"] = CandidateNeedStatus(
             payload.get("status", CandidateNeedStatus.PENDING_REVIEW)
         ).value
+        candidate_type = payload.get("candidate_type")
+        if candidate_type is not None:
+            payload["candidate_type"] = (
+                candidate_type.value
+                if isinstance(candidate_type, CandidateNeedType)
+                else str(candidate_type)
+            )
         with self._session() as session:
             entity = CandidateNeedEntity(**payload)
             session.add(entity)
@@ -422,6 +430,9 @@ class SQLDatabase:
         search: str | None = None,
         raw_entry_id: int | None = None,
         source_type: SourceType | None = None,
+        candidate_type: CandidateNeedType | None = None,
+        min_review_readiness: float | None = None,
+        review_ready_only: bool | None = None,
         synced: bool | None = None,
         skip: int = 0,
         limit: int | None = None,
@@ -437,6 +448,14 @@ class SQLDatabase:
             if statuses:
                 stmt = stmt.where(
                     CandidateNeedEntity.status.in_([status.value for status in statuses])
+                )
+            if candidate_type is not None:
+                stmt = stmt.where(CandidateNeedEntity.candidate_type == candidate_type.value)
+            if min_review_readiness is not None:
+                stmt = stmt.where(CandidateNeedEntity.review_readiness >= min_review_readiness)
+            if review_ready_only:
+                stmt = stmt.where(CandidateNeedEntity.review_readiness >= 0.55).where(
+                    CandidateNeedEntity.candidate_type != CandidateNeedType.BUG_REPORT.value
                 )
             if raw_entry_id is not None:
                 stmt = stmt.where(CandidateNeedEntity.raw_entry_id == raw_entry_id)
@@ -470,6 +489,9 @@ class SQLDatabase:
         search: str | None = None,
         raw_entry_id: int | None = None,
         source_type: SourceType | None = None,
+        candidate_type: CandidateNeedType | None = None,
+        min_review_readiness: float | None = None,
+        review_ready_only: bool | None = None,
         synced: bool | None = None,
     ) -> int:
         with self._session() as session:
@@ -484,6 +506,14 @@ class SQLDatabase:
             if statuses:
                 stmt = stmt.where(
                     CandidateNeedEntity.status.in_([status.value for status in statuses])
+                )
+            if candidate_type is not None:
+                stmt = stmt.where(CandidateNeedEntity.candidate_type == candidate_type.value)
+            if min_review_readiness is not None:
+                stmt = stmt.where(CandidateNeedEntity.review_readiness >= min_review_readiness)
+            if review_ready_only:
+                stmt = stmt.where(CandidateNeedEntity.review_readiness >= 0.55).where(
+                    CandidateNeedEntity.candidate_type != CandidateNeedType.BUG_REPORT.value
                 )
             if raw_entry_id is not None:
                 stmt = stmt.where(CandidateNeedEntity.raw_entry_id == raw_entry_id)
@@ -809,6 +839,10 @@ def _to_candidate_need(entity: CandidateNeedEntity) -> CandidateNeed:
         target_users=entity.target_users,
         value_proposition=entity.value_proposition,
         competition=entity.competition,
+        candidate_type=CandidateNeedType(entity.candidate_type)
+        if entity.candidate_type
+        else None,
+        review_readiness=entity.review_readiness,
         notes=entity.notes,
         status=CandidateNeedStatus(entity.status),
         confidence=entity.confidence,
@@ -827,6 +861,8 @@ def _apply_candidate_need(entity: CandidateNeedEntity, model: CandidateNeed) -> 
     entity.target_users = model.target_users
     entity.value_proposition = model.value_proposition
     entity.competition = model.competition
+    entity.candidate_type = model.candidate_type.value if model.candidate_type else None
+    entity.review_readiness = model.review_readiness
     entity.notes = model.notes
     entity.status = model.status.value
     entity.confidence = model.confidence

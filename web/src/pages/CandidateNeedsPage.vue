@@ -151,6 +151,26 @@
             :value="option.value"
           />
         </el-select>
+        <el-select
+          v-model="candidateTypeFilter"
+          class="filters__select"
+          :placeholder="t('candidates.filters.candidateType')"
+        >
+          <el-option
+            v-for="option in candidateTypeOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <el-select v-model="queueViewFilter" class="filters__select" :placeholder="t('candidates.filters.queueView')">
+          <el-option
+            v-for="option in queueViewOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
       </div>
       <el-table
         :data="needs"
@@ -174,12 +194,22 @@
             </div>
           </template>
         </el-table-column>
+        <el-table-column :label="t('candidates.table.candidateType')" width="170">
+          <template #default="{ row }">
+            <el-tag :type="candidateTypeTag(row.candidate_type)" effect="plain">
+              {{ candidateTypeLabel(row.candidate_type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('candidates.table.status')" width="140">
           <template #default="{ row }">
             <el-tag :type="statusTag(row.status)">
               {{ statusLabel(row.status) }}
             </el-tag>
           </template>
+        </el-table-column>
+        <el-table-column :label="t('candidates.table.reviewReadiness')" width="150">
+          <template #default="{ row }">{{ formatScore(row.review_readiness) }}</template>
         </el-table-column>
         <el-table-column :label="t('candidates.table.ruleScore')" width="140">
           <template #default="{ row }">{{ formatScore(row.rule_score) }}</template>
@@ -350,6 +380,21 @@
           </div>
         </div>
 
+        <div class="detail-panel__section">
+          <strong>{{ t('candidates.detail.explanation.title') }}</strong>
+          <p>{{ detailQuery.data.value.review_explanation || t('candidates.detail.explanation.empty') }}</p>
+          <div v-if="detailQuery.data.value.review_signals.length" class="signal-list">
+            <el-tag
+              v-for="signal in detailQuery.data.value.review_signals"
+              :key="signal"
+              effect="plain"
+              size="small"
+            >
+              {{ reviewSignalLabel(signal) }}
+            </el-tag>
+          </div>
+        </div>
+
         <div class="detail-panel__grid">
           <div class="detail-field">
             <span>{{ t('candidates.detail.fields.problem') }}</span>
@@ -366,6 +411,14 @@
           <div class="detail-field">
             <span>{{ t('candidates.detail.fields.competition') }}</span>
             <p>{{ detailQuery.data.value.competition || '—' }}</p>
+          </div>
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.candidateType') }}</span>
+            <p>{{ candidateTypeLabel(detailQuery.data.value.candidate_type) }}</p>
+          </div>
+          <div class="detail-field">
+            <span>{{ t('candidates.detail.fields.reviewReadiness') }}</span>
+            <p>{{ formatScore(detailQuery.data.value.review_readiness) }}</p>
           </div>
           <div class="detail-field">
             <span>{{ t('candidates.detail.fields.ruleScore') }}</span>
@@ -408,6 +461,7 @@ import {
   updateCandidateNeedStatus,
   type CandidateNeedCluster,
   type CandidateNeed,
+  type CandidateNeedType,
   type CandidateNeedSourceType,
   type CandidateNeedExportJob,
   type CandidateNeedExportJobPayload,
@@ -424,12 +478,16 @@ const searchTerm = ref('');
 type StatusFilter = CandidateNeed['status'] | 'all';
 type SyncFilter = 'all' | 'synced' | 'unsynced';
 type SourceTypeFilter = CandidateNeedSourceType | 'all';
+type CandidateTypeFilter = CandidateNeedType | 'all';
+type QueueViewFilter = 'reviewable' | 'all';
 
 type ExportFormat = 'csv' | 'json';
 
 const statusFilter = ref<StatusFilter>('all');
 const syncFilter = ref<SyncFilter>('all');
 const sourceTypeFilter = ref<SourceTypeFilter>('all');
+const candidateTypeFilter = ref<CandidateTypeFilter>('all');
+const queueViewFilter = ref<QueueViewFilter>('reviewable');
 
 const statusOptions = computed(() => [
   { label: t('candidates.filters.statusOptions.all'), value: 'all' as const },
@@ -455,12 +513,28 @@ const sourceTypeOptions = computed(() => [
   { label: t('candidates.filters.sourceTypeOptions.youtube'), value: 'youtube' as const },
 ]);
 
+const candidateTypeOptions = computed(() => [
+  { label: t('candidates.filters.candidateTypeOptions.all'), value: 'all' as const },
+  { label: t('candidates.filters.candidateTypeOptions.workflow_pain'), value: 'workflow_pain' as const },
+  { label: t('candidates.filters.candidateTypeOptions.feature_gap'), value: 'feature_gap' as const },
+  { label: t('candidates.filters.candidateTypeOptions.tool_seeking'), value: 'tool_seeking' as const },
+  { label: t('candidates.filters.candidateTypeOptions.bug_report'), value: 'bug_report' as const },
+  { label: t('candidates.filters.candidateTypeOptions.market_signal'), value: 'market_signal' as const },
+]);
+
+const queueViewOptions = computed(() => [
+  { label: t('candidates.filters.queueViewOptions.reviewable'), value: 'reviewable' as const },
+  { label: t('candidates.filters.queueViewOptions.all'), value: 'all' as const },
+]);
+
 const queryOptions = computed<CandidateNeedQueryParams>(() => ({
   skip: (page.value - 1) * pageSize,
   limit: pageSize,
   search: searchTerm.value || undefined,
   statuses: statusFilter.value === 'all' ? undefined : [statusFilter.value],
   source_type: sourceTypeFilter.value === 'all' ? undefined : sourceTypeFilter.value,
+  candidate_type: candidateTypeFilter.value === 'all' ? undefined : candidateTypeFilter.value,
+  review_ready_only: queueViewFilter.value === 'reviewable' ? true : undefined,
   synced: syncFilter.value === 'all' ? undefined : syncFilter.value === 'synced',
 }));
 
@@ -499,12 +573,12 @@ const exportJobs = computed(() => exportJobsQuery.data.value?.items ?? []);
 const detailDrawerVisible = ref(false);
 const selectedNeedId = ref<number | null>(null);
 const sourceOverviewQuery = useQuery({
-  queryKey: ['candidate-needs-source-overview'],
-  queryFn: () => fetchCandidateNeeds({ limit: 200 }),
+  queryKey: computed(() => ['candidate-needs-source-overview', queryOptions.value]),
+  queryFn: () => fetchCandidateNeeds({ ...queryOptions.value, skip: 0, limit: 200 }),
   refetchOnWindowFocus: false,
 });
 
-watch([statusFilter, syncFilter, sourceTypeFilter], () => {
+watch([statusFilter, syncFilter, sourceTypeFilter, candidateTypeFilter, queueViewFilter], () => {
   page.value = 1;
 });
 
@@ -576,6 +650,30 @@ const sourceTypeLabel = (sourceType: CandidateNeed['source_type']) => {
     return t('candidates.filters.sourceTypeOptions.all');
   }
   return t(`candidates.filters.sourceTypeOptions.${sourceType}`);
+};
+
+const candidateTypeLabel = (candidateType: CandidateNeed['candidate_type']) => {
+  if (!candidateType) {
+    return '—';
+  }
+  return t(`candidates.filters.candidateTypeOptions.${candidateType}`);
+};
+
+const candidateTypeTag = (candidateType: CandidateNeed['candidate_type']) => {
+  switch (candidateType) {
+    case 'workflow_pain':
+      return 'danger';
+    case 'feature_gap':
+      return 'warning';
+    case 'tool_seeking':
+      return 'success';
+    case 'market_signal':
+      return 'info';
+    case 'bug_report':
+      return '';
+    default:
+      return 'info';
+  }
 };
 
 const sourceOverviewItems = computed(() => {
@@ -663,6 +761,15 @@ const changeNeedStatus = (status: CandidateNeed['status']) => {
 };
 
 const reviewHint = (need: CandidateNeed) => {
+  if (need.candidate_type === 'workflow_pain') {
+    return t('candidates.detail.reviewHints.workflowPain');
+  }
+  if (need.candidate_type === 'tool_seeking') {
+    return t('candidates.detail.reviewHints.toolSeeking');
+  }
+  if (need.candidate_type === 'bug_report') {
+    return t('candidates.detail.reviewHints.bugReport');
+  }
   if (need.source_type === 'github_issues') {
     return t('candidates.detail.reviewHints.github');
   }
@@ -670,6 +777,12 @@ const reviewHint = (need: CandidateNeed) => {
     return t('candidates.detail.reviewHints.community');
   }
   return t('candidates.detail.reviewHints.default');
+};
+
+const reviewSignalLabel = (signal: string) => {
+  const key = signal.replace(':', '_');
+  const translated = t(`candidates.detail.signals.${key}`);
+  return translated === `candidates.detail.signals.${key}` ? signal : translated;
 };
 
 const nextStatusOptions = (need: CandidateNeed) => {
@@ -755,6 +868,12 @@ const submitExport = () => {
   }
   if (exportForm.sourceType !== 'all') {
     payload.source_type = exportForm.sourceType;
+  }
+  if (candidateTypeFilter.value !== 'all') {
+    payload.candidate_type = candidateTypeFilter.value;
+  }
+  if (queueViewFilter.value === 'reviewable') {
+    payload.review_ready_only = true;
   }
   if (exportForm.synced !== 'all') {
     payload.synced = exportForm.synced === 'synced';

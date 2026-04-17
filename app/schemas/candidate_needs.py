@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from app.models import CandidateNeedStatus, ExportJobStatus, SourceType, SyncChannel
+from app.models import CandidateNeedStatus, CandidateNeedType, ExportJobStatus, SourceType, SyncChannel
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -20,6 +20,16 @@ class CandidateNeedStatusEnum(str, Enum):
     COMPLETED = CandidateNeedStatus.COMPLETED.value
 
 
+class CandidateNeedTypeEnum(str, Enum):
+    """候选需求类型枚举。"""
+
+    WORKFLOW_PAIN = CandidateNeedType.WORKFLOW_PAIN.value
+    FEATURE_GAP = CandidateNeedType.FEATURE_GAP.value
+    TOOL_SEEKING = CandidateNeedType.TOOL_SEEKING.value
+    BUG_REPORT = CandidateNeedType.BUG_REPORT.value
+    MARKET_SIGNAL = CandidateNeedType.MARKET_SIGNAL.value
+
+
 class CandidateNeedRead(BaseModel):
     """候选需求输出模型。"""
 
@@ -30,6 +40,10 @@ class CandidateNeedRead(BaseModel):
     target_users: str | None = None
     value_proposition: str | None = None
     competition: str | None = None
+    candidate_type: CandidateNeedTypeEnum | None = None
+    review_readiness: float | None = Field(default=None, ge=0.0, le=1.0)
+    review_explanation: str | None = None
+    review_signals: list[str] = Field(default_factory=list)
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     rule_score: float | None = Field(default=None, ge=0.0, le=1.0)
     status: CandidateNeedStatusEnum
@@ -92,6 +106,8 @@ class CandidateNeedCreate(BaseModel):
     target_users: str | None = None
     value_proposition: str | None = None
     competition: str | None = None
+    candidate_type: CandidateNeedTypeEnum | None = None
+    review_readiness: float | None = Field(default=None, ge=0.0, le=1.0)
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     status: CandidateNeedStatusEnum = CandidateNeedStatusEnum.PENDING_REVIEW
     notes: str | None = None
@@ -107,6 +123,8 @@ class CandidateNeedUpdate(BaseModel):
     target_users: str | None = None
     value_proposition: str | None = None
     competition: str | None = None
+    candidate_type: CandidateNeedTypeEnum | None = None
+    review_readiness: float | None = Field(default=None, ge=0.0, le=1.0)
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     status: CandidateNeedStatusEnum | None = None
     notes: str | None = None
@@ -184,6 +202,9 @@ class CandidateNeedExportJobCreate(BaseModel):
     search: str | None = None
     raw_entry_id: int | None = None
     source_type: SourceType | None = None
+    candidate_type: CandidateNeedTypeEnum | None = None
+    review_ready_only: bool | None = None
+    min_review_readiness: float | None = Field(default=None, ge=0.0, le=1.0)
     synced: bool | None = None
     limit: int | None = Field(default=None, ge=1, le=5000)
 

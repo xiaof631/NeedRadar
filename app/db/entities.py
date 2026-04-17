@@ -21,6 +21,7 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 from app.models import (
     CandidateNeedStatus,
+    CandidateNeedType,
     ExportJobStatus,
     FetchStatus,
     RawEntryStatus,
@@ -132,6 +133,10 @@ class CandidateNeedEntity(TimestampMixin, Base):
     target_users: Mapped[str | None] = mapped_column(Text)
     value_proposition: Mapped[str | None] = mapped_column(Text)
     competition: Mapped[str | None] = mapped_column(Text)
+    candidate_type: Mapped[str | None] = mapped_column(
+        String(32), default=CandidateNeedType.MARKET_SIGNAL.value
+    )
+    review_readiness: Mapped[float | None] = mapped_column(Float)
     notes: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         String(32), default=CandidateNeedStatus.PENDING_REVIEW.value

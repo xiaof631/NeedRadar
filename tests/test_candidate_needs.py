@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.main import app
-from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus, SourceType, SyncChannel
+from app.models import CandidateNeedStatus, CandidateNeedType, RawEntryStatus, SourceStatus, SourceType, SyncChannel
 import app.services.export_jobs as export_jobs
 
 from app.services import candidate_clusters, candidate_needs, raw_entries, rss_sources, sync_audit
@@ -257,6 +257,61 @@ def test_filter_candidate_needs_by_synced_status(client: TestClient) -> None:
     synced_body = synced_response.json()
     assert synced_body["total"] == 1
     assert all(item["synced_at"] is not None for item in synced_body["items"])
+
+
+def test_candidate_review_metadata_is_enriched(client: TestClient) -> None:
+    _seed_candidate_needs()
+
+    response = client.get("/api/v1/candidate-needs", params={"limit": 10})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] >= 2
+    first = body["items"][0]
+    assert first["candidate_type"] is not None
+    assert 0.0 <= first["review_readiness"] <= 1.0
+    assert isinstance(first["review_signals"], list)
+    assert first["review_explanation"]
+
+
+def test_candidate_review_queue_filter_excludes_bug_reports(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Issues",
+            "url": "https://example.com/issues.xml",
+            "frequency": 3600,
+            "status": SourceStatus.ACTIVE,
+            "source_type": SourceType.GITHUB_ISSUES,
+        }
+    )
+    entry = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "issue-1",
+            "title": "OAuth login stuck with API Error 500",
+            "summary": "OAuth flow is stuck and users cannot continue.",
+            "status": RawEntryStatus.PROMOTED,
+        }
+    )
+    candidate_needs.create_need(
+        {
+            "raw_entry_id": entry.id,
+            "summary": "OAuth login stuck with API Error 500",
+            "problem_statement": "Users cannot continue after the OAuth flow gets stuck.",
+            "status": CandidateNeedStatus.PENDING_REVIEW,
+        }
+    )
+    existing = candidate_needs.list_needs(limit=10)[1]
+    assert any(need.candidate_type == CandidateNeedType.BUG_REPORT for need in existing)
+
+    response = client.get(
+        "/api/v1/candidate-needs",
+        params={"review_ready_only": True},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert all(item["candidate_type"] != CandidateNeedType.BUG_REPORT.value for item in body["items"])
 
 
 def test_sync_logs_endpoint(client: TestClient) -> None:

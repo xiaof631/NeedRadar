@@ -199,6 +199,8 @@
       "search": "关键字",
       "status": "状态",
       "sourceType": "来源类型",
+      "candidateType": "候选类型",
+      "queueView": "队列视图",
       "synced": "同步状态",
       "searchPlaceholder": "输入摘要、问题或备注以筛选",
       "panelTitle": "筛选条件",
@@ -213,6 +215,18 @@
         "hacker_news": "Hacker News",
         "reddit": "Reddit",
         "youtube": "YouTube"
+      },
+      "candidateTypeOptions": {
+        "all": "全部类型",
+        "workflow_pain": "工作流痛点",
+        "feature_gap": "能力缺口",
+        "tool_seeking": "找工具/替代",
+        "bug_report": "故障反馈",
+        "market_signal": "市场信号"
+      },
+      "queueViewOptions": {
+        "reviewable": "默认评审队列",
+        "all": "全部候选"
       },
       "syncedOptions": {
         "all": "全部",
@@ -235,7 +249,9 @@
     "table": {
       "summary": "摘要",
       "source": "来源",
+      "candidateType": "候选类型",
       "status": "状态",
+      "reviewReadiness": "评审就绪度",
       "ruleScore": "规则得分",
       "confidence": "信心",
       "synced": "同步",
@@ -276,7 +292,14 @@
         "reopen": "重新进入待评审",
         "complete": "标记为已完成"
       },
+      "explanation": {
+        "title": "入队原因",
+        "empty": "暂无自动解释"
+      },
       "reviewHints": {
+        "workflowPain": "这类候选更像稳定存在的流程摩擦，优先判断问题是否重复出现、是否值得产品化。",
+        "toolSeeking": "这类候选更像明确的找工具/替代需求，优先判断是否存在统一需求面与付费意愿。",
+        "bugReport": "这类候选默认不进入评审队列，除非它背后代表更广泛的能力缺口或反复出现的流程问题。",
         "github": "GitHub issue 更适合判断是否代表稳定存在的工作流问题，而不是单点技术故障。",
         "community": "社区来源更适合判断是否代表一类重复出现的真实需求，而不是单次闲聊或泛建议。",
         "default": "优先判断问题是否真实、是否重复出现、是否值得进入后续调研。"
@@ -286,10 +309,33 @@
         "targetUsers": "目标用户",
         "value": "价值主张",
         "competition": "竞品/替代",
+        "candidateType": "候选类型",
+        "reviewReadiness": "评审就绪度",
         "ruleScore": "规则得分",
         "confidence": "信心",
         "rawEntryId": "原始条目",
         "updatedAt": "更新时间"
+      },
+      "signals": {
+        "type_workflow_pain": "类型：工作流痛点",
+        "type_feature_gap": "类型：能力缺口",
+        "type_tool_seeking": "类型：找工具/替代",
+        "type_bug_report": "类型：故障反馈",
+        "type_market_signal": "类型：市场信号",
+        "source_rss": "来源：RSS",
+        "source_hacker_news": "来源：Hacker News",
+        "source_github_issues": "来源：GitHub Issues",
+        "source_reddit": "来源：Reddit",
+        "source_youtube": "来源：YouTube",
+        "review_high": "高就绪度",
+        "review_queue": "进入默认评审队列",
+        "review_low": "低就绪度",
+        "rule_strong": "强规则命中",
+        "rule_moderate": "中等规则命中",
+        "confidence_high": "高置信度",
+        "confidence_medium": "中等置信度",
+        "problem_present": "问题陈述完整",
+        "user_present": "目标用户已识别"
       }
     },
     "intelligence": {

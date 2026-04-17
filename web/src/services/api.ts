@@ -252,6 +252,13 @@ export type CandidateNeedSourceType =
   | 'reddit'
   | 'youtube';
 
+export type CandidateNeedType =
+  | 'workflow_pain'
+  | 'feature_gap'
+  | 'tool_seeking'
+  | 'bug_report'
+  | 'market_signal';
+
 export interface CandidateNeed {
   id: number;
   raw_entry_id: number;
@@ -260,6 +267,10 @@ export interface CandidateNeed {
   target_users: string | null;
   value_proposition: string | null;
   competition: string | null;
+  candidate_type: CandidateNeedType | null;
+  review_readiness: number | null;
+  review_explanation: string | null;
+  review_signals: string[];
   confidence: number | null;
   rule_score: number | null;
   status: CandidateNeedStatus;
@@ -309,6 +320,9 @@ export interface CandidateNeedQueryParams {
   statuses?: CandidateNeedStatus[];
   search?: string;
   source_type?: CandidateNeedSourceType;
+  candidate_type?: CandidateNeedType;
+  review_ready_only?: boolean;
+  min_review_readiness?: number;
   synced?: boolean;
 }
 
@@ -384,6 +398,9 @@ export interface CandidateNeedExportJobPayload {
   search?: string;
   raw_entry_id?: number;
   source_type?: CandidateNeedSourceType;
+  candidate_type?: CandidateNeedType;
+  review_ready_only?: boolean;
+  min_review_readiness?: number;
   synced?: boolean;
   limit?: number;
 }
@@ -426,8 +443,17 @@ function buildCandidateNeedParams(params: CandidateNeedQueryParams): URLSearchPa
   if (params.source_type) {
     searchParams.set('source_type', params.source_type);
   }
+  if (params.candidate_type) {
+    searchParams.set('candidate_type', params.candidate_type);
+  }
   if (params.statuses) {
     params.statuses.forEach((status) => searchParams.append('statuses', status));
+  }
+  if (typeof params.review_ready_only === 'boolean') {
+    searchParams.set('review_ready_only', String(params.review_ready_only));
+  }
+  if (typeof params.min_review_readiness === 'number') {
+    searchParams.set('min_review_readiness', String(params.min_review_readiness));
   }
   if (typeof params.synced === 'boolean') {
     searchParams.set('synced', String(params.synced));

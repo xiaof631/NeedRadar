@@ -199,6 +199,8 @@
       "search": "Keyword",
       "status": "Status",
       "sourceType": "Source type",
+      "candidateType": "Candidate type",
+      "queueView": "Queue view",
       "synced": "Sync state",
       "searchPlaceholder": "Type to filter by summary, problem or note",
       "panelTitle": "Filters",
@@ -213,6 +215,18 @@
         "hacker_news": "Hacker News",
         "reddit": "Reddit",
         "youtube": "YouTube"
+      },
+      "candidateTypeOptions": {
+        "all": "All types",
+        "workflow_pain": "Workflow pain",
+        "feature_gap": "Feature gap",
+        "tool_seeking": "Tool seeking",
+        "bug_report": "Bug report",
+        "market_signal": "Market signal"
+      },
+      "queueViewOptions": {
+        "reviewable": "Default review queue",
+        "all": "All candidates"
       },
       "syncedOptions": {
         "all": "All",
@@ -235,7 +249,9 @@
     "table": {
       "summary": "Summary",
       "source": "Source",
+      "candidateType": "Candidate type",
       "status": "Status",
+      "reviewReadiness": "Review readiness",
       "ruleScore": "Rule score",
       "confidence": "Confidence",
       "synced": "Sync",
@@ -276,7 +292,14 @@
         "reopen": "Return to review",
         "complete": "Mark completed"
       },
+      "explanation": {
+        "title": "Why this is in queue",
+        "empty": "No automatic explanation yet"
+      },
       "reviewHints": {
+        "workflowPain": "These items usually represent recurring workflow friction. Focus on repeatability and productization potential.",
+        "toolSeeking": "These items are explicit tool-seeking signals. Focus on whether they map to a shared demand surface and clear willingness to switch or pay.",
+        "bugReport": "These items stay out of the default review queue unless they point to a broader capability gap or a repeated workflow failure.",
         "github": "GitHub issues should be reviewed for durable workflow pain, not just isolated implementation bugs.",
         "community": "Community signals should be reviewed for repeated real demand, not casual discussion or generic advice.",
         "default": "Check whether the problem is real, recurring, and worth deeper validation."
@@ -286,10 +309,33 @@
         "targetUsers": "Target users",
         "value": "Value proposition",
         "competition": "Competition / alternative",
+        "candidateType": "Candidate type",
+        "reviewReadiness": "Review readiness",
         "ruleScore": "Rule score",
         "confidence": "Confidence",
         "rawEntryId": "Raw entry",
         "updatedAt": "Updated at"
+      },
+      "signals": {
+        "type_workflow_pain": "Type: Workflow pain",
+        "type_feature_gap": "Type: Feature gap",
+        "type_tool_seeking": "Type: Tool seeking",
+        "type_bug_report": "Type: Bug report",
+        "type_market_signal": "Type: Market signal",
+        "source_rss": "Source: RSS",
+        "source_hacker_news": "Source: Hacker News",
+        "source_github_issues": "Source: GitHub Issues",
+        "source_reddit": "Source: Reddit",
+        "source_youtube": "Source: YouTube",
+        "review_high": "High readiness",
+        "review_queue": "In default review queue",
+        "review_low": "Low readiness",
+        "rule_strong": "Strong rule match",
+        "rule_moderate": "Moderate rule match",
+        "confidence_high": "High confidence",
+        "confidence_medium": "Medium confidence",
+        "problem_present": "Problem statement present",
+        "user_present": "Target user identified"
       }
     },
     "intelligence": {

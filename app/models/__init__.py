@@ -4,6 +4,7 @@ from app.models.candidate_need import (
     CandidateNeed,
     CandidateNeedStatus,
     CandidateNeedStatusLog,
+    CandidateNeedType,
 )
 from app.models.downstream import DownstreamSyncLog, SyncChannel
 from app.models.export_job import ExportJob, ExportJobStatus
@@ -22,6 +23,7 @@ __all__ = [
     "CandidateNeed",
     "CandidateNeedStatus",
     "CandidateNeedStatusLog",
+    "CandidateNeedType",
     "DownstreamSyncLog",
     "SyncChannel",
     "ExportJob",

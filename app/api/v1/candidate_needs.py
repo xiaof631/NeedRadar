@@ -11,7 +11,7 @@ from io import StringIO
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.db.storage import db
-from app.models import CandidateNeed, CandidateNeedStatus, ExportJobStatus, RssSource, SourceType, SyncChannel
+from app.models import CandidateNeed, CandidateNeedStatus, CandidateNeedType, ExportJobStatus, RssSource, SourceType, SyncChannel
 from app.schemas import (
     CandidateNeedClusterList,
     CandidateNeedClusterRead,
@@ -24,6 +24,7 @@ from app.schemas import (
     CandidateNeedStatusLogRead,
     CandidateNeedStatusEnum,
     CandidateNeedStatusUpdate,
+    CandidateNeedTypeEnum,
     CandidateNeedSyncLogList,
     CandidateNeedSyncLogRead,
     CandidateNeedSyncChannelStat,
@@ -55,6 +56,9 @@ async def list_candidate_needs(
     search: str | None = Query(default=None, description="关键字搜索"),
     raw_entry_id: int | None = Query(default=None, description="关联的原始条目 ID"),
     source_type: SourceType | None = Query(default=None, description="按来源类型过滤"),
+    candidate_type: CandidateNeedTypeEnum | None = Query(default=None, description="按候选类型过滤"),
+    review_ready_only: bool | None = Query(default=None, description="仅显示默认评审队列"),
+    min_review_readiness: float | None = Query(default=None, ge=0.0, le=1.0, description="最小评审就绪度"),
     synced: bool | None = Query(
         default=None,
         description="按同步状态过滤，true 表示已同步，false 表示未同步",
@@ -65,6 +69,9 @@ async def list_candidate_needs(
         search=search,
         raw_entry_id=raw_entry_id,
         source_type=source_type,
+        candidate_type=_convert_candidate_type(candidate_type),
+        review_ready_only=review_ready_only,
+        min_review_readiness=min_review_readiness,
         synced=synced,
         skip=skip,
         limit=limit,
@@ -87,6 +94,9 @@ async def list_candidate_need_clusters(
     ),
     search: str | None = Query(default=None, description="关键字搜索"),
     source_type: SourceType | None = Query(default=None, description="按来源类型过滤"),
+    candidate_type: CandidateNeedTypeEnum | None = Query(default=None, description="按候选类型过滤"),
+    review_ready_only: bool | None = Query(default=None, description="仅显示默认评审队列"),
+    min_review_readiness: float | None = Query(default=None, ge=0.0, le=1.0, description="最小评审就绪度"),
     synced: bool | None = Query(default=None, description="按同步状态过滤"),
     limit: int = Query(default=100, ge=1, le=500, description="聚类时纳入计算的候选需求数量"),
     min_cluster_size: int = Query(default=2, ge=2, le=20, description="最小簇大小"),
@@ -102,6 +112,9 @@ async def list_candidate_need_clusters(
         statuses=tuple(normalized_statuses) if normalized_statuses is not None else None,
         search=search,
         source_type=source_type,
+        candidate_type=_convert_candidate_type(candidate_type),
+        review_ready_only=review_ready_only,
+        min_review_readiness=min_review_readiness,
         synced=synced,
         limit=limit,
         min_cluster_size=min_cluster_size,
@@ -300,6 +313,9 @@ async def export_candidate_needs(
     search: str | None = Query(default=None, description="关键字搜索"),
     raw_entry_id: int | None = Query(default=None, description="关联的原始条目 ID"),
     source_type: SourceType | None = Query(default=None, description="按来源类型过滤"),
+    candidate_type: CandidateNeedTypeEnum | None = Query(default=None, description="按候选类型过滤"),
+    review_ready_only: bool | None = Query(default=None, description="仅显示默认评审队列"),
+    min_review_readiness: float | None = Query(default=None, ge=0.0, le=1.0, description="最小评审就绪度"),
     synced: bool | None = Query(
         default=None,
         description="按同步状态过滤，true 表示已同步，false 表示未同步",
@@ -311,6 +327,9 @@ async def export_candidate_needs(
         search=search,
         raw_entry_id=raw_entry_id,
         source_type=source_type,
+        candidate_type=_convert_candidate_type(candidate_type),
+        review_ready_only=review_ready_only,
+        min_review_readiness=min_review_readiness,
         synced=synced,
         limit=limit,
     )
@@ -328,6 +347,8 @@ async def export_candidate_needs(
         "target_users",
         "value_proposition",
         "competition",
+        "candidate_type",
+        "review_readiness",
         "confidence",
         "rule_score",
         "status",
@@ -347,6 +368,8 @@ async def export_candidate_needs(
                 "target_users": model.target_users or "",
                 "value_proposition": model.value_proposition or "",
                 "competition": model.competition or "",
+                "candidate_type": model.candidate_type.value if model.candidate_type else "",
+                "review_readiness": model.review_readiness if model.review_readiness is not None else "",
                 "confidence": model.confidence if model.confidence is not None else "",
                 "rule_score": model.rule_score if model.rule_score is not None else "",
                 "status": model.status.value,
@@ -392,6 +415,9 @@ async def create_candidate_need_export_task(
         search=payload.search,
         raw_entry_id=payload.raw_entry_id,
         source_type=payload.source_type,
+        candidate_type=_convert_candidate_type(payload.candidate_type),
+        review_ready_only=payload.review_ready_only,
+        min_review_readiness=payload.min_review_readiness,
         synced=payload.synced,
         limit=payload.limit,
     )
@@ -432,6 +458,16 @@ def _convert_statuses(
     return [_convert_status(value) for value in values]
 
 
+def _convert_candidate_type(
+    value: CandidateNeedTypeEnum | CandidateNeedType | None,
+) -> CandidateNeedType | None:
+    if value is None:
+        return None
+    if isinstance(value, CandidateNeedType):
+        return value
+    return CandidateNeedType(value.value)
+
+
 def _convert_sync_channel(
     value: SyncChannelEnum | SyncChannel | None,
 ) -> SyncChannel | None:
@@ -461,13 +497,91 @@ def _build_candidate_need_reads(items: list[CandidateNeed]) -> list[CandidateNee
             if source is not None:
                 source_name = source.name
                 source_type = source.source_type
+        review_signals = _build_review_signals(item, source_type)
         payloads.append(
             CandidateNeedRead.model_validate(
                 {
                     **asdict(item),
                     "source_name": source_name,
                     "source_type": source_type,
+                    "review_signals": review_signals,
+                    "review_explanation": _build_review_explanation(
+                        item,
+                        source_type=source_type,
+                        review_signals=review_signals,
+                    ),
                 }
             )
         )
     return payloads
+
+
+def _build_review_signals(
+    item: CandidateNeed,
+    source_type: SourceType | None,
+) -> list[str]:
+    signals: list[str] = []
+    if item.candidate_type is not None:
+        signals.append(f"type:{item.candidate_type.value}")
+    if source_type is not None:
+        signals.append(f"source:{source_type.value}")
+    if item.review_readiness is not None:
+        if item.review_readiness >= 0.75:
+            signals.append("review:high")
+        elif item.review_readiness >= 0.55:
+            signals.append("review:queue")
+        else:
+            signals.append("review:low")
+    if item.rule_score is not None and item.rule_score >= 0.6:
+        signals.append("rule:strong")
+    elif item.rule_score is not None and item.rule_score >= 0.4:
+        signals.append("rule:moderate")
+    if item.confidence is not None and item.confidence >= 0.75:
+        signals.append("confidence:high")
+    elif item.confidence is not None and item.confidence >= 0.6:
+        signals.append("confidence:medium")
+    if item.problem_statement:
+        signals.append("problem:present")
+    if item.target_users:
+        signals.append("user:present")
+    return signals
+
+
+def _build_review_explanation(
+    item: CandidateNeed,
+    *,
+    source_type: SourceType | None,
+    review_signals: list[str],
+) -> str | None:
+    readiness = item.review_readiness or 0.0
+    if item.candidate_type == CandidateNeedType.WORKFLOW_PAIN:
+        base = "这条候选被归为工作流痛点，说明它更像重复出现的流程摩擦，不只是一次性反馈。"
+    elif item.candidate_type == CandidateNeedType.FEATURE_GAP:
+        base = "这条候选被归为能力缺口，说明问题更接近稳定存在的产品缺失，而不是单点故障。"
+    elif item.candidate_type == CandidateNeedType.TOOL_SEEKING:
+        base = "这条候选被归为找工具/替代，说明它反映了明确的替代意图或选型需求。"
+    elif item.candidate_type == CandidateNeedType.BUG_REPORT:
+        base = "这条候选被归为故障反馈，默认不优先进入评审队列，除非它同时体现更广泛的能力缺口。"
+    elif item.candidate_type == CandidateNeedType.MARKET_SIGNAL:
+        base = "这条候选更偏市场信号，说明它有参考价值，但需求边界还不够清晰。"
+    else:
+        base = None
+
+    details: list[str] = []
+    if readiness >= 0.75:
+        details.append("当前评审就绪度较高，适合直接进入人工评审。")
+    elif readiness >= 0.55:
+        details.append("当前评审就绪度达到默认队列阈值，可以进入待评审池。")
+    else:
+        details.append("当前评审就绪度偏低，更适合作为观察信号而不是立即评审。")
+    if source_type == SourceType.GITHUB_ISSUES and item.candidate_type != CandidateNeedType.BUG_REPORT:
+        details.append("虽然来源于 GitHub，但它已经被识别成比单纯 bug 更稳定的需求信号。")
+    if "rule:strong" in review_signals:
+        details.append("它命中了较强的筛选规则信号。")
+    if "confidence:high" in review_signals:
+        details.append("结构化提取的置信度也比较高。")
+    if "problem:present" in review_signals and "user:present" in review_signals:
+        details.append("问题陈述和目标用户都比较完整。")
+    if base is None:
+        return " ".join(details) or None
+    return " ".join([base, *details])

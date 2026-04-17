@@ -11,7 +11,7 @@ from app.core import metrics
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.storage import db
-from app.models import CandidateNeedStatus, ExportJob, ExportJobStatus, SourceType, SyncChannel
+from app.models import CandidateNeedStatus, CandidateNeedType, ExportJob, ExportJobStatus, SourceType, SyncChannel
 from app.schemas import CandidateNeedRead
 from app.services import candidate_needs, sync_audit
 
@@ -33,6 +33,9 @@ def create_candidate_export_job(
     search: str | None = None,
     raw_entry_id: int | None = None,
     source_type: SourceType | None = None,
+    candidate_type: CandidateNeedType | None = None,
+    review_ready_only: bool | None = None,
+    min_review_readiness: float | None = None,
     synced: bool | None = None,
     limit: int | None = None,
 ) -> ExportJob:
@@ -43,6 +46,9 @@ def create_candidate_export_job(
         "search": search,
         "raw_entry_id": raw_entry_id,
         "source_type": source_type.value if source_type else None,
+        "candidate_type": candidate_type.value if candidate_type else None,
+        "review_ready_only": review_ready_only,
+        "min_review_readiness": min_review_readiness,
         "synced": synced,
         "limit": limit,
     }
@@ -124,6 +130,9 @@ def _render_candidates(job: ExportJob) -> Tuple[dict[str, Any], list[CandidateNe
         search=filters.get("search"),
         raw_entry_id=filters.get("raw_entry_id"),
         source_type=SourceType(filters["source_type"]) if filters.get("source_type") else None,
+        candidate_type=CandidateNeedType(filters["candidate_type"]) if filters.get("candidate_type") else None,
+        review_ready_only=filters.get("review_ready_only"),
+        min_review_readiness=filters.get("min_review_readiness"),
         synced=filters.get("synced"),
         limit=filters.get("limit"),
     )
@@ -148,6 +157,8 @@ def _render_candidates(job: ExportJob) -> Tuple[dict[str, Any], list[CandidateNe
             "target_users",
             "value_proposition",
             "competition",
+            "candidate_type",
+            "review_readiness",
             "confidence",
             "rule_score",
             "status",
@@ -166,6 +177,8 @@ def _render_candidates(job: ExportJob) -> Tuple[dict[str, Any], list[CandidateNe
                 model.target_users or "",
                 model.value_proposition or "",
                 model.competition or "",
+                model.candidate_type.value if model.candidate_type else "",
+                model.review_readiness if model.review_readiness is not None else "",
                 model.confidence if model.confidence is not None else "",
                 model.rule_score if model.rule_score is not None else "",
                 model.status.value,

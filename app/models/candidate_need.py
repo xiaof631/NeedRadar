@@ -17,6 +17,16 @@ class CandidateNeedStatus(str, Enum):
     COMPLETED = "completed"
 
 
+class CandidateNeedType(str, Enum):
+    """候选需求的类型分层。"""
+
+    WORKFLOW_PAIN = "workflow_pain"
+    FEATURE_GAP = "feature_gap"
+    TOOL_SEEKING = "tool_seeking"
+    BUG_REPORT = "bug_report"
+    MARKET_SIGNAL = "market_signal"
+
+
 @dataclass(slots=True)
 class CandidateNeed:
     """候选需求记录。"""
@@ -28,6 +38,8 @@ class CandidateNeed:
     target_users: str | None = None
     value_proposition: str | None = None
     competition: str | None = None
+    candidate_type: CandidateNeedType | None = None
+    review_readiness: float | None = None
     confidence: float | None = None
     rule_score: float | None = None
     status: CandidateNeedStatus = CandidateNeedStatus.PENDING_REVIEW
