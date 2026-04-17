@@ -189,6 +189,38 @@ SAMPLE_WWR_RSS = """<?xml version="1.0" encoding="UTF-8"?>
 </rss>
 """
 
+SAMPLE_REMOTIVE_JSON = """{
+  "job-count": 2,
+  "jobs": [
+    {
+      "id": 2001,
+      "url": "https://remotive.com/remote-jobs/software-dev/senior-frontend-engineer-contract-2001",
+      "title": "Senior Frontend Engineer (Contract)",
+      "company_name": "Acme Labs",
+      "category": "Software Development",
+      "job_type": "contract",
+      "publication_date": "2026-04-16T09:30:00",
+      "candidate_required_location": "Worldwide",
+      "salary": "$100,000 - $120,000",
+      "description": "<p>Build and ship React interfaces for a B2B SaaS platform.</p>",
+      "tags": ["React", "TypeScript", "Frontend"]
+    },
+    {
+      "id": 2002,
+      "url": "https://remotive.com/remote-jobs/software-dev/full-time-backend-engineer-2002",
+      "title": "Backend Engineer",
+      "company_name": "Northwind",
+      "category": "Software Development",
+      "job_type": "full_time",
+      "publication_date": "2026-04-15T10:00:00",
+      "candidate_required_location": "USA",
+      "salary": "$130,000 - $150,000",
+      "description": "<p>Join our full-time backend team.</p>",
+      "tags": ["Python", "API", "Backend"]
+    }
+  ]
+}"""
+
 
 def test_fetch_rss_source_success_and_deduplicate() -> None:
     async def _run() -> None:
@@ -360,6 +392,40 @@ def test_parse_weworkremotely_programming_rss() -> None:
     assert item.metadata["engagement"] == "contract"
     assert item.metadata["budget"] == "$100/hr to $130/hr"
     assert item.metadata["location"] == "Anywhere in the World"
+
+
+def test_parse_remotive_api_contract_jobs() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=40",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {
+                "adapter": "remotive_api",
+                "item_limit": 10,
+                "job_types": "contract,freelance",
+                "include_keywords": "contract,freelance,developer,engineer,frontend,backend,react,next.js,python,django,api",
+                "exclude_keywords": "intern,designer,design,sales,marketing,talent pool,talent community",
+            },
+        }
+    )
+
+    items = marketplace_fetcher._filter_marketplace_items(
+        source,
+        marketplace_fetcher._parse_marketplace_page(source, SAMPLE_REMOTIVE_JSON),
+    )
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.title == "Senior Frontend Engineer (Contract)"
+    assert item.author == "Acme Labs"
+    assert item.link == "https://remotive.com/remote-jobs/software-dev/senior-frontend-engineer-contract-2001"
+    assert item.metadata["platform"] == "Remotive"
+    assert item.metadata["engagement"] == "contract"
+    assert item.metadata["budget"] == "$100,000 - $120,000"
+    assert item.metadata["location"] == "Worldwide"
+    assert item.metadata["skills"] == ["React", "TypeScript", "Frontend"]
 
 
 def test_fetch_rss_source_http_failure() -> None:
@@ -642,6 +708,42 @@ def test_fetch_marketplace_source_success() -> None:
         assert entries[0].metadata["budget"] == "1千~5千"
         assert entries[0].metadata["category"] == "数据采集与分析"
         assert entries[0].link == "https://www.sxsoft.com/project/1"
+
+    asyncio.run(_run())
+
+
+def test_fetch_remotive_marketplace_source_success() -> None:
+    async def _run() -> None:
+        source = rss_sources.create_source(
+            {
+                "name": "Remotive Software Contracts",
+                "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=40",
+                "frequency": 21600,
+                "source_type": SourceType.FREELANCE_MARKETPLACE,
+                "config": {
+                    "adapter": "remotive_api",
+                    "item_limit": 5,
+                    "job_types": "contract,freelance",
+                },
+            }
+        )
+
+        def handler(_: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, text=SAMPLE_REMOTIVE_JSON, headers={"content-type": "application/json"})
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert result.status == FetchStatus.SUCCESS
+        assert result.fetched_entries == 1
+        assert result.new_entries == 1
+
+        total, entries = raw_entries.list_entries(source_id=source.id)
+        assert total == 1
+        assert entries[0].title == "Senior Frontend Engineer (Contract)"
+        assert entries[0].metadata["platform"] == "Remotive"
+        assert entries[0].metadata["engagement"] == "contract"
+        assert entries[0].author == "Acme Labs"
 
     asyncio.run(_run())
 

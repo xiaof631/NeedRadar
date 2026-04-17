@@ -158,6 +158,21 @@ _MARKETPLACE_PUBLIC_BASELINE: tuple[CatalogEntry, ...] = (
         },
     },
     {
+        "name": "Remotive Software Contracts",
+        "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=40",
+        "category": "freelance-marketplace",
+        "frequency": 21600,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "remotive_api",
+            "item_limit": 15,
+            "topic": "software-contracting",
+            "job_types": "contract,freelance",
+            "include_keywords": "contract,freelance,consultant,developer,engineer,full stack,full-stack,frontend,backend,react,next.js,python,django,api,saas,wordpress,mobile,android,ios",
+            "exclude_keywords": "intern,designer,design,sales,marketing,talent pool,talent community,recruiter,human resources",
+        },
+    },
+    {
         "name": "Contra Featured Remote Jobs",
         "url": "https://contra.com/featured-jobs/freelance-creative-jobs",
         "category": "freelance-marketplace",

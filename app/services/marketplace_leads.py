@@ -411,10 +411,16 @@ def _diversify_by_source(items: list[MarketplaceLead]) -> list[MarketplaceLead]:
 
 _STRONG_HIGH_PURITY_KEYWORDS = (
     "frontend developer",
+    "frontend engineer",
     "backend developer",
+    "backend engineer",
     "full stack developer",
+    "full stack engineer",
     "full-stack developer",
+    "full-stack engineer",
     "full-stack web developer",
+    "full-stack react",
+    "react developer",
     "web developer",
     "react / next.js",
     "react/next.js",

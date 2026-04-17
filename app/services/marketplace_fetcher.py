@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -188,6 +189,8 @@ def _parse_marketplace_page(source: RssSource, payload: str) -> list[ParsedMarke
         return _parse_contra_featured_jobs(payload, source=source, item_limit=item_limit)
     if adapter == "peopleperhour_technology":
         return _parse_peopleperhour_technology(payload, source=source, item_limit=item_limit)
+    if adapter == "remotive_api":
+        return _parse_remotive_api(payload, source=source, item_limit=item_limit)
     if adapter == "wwr_programming_rss":
         return _parse_wwr_programming_rss(payload, source=source, item_limit=item_limit)
     if adapter == "zbj_hall_scroll":
@@ -500,6 +503,83 @@ def _parse_peopleperhour_technology(
             break
     if not items:
         raise ValueError("failed to parse peopleperhour marketplace listing")
+    return items
+
+
+def _parse_remotive_api(
+    payload: str,
+    *,
+    source: RssSource,
+    item_limit: int,
+) -> list[ParsedMarketplaceLead]:
+    try:
+        document = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise ValueError("failed to parse remotive api response") from exc
+
+    jobs = document.get("jobs")
+    if not isinstance(jobs, list):
+        raise ValueError("failed to parse remotive api response")
+
+    allowed_job_types = {
+        item
+        for item in _normalize_keywords(source.config.get("job_types"))
+        if item
+    }
+    items: list[ParsedMarketplaceLead] = []
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        link = _normalize_text(job.get("url"))
+        title = _normalize_text(job.get("title"))
+        if not link or not title:
+            continue
+        job_type = _normalize_text(job.get("job_type"))
+        description_html = _normalize_text(job.get("description"))
+        description = _strip_html_tags(description_html or "")
+        category = _normalize_text(job.get("category"))
+        company = _normalize_text(job.get("company_name"))
+        location = _normalize_text(job.get("candidate_required_location"))
+        salary = _normalize_text(job.get("salary"))
+        tags = ["marketplace", "remotive", "remote"]
+        if category:
+            tags.append(category)
+
+        if allowed_job_types:
+            normalized_job_type = (job_type or "").lower()
+            haystack = " ".join(part for part in (title, description or "") if part).lower()
+            if normalized_job_type not in allowed_job_types and not any(
+                keyword in haystack for keyword in allowed_job_types
+            ):
+                continue
+
+        items.append(
+            ParsedMarketplaceLead(
+                guid=link,
+                title=title,
+                summary=_join_summary(title, budget=salary, timeline=location, platform="Remotive"),
+                description=description,
+                link=link,
+                published_at=_parse_datetime(job.get("publication_date")),
+                author=company,
+                tags=list(dict.fromkeys(tags)),
+                metadata={
+                    "platform": "Remotive",
+                    "category": category,
+                    "budget": salary,
+                    "timeline": location,
+                    "engagement": job_type,
+                    "location": location,
+                    "skills": _extract_remotive_skills(job),
+                    "bids": None,
+                },
+            )
+        )
+        if len(items) >= item_limit:
+            break
+
+    if not items:
+        raise ValueError("failed to parse remotive api response")
     return items
 
 
@@ -843,6 +923,31 @@ def _parse_date(value: str | None) -> datetime | None:
         return datetime.fromisoformat(text).replace(tzinfo=UTC)
     except ValueError:
         return None
+
+
+def _parse_datetime(value: object) -> datetime | None:
+    text = _normalize_text(value)
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _extract_remotive_skills(job: dict[str, Any]) -> list[str]:
+    candidates = job.get("tags")
+    if not isinstance(candidates, list):
+        return []
+    skills: list[str] = []
+    for item in candidates:
+        text = _normalize_text(item)
+        if text:
+            skills.append(text)
+    return skills
 
 
 def _coerce_item_limit(value: Any) -> int:

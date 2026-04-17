@@ -385,6 +385,47 @@ def test_peopleperhour_hubspot_cms_project_is_high_purity() -> None:
     assert tier_breakdown["expanded"] == 0
 
 
+def test_remotive_full_stack_react_contract_is_high_purity() -> None:
+    remotive = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=40",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "remotive_api"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": remotive.id,
+            "guid": "remotive-full-stack-react",
+            "title": "Senior Full-stack React Developer",
+            "summary": "Senior Full-stack React Developer | Americas, Europe, Asia, Oceania",
+            "content": "Contract software development role covering React, Python, Node.js, and Next.js delivery.",
+            "link": "https://remotive.com/remote-jobs/software-development/senior-full-stack-react-developer-2088711",
+            "tags": ["marketplace", "remotive", "remote", "Software Development"],
+            "metadata": {
+                "platform": "Remotive",
+                "category": "Software Development",
+                "timeline": "Americas, Europe, Asia, Oceania",
+                "engagement": "contract",
+                "location": "Americas, Europe, Asia, Oceania",
+                "skills": ["react", "python", "node.js", "next.js"],
+            },
+        }
+    )
+
+    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
+        tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    )
+
+    assert total == 1
+    assert items[0].source_name == "Remotive Software Contracts"
+    assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    assert tier_breakdown["high_purity"] == 1
+    assert tier_breakdown["expanded"] == 0
+
+
 def test_peopleperhour_kiosk_project_stays_expanded() -> None:
     pph = rss_sources.create_source(
         {
