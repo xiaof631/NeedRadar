@@ -150,6 +150,45 @@ SAMPLE_ZBJ_HTML = """
 </ul>
 """
 
+SAMPLE_PPH_HTML = """
+<ul>
+  <li class="list__item⤍List⤚2ytmm">
+    <div class="item⤍ListItem⤚1iGUH item--container⤍ListItem⤚2wpiz">
+      <div class="card__meta⤍ListItem⤚3wkEV">
+        <div class="card__user⤍ListItem⤚3sK3s">
+          <span class="card__username-container⤍ListItem⤚2kPGk"><span class="u-txt--crop">by<span class="card__username⤍ListItem⤚QnBBG">&nbsp;Raj S.</span></span></span>
+        </div>
+        <div class="u-txt--right card__price⤍ListItem⤚3VxJ9"><span class="title-nano"><div><span>$203</span></div></span></div>
+      </div>
+      <h6 class="item__title⤍ListItem⤚2FRMT"><a class="item__url⤍ListItem⤚20ULx" href="https://www.peopleperhour.com/freelance-jobs/technology-programming/front-end-development/frontend-developer-react-next-js-4488000">Frontend Developer (React / Next.js)</a></h6>
+      <p class="item__desc⤍ListItem⤚3f4JV">Early-stage startup seeks a proactive Frontend Developer (React/Next.js) to own features end-to-end.</p>
+      <div class="card__footer⤍ListItem⤚1KHhv"><div class="nano card__footer-left⤍ListItem⤚16Odv"><span>1 day ago</span><span class="u-mgl--1">57 proposals</span><span class="u-mgl--1"><span><i class="fpph fpph-location"></i>Remote</span></span></div></div>
+    </div>
+  </li>
+</ul>
+"""
+
+SAMPLE_WWR_RSS = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>We Work Remotely: Remote jobs in design, programming, marketing and more</title>
+    <item>
+      <title>Sanctuary Computer: Senior Frontend Developer (Contract)</title>
+      <region>Anywhere in the World</region>
+      <category>Front-End Programming</category>
+      <description><![CDATA[
+        <p><strong>Headquarters:</strong> New York City</p>
+        <p>We are hiring a contract-based Senior Frontend Developer for client projects.</p>
+        <p>Compensation ranges from $100/hr to $130/hr.</p>
+      ]]></description>
+      <pubDate>Fri, 27 Mar 2026 16:28:28 +0000</pubDate>
+      <guid>https://weworkremotely.com/remote-jobs/sanctuary-computer-senior-frontend-developer-1</guid>
+      <link>https://weworkremotely.com/remote-jobs/sanctuary-computer-senior-frontend-developer-1</link>
+    </item>
+  </channel>
+</rss>
+"""
+
 
 def test_fetch_rss_source_success_and_deduplicate() -> None:
     async def _run() -> None:
@@ -259,6 +298,68 @@ def test_parse_zbj_marketplace_listing() -> None:
     assert item.metadata["timeline"] == "选标中"
     assert item.metadata["location"] is None
     assert item.description == "选标中"
+
+
+def test_parse_peopleperhour_marketplace_listing() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {
+                "adapter": "peopleperhour_technology",
+                "item_limit": 10,
+                "include_keywords": "developer,development,software,website,web,frontend,backend,full-stack,full stack,react,next.js,python,django,api,cms,erp,crm,database,automation,android,ios,wordpress,app",
+                "exclude_keywords": "logo,branding,illustration,copywriting,video,marketing,social media,seo only,design only",
+            },
+        }
+    )
+
+    items = marketplace_fetcher._filter_marketplace_items(
+        source,
+        marketplace_fetcher._parse_marketplace_page(source, SAMPLE_PPH_HTML),
+    )
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.title == "Frontend Developer (React / Next.js)"
+    assert item.author == "Raj S."
+    assert item.metadata["platform"] == "PeoplePerHour"
+    assert item.metadata["budget"] == "$203"
+    assert item.metadata["location"] == "Remote"
+    assert item.metadata["bids"] == "57"
+
+
+def test_parse_weworkremotely_programming_rss() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "We Work Remotely Programming Contracts",
+            "url": "https://weworkremotely.com/categories/remote-programming-jobs.rss",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {
+                "adapter": "wwr_programming_rss",
+                "item_limit": 10,
+                "include_keywords": "contract,contract-based,freelance,project-based,/hr,hourly",
+                "exclude_keywords": "intern,marketing,sales,designer,design",
+            },
+        }
+    )
+
+    items = marketplace_fetcher._filter_marketplace_items(
+        source,
+        marketplace_fetcher._parse_marketplace_page(source, SAMPLE_WWR_RSS),
+    )
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.title == "Senior Frontend Developer (Contract)"
+    assert item.author == "Sanctuary Computer"
+    assert item.metadata["platform"] == "We Work Remotely"
+    assert item.metadata["engagement"] == "contract"
+    assert item.metadata["budget"] == "$100/hr to $130/hr"
+    assert item.metadata["location"] == "Anywhere in the World"
 
 
 def test_fetch_rss_source_http_failure() -> None:

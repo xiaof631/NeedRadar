@@ -176,3 +176,42 @@ def test_list_marketplace_leads_supports_tier_filtering() -> None:
     assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.EXPANDED
     assert tier_breakdown["high_purity"] == 1
     assert tier_breakdown["expanded"] == 1
+
+
+def test_peopleperhour_frontend_project_is_high_purity() -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "pph-frontend",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $41 | a day ago",
+            "content": "Build polished, responsive UIs and collaborate with backend teams.",
+            "link": "https://www.peopleperhour.com/projects/frontend",
+            "tags": ["marketplace", "peopleperhour", "remote"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$41",
+                "timeline": "a day ago",
+                "location": "Remote",
+                "skills": [],
+            },
+        }
+    )
+
+    total, items, tier_breakdown = marketplace_leads.list_leads(
+        tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    )
+
+    assert total == 1
+    assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    assert tier_breakdown["high_purity"] == 1
+    assert tier_breakdown["expanded"] == 0

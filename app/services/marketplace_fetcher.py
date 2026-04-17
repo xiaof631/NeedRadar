@@ -6,9 +6,11 @@ import html
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urljoin
+from xml.etree import ElementTree as ET
 
 import httpx
 
@@ -35,6 +37,13 @@ _ZBJ_TASK_CARD_RE = re.compile(
     r'(?:<p class="state"><span class="state [^"]+">(?P<state>[^<]+)</span>)?',
     re.IGNORECASE | re.DOTALL,
 )
+_PPH_ITEM_BLOCK_RE = re.compile(r'<li class="list__item[^"]*".*?</li>', re.IGNORECASE | re.DOTALL)
+_WWR_COMPENSATION_RE = re.compile(
+    r"\$(?:\d[\d,.]*)(?:k)?(?:/\w+| per annual)?(?:\s*(?:to|-)\s*\$(?:\d[\d,.]*)(?:k)?(?:/\w+| per annual)?)?",
+    re.IGNORECASE,
+)
+_WWR_COMPANY_RE = re.compile(r"^(?P<company>[^:]+):\s*(?P<title>.+)$")
+_WWR_CONTRACT_HINTS = ("contract", "contract-based", "freelance", "project-based", "/hr", "hourly")
 
 
 @dataclass(slots=True)
@@ -177,6 +186,10 @@ def _parse_marketplace_page(source: RssSource, payload: str) -> list[ParsedMarke
         return _parse_freelancer_jobs(payload, source=source, item_limit=item_limit)
     if adapter == "contra_featured_jobs":
         return _parse_contra_featured_jobs(payload, source=source, item_limit=item_limit)
+    if adapter == "peopleperhour_technology":
+        return _parse_peopleperhour_technology(payload, source=source, item_limit=item_limit)
+    if adapter == "wwr_programming_rss":
+        return _parse_wwr_programming_rss(payload, source=source, item_limit=item_limit)
     if adapter == "zbj_hall_scroll":
         return _parse_zbj_hall_scroll(payload, source=source, item_limit=item_limit)
     raise ValueError(f"unsupported marketplace adapter: {adapter or 'unknown'}")
@@ -410,6 +423,149 @@ def _parse_contra_featured_jobs(
     return items
 
 
+def _parse_peopleperhour_technology(
+    payload: str,
+    *,
+    source: RssSource,
+    item_limit: int,
+) -> list[ParsedMarketplaceLead]:
+    items: list[ParsedMarketplaceLead] = []
+    for match in _PPH_ITEM_BLOCK_RE.finditer(payload):
+        block = match.group(0)
+        title_match = re.search(
+            r'item__url[^"]*" href="(?P<href>[^"]+)">(?P<title>[^<]+)</a>',
+            block,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if title_match is None:
+            continue
+        title = _normalize_text(title_match.group("title"))
+        href = _normalize_text(title_match.group("href"))
+        if not title or not href:
+            continue
+        description_match = re.search(
+            r'item__desc[^"]*">(?P<description>.*?)</p>',
+            block,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        footer_match = re.search(
+            r'card__footer-left[^"]*"><span>(?P<published>[^<]+)</span><span class="u-mgl--1">(?P<proposals>\d+).*?</span>'
+            r'<span class="u-mgl--1"><span><i class="fpph fpph-location"></i>(?P<location>[^<]+)</span>',
+            block,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        budget_match = re.search(
+            r'card__price[^"]*"><span class="title-nano"><div><span>(?P<budget>[^<]+)</span>',
+            block,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        author_match = re.search(
+            r'card__username[^"]*">\s*&nbsp;\s*(?P<author>[^<]+)</span>',
+            block,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        description = _strip_html_tags(description_match.group("description")) if description_match else None
+        published_text = _normalize_text(footer_match.group("published")) if footer_match else None
+        proposals = _normalize_text(footer_match.group("proposals")) if footer_match else None
+        location = _normalize_text(footer_match.group("location")) if footer_match else None
+        budget = _normalize_text(budget_match.group("budget")) if budget_match else None
+        link = urljoin(source.url, href)
+        tags = ["marketplace", "peopleperhour", "remote"]
+        category = str(source.config.get("topic") or source.category or "").strip() or None
+        if category:
+            tags.append(category)
+        items.append(
+            ParsedMarketplaceLead(
+                guid=link,
+                title=title,
+                summary=_join_summary(title, budget=budget, timeline=published_text, platform="PeoplePerHour"),
+                description=description,
+                link=link,
+                published_at=None,
+                author=_normalize_text(author_match.group("author")) if author_match else None,
+                tags=list(dict.fromkeys(tags)),
+                metadata={
+                    "platform": "PeoplePerHour",
+                    "category": category,
+                    "budget": budget,
+                    "timeline": published_text,
+                    "engagement": _infer_engagement(budget) or "fixed-price",
+                    "location": location,
+                    "skills": [],
+                    "bids": proposals,
+                },
+            )
+        )
+        if len(items) >= item_limit:
+            break
+    if not items:
+        raise ValueError("failed to parse peopleperhour marketplace listing")
+    return items
+
+
+def _parse_wwr_programming_rss(
+    payload: str,
+    *,
+    source: RssSource,
+    item_limit: int,
+) -> list[ParsedMarketplaceLead]:
+    try:
+        root = ET.fromstring(payload)
+    except ET.ParseError as exc:
+        raise ValueError("failed to parse weworkremotely rss feed") from exc
+
+    channel = root.find("channel")
+    if channel is None:
+        raise ValueError("failed to parse weworkremotely rss feed")
+
+    items: list[ParsedMarketplaceLead] = []
+    for item in channel.findall("item"):
+        raw_title = _normalize_text(item.findtext("title"))
+        link = _normalize_text(item.findtext("link"))
+        if not raw_title or not link:
+            continue
+        title_match = _WWR_COMPANY_RE.match(raw_title)
+        company = _normalize_text(title_match.group("company")) if title_match else None
+        title = _normalize_text(title_match.group("title")) if title_match else raw_title
+        description_html = item.findtext("description") or ""
+        description = _strip_html_tags(description_html)
+        region = _normalize_text(item.findtext("region"))
+        category = _normalize_text(item.findtext("category"))
+        compensation = _extract_wwr_compensation(description)
+        engagement = _infer_wwr_engagement(raw_title, description)
+        tags = ["marketplace", "weworkremotely", "remote"]
+        if category:
+            tags.append(category)
+        published_at = _parse_pubdate(item.findtext("pubDate"))
+        items.append(
+            ParsedMarketplaceLead(
+                guid=link,
+                title=title or raw_title,
+                summary=_join_summary(title or raw_title, budget=compensation, timeline=region, platform="We Work Remotely"),
+                description=description,
+                link=link,
+                published_at=published_at,
+                author=company,
+                tags=list(dict.fromkeys(tags)),
+                metadata={
+                    "platform": "We Work Remotely",
+                    "category": category,
+                    "budget": compensation,
+                    "timeline": region,
+                    "engagement": engagement,
+                    "location": region,
+                    "skills": [category] if category else [],
+                    "bids": None,
+                },
+            )
+        )
+        if len(items) >= item_limit:
+            break
+    if not items:
+        raise ValueError("failed to parse weworkremotely rss feed")
+    return items
+
+
 def _parse_zbj_hall_scroll(
     payload: str,
     *,
@@ -592,6 +748,39 @@ def _normalize_keywords(value: object) -> list[str]:
         if text:
             normalized.append(text.lower())
     return normalized
+
+
+def _strip_html_tags(value: str) -> str | None:
+    text = re.sub(r"<[^>]+>", " ", value)
+    return _normalize_text(text)
+
+
+def _parse_pubdate(value: str | None) -> datetime | None:
+    text = _normalize_text(value)
+    if not text:
+        return None
+    try:
+        parsed = parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError):
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _extract_wwr_compensation(description: str | None) -> str | None:
+    text = _normalize_text(description)
+    if not text:
+        return None
+    match = _WWR_COMPENSATION_RE.search(text)
+    return match.group(0) if match else None
+
+
+def _infer_wwr_engagement(title: str, description: str | None) -> str:
+    haystack = " ".join(part for part in (title, description or "") if part).lower()
+    if any(keyword in haystack for keyword in _WWR_CONTRACT_HINTS):
+        return "contract"
+    return "full-time"
 
 
 def _build_keyword_haystack(item: ParsedMarketplaceLead) -> str:
