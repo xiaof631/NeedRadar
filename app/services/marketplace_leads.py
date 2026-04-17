@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 from collections import deque
 from collections.abc import Iterable
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from enum import StrEnum
 from urllib.parse import urlsplit
 
@@ -69,6 +69,8 @@ class MarketplaceLead:
     tier_reason: str
     lead_status: MarketplaceLeadStatus
     notes: str | None
+    priority_score: int
+    priority_reason: str
     duplicate_count: int
     duplicate_sources: list[str]
     created_at: datetime
@@ -86,6 +88,12 @@ class MarketplaceLeadSourceMetric:
     full_time_job: int
     watching: int
     contacted: int
+
+
+@dataclass(slots=True)
+class MarketplacePriorityContext:
+    source_history: dict[int, MarketplaceLeadSourceMetric]
+    now: datetime
 
 
 def list_leads(
@@ -118,6 +126,12 @@ def list_leads(
     kind_breakdown = _count_kinds(leads)
     status_breakdown = _count_statuses(leads)
     source_breakdown = _build_source_breakdown(leads)
+    priority_context = MarketplacePriorityContext(
+        source_history={item.source_id: item for item in source_breakdown},
+        now=datetime.now(UTC),
+    )
+    leads = [_with_priority(lead, priority_context) for lead in leads]
+    leads.sort(key=_lead_sort_key, reverse=True)
     if tier is not None:
         leads = [lead for lead in leads if lead.lead_tier == tier]
     if lead_kind is not None:
@@ -126,8 +140,6 @@ def list_leads(
         leads = [lead for lead in leads if lead.lead_kind in _REVIEWABLE_LEAD_KINDS]
     if lead_status is not None:
         leads = [lead for lead in leads if lead.lead_status == lead_status]
-    if source_id is None:
-        leads = _diversify_by_source(leads)
     total = len(leads)
     leads = leads[skip : skip + limit]
     return total, leads, tier_breakdown, kind_breakdown, status_breakdown, source_breakdown
@@ -214,6 +226,8 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         tier_reason=tier_reason,
         lead_status=_to_lead_status(metadata.get("lead_status")),
         notes=_to_string(metadata.get("lead_notes")),
+        priority_score=0,
+        priority_reason="尚未计算优先级。",
         duplicate_count=1,
         duplicate_sources=[source.name],
         created_at=item.created_at,
@@ -329,6 +343,8 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         tier_reason=representative.tier_reason,
         lead_status=status,
         notes=representative.notes or alternate.notes,
+        priority_score=max(left.priority_score, right.priority_score),
+        priority_reason=representative.priority_reason or alternate.priority_reason,
         duplicate_count=left.duplicate_count + right.duplicate_count,
         duplicate_sources=duplicate_sources,
         created_at=min(left.created_at, right.created_at),
@@ -338,11 +354,90 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
 
 def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, datetime]:
     return (
+        lead.priority_score,
         1 if lead.lead_kind in _REVIEWABLE_LEAD_KINDS else 0,
         1 if lead.lead_tier == MarketplaceLeadTier.HIGH_PURITY else 0,
         _lead_status_rank(lead.lead_status),
         lead.published_at or lead.created_at,
     )
+
+
+def _with_priority(lead: MarketplaceLead, context: MarketplacePriorityContext) -> MarketplaceLead:
+    score, reason = _calculate_priority(lead, context)
+    return replace(lead, priority_score=score, priority_reason=reason)
+
+
+def _calculate_priority(lead: MarketplaceLead, context: MarketplacePriorityContext) -> tuple[int, str]:
+    score = 0
+    reasons: list[str] = []
+
+    if lead.lead_tier == MarketplaceLeadTier.HIGH_PURITY:
+        score += 35
+        reasons.append("高纯度线索")
+    else:
+        score += 12
+        reasons.append("扩展线索")
+
+    if lead.lead_kind == MarketplaceLeadKind.PROJECT:
+        score += 28
+        reasons.append("项目型")
+    elif lead.lead_kind == MarketplaceLeadKind.CONTRACT_ROLE:
+        score += 20
+        reasons.append("合同型角色")
+    else:
+        score -= 18
+        reasons.append("全职招聘降权")
+
+    if lead.lead_status == MarketplaceLeadStatus.NEW:
+        score += 12
+        reasons.append("待处理")
+    elif lead.lead_status == MarketplaceLeadStatus.WATCHING:
+        score += 6
+        reasons.append("已关注")
+    elif lead.lead_status == MarketplaceLeadStatus.CONTACTED:
+        score -= 10
+        reasons.append("已联系")
+    else:
+        score -= 24
+        reasons.append("已忽略")
+
+    published_at = _ensure_utc(lead.published_at or lead.created_at)
+    age_days = max((context.now - published_at).days, 0)
+    if age_days <= 3:
+        score += 14
+        reasons.append("最近 3 天发布")
+    elif age_days <= 7:
+        score += 8
+        reasons.append("最近 7 天发布")
+    elif age_days <= 14:
+        score += 3
+        reasons.append("近期发布")
+
+    if lead.duplicate_count > 1:
+        score -= min((lead.duplicate_count - 1) * 4, 12)
+        reasons.append("重复线索降权")
+
+    source_metric = context.source_history.get(lead.source_id)
+    if source_metric and source_metric.total >= 1:
+        purity_ratio = source_metric.high_purity / source_metric.total
+        if purity_ratio >= 0.7:
+            score += 10
+            reasons.append("来源高纯度占比高")
+        elif purity_ratio >= 0.4:
+            score += 5
+            reasons.append("来源质量稳定")
+
+    if lead.notes:
+        score += 4
+        reasons.append("已有备注")
+
+    return score, " / ".join(reasons)
+
+
+def _ensure_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _lead_status_rank(status: MarketplaceLeadStatus) -> int:

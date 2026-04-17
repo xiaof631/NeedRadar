@@ -906,3 +906,69 @@ def test_marketplace_leads_source_breakdown_tracks_quality() -> None:
     assert by_name["PeoplePerHour Technology Projects"].reviewable == 1
     assert by_name["Jobicy Contract Developer Roles"].contacted == 1
     assert by_name["Jobicy Contract Developer Roles"].reviewable == 1
+
+
+def test_marketplace_leads_prioritize_reviewable_new_high_purity_items() -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    jobs = rss_sources.create_source(
+        {
+            "name": "Generic Remote Jobs",
+            "url": "https://example.com/jobs",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "generic_remote"},
+        }
+    )
+    top_lead = raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "priority-top",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $41 | a day ago",
+            "content": "Build polished, responsive UIs and collaborate with backend teams.",
+            "link": "https://www.peopleperhour.com/projects/priority-top",
+            "tags": ["marketplace", "peopleperhour", "remote"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$41",
+                "timeline": "a day ago",
+                "location": "Remote",
+                "skills": [],
+            },
+        }
+    )
+    low_lead = raw_entries.create_entry(
+        {
+            "source_id": jobs.id,
+            "guid": "priority-low",
+            "title": "Senior Backend Engineer",
+            "summary": "Senior Backend Engineer | Remote",
+            "content": "Employment type: full-time. Build backend APIs and services.",
+            "link": "https://example.com/jobs/priority-low",
+            "tags": ["marketplace", "remote"],
+            "metadata": {
+                "platform": "Example Jobs",
+                "category": "Software Development",
+                "engagement": "full-time",
+                "location": "Remote",
+                "skills": ["python", "api"],
+            },
+        }
+    )
+    marketplace_leads.update_lead_status(low_lead.id, marketplace_leads.MarketplaceLeadStatus.CONTACTED)
+
+    total, items, _, _, _, _ = marketplace_leads.list_leads()
+
+    assert total == 2
+    assert items[0].id == top_lead.id
+    assert items[0].priority_score > items[1].priority_score
+    assert "高纯度线索" in items[0].priority_reason
+    assert "全职招聘降权" in items[1].priority_reason

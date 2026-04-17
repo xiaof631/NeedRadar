@@ -214,6 +214,14 @@
             <div class="summary-text">{{ row.tier_reason }}</div>
           </template>
         </el-table-column>
+        <el-table-column :label="t('marketplace.table.priority')" width="120">
+          <template #default="{ row }">
+            <div class="priority-cell">
+              <span class="priority-score">{{ row.priority_score }}</span>
+              <div class="summary-text">{{ row.priority_reason }}</div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('marketplace.table.status')" width="190">
           <template #default="{ row }">
             <el-tag :type="leadStatusTagType(row.lead_status)" effect="plain">
@@ -341,6 +349,14 @@
           <div class="details-section">
             <div class="detail-label">{{ t('marketplace.details.reason') }}</div>
             <p class="detail-paragraph">{{ selectedLead.tier_reason }}</p>
+          </div>
+
+          <div class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.priority') }}</div>
+            <p class="detail-paragraph">
+              {{ t('marketplace.details.priorityScore', { score: selectedLead.priority_score }) }}
+            </p>
+            <p class="detail-paragraph">{{ selectedLead.priority_reason }}</p>
           </div>
 
           <div v-if="selectedLead.skills.length" class="details-section">
@@ -772,6 +788,17 @@ const formatDate = (value: string | null) => {
   line-height: 1.6;
   color: #0f172a;
   white-space: pre-wrap;
+}
+
+.priority-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.priority-score {
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .details-actions {

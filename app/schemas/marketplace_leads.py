@@ -32,6 +32,8 @@ class MarketplaceLeadRead(BaseModel):
     tier_reason: str
     lead_status: str
     notes: str | None = None
+    priority_score: int
+    priority_reason: str
     duplicate_count: int = 1
     duplicate_sources: list[str] = Field(default_factory=list)
     created_at: datetime

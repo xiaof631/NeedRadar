@@ -284,6 +284,8 @@ export interface MarketplaceLead {
   tier_reason: string;
   lead_status: 'new' | 'watching' | 'contacted' | 'ignored';
   notes: string | null;
+  priority_score: number;
+  priority_reason: string;
   duplicate_count: number;
   duplicate_sources: string[];
   created_at: string;
