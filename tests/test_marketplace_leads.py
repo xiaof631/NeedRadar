@@ -637,3 +637,156 @@ def test_list_marketplace_leads_supports_reviewable_only() -> None:
     assert items[0].lead_kind == marketplace_leads.MarketplaceLeadKind.PROJECT
     assert kind_breakdown["project"] == 1
     assert kind_breakdown["full_time_job"] == 1
+
+
+def test_marketplace_leads_merge_same_company_similar_titles() -> None:
+    remotive = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=40",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "remotive_api"},
+        }
+    )
+    job_board = rss_sources.create_source(
+        {
+            "name": "Generic Remote Jobs",
+            "url": "https://example.com/jobs",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "generic_remote"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": remotive.id,
+            "guid": "remotive-react-role",
+            "title": "Senior Full-stack React Developer",
+            "summary": "Senior Full-stack React Developer | Remote",
+            "content": "Contract role for React delivery.",
+            "link": "https://remotive.com/remote-jobs/software-development/full-stack-react",
+            "author": "Lemon.io",
+            "tags": ["marketplace", "remotive"],
+            "metadata": {
+                "platform": "Remotive",
+                "category": "Software Development",
+                "engagement": "contract",
+                "location": "Remote",
+                "skills": ["react", "python", "next.js"],
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": job_board.id,
+            "guid": "job-board-react-role",
+            "title": "Full Stack React Developer",
+            "summary": "Full Stack React Developer | Remote",
+            "content": "React contract role with product delivery ownership.",
+            "link": "https://example.com/jobs/full-stack-react",
+            "author": "Lemon.io",
+            "tags": ["marketplace", "remote"],
+            "metadata": {
+                "platform": "Example Jobs",
+                "category": "Software Development",
+                "engagement": "contract",
+                "location": "Remote",
+                "skills": ["react", "python", "next.js"],
+            },
+        }
+    )
+
+    total, items, _, _, _ = marketplace_leads.list_leads()
+
+    assert total == 1
+    assert items[0].duplicate_count == 2
+    assert len(items[0].duplicate_sources) == 2
+
+
+def test_marketplace_leads_merge_same_link_without_query_string() -> None:
+    remotive = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=40",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "remotive_api"},
+        }
+    )
+    job_board = rss_sources.create_source(
+        {
+            "name": "Generic Remote Jobs",
+            "url": "https://example.com/jobs",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "generic_remote"},
+        }
+    )
+    for guid, source_id, link in (
+        ("same-link-a", remotive.id, "https://example.com/jobs/123?utm_source=remotive"),
+        ("same-link-b", job_board.id, "https://example.com/jobs/123?ref=job-board"),
+    ):
+        raw_entries.create_entry(
+            {
+                "source_id": source_id,
+                "guid": guid,
+                "title": "Senior Backend Engineer",
+                "summary": "Senior Backend Engineer | Remote",
+                "content": "Contract backend work.",
+                "link": link,
+                "tags": ["marketplace", "remote"],
+                "metadata": {
+                    "platform": "Example Jobs",
+                    "category": "Software Development",
+                    "engagement": "contract",
+                    "location": "Remote",
+                    "skills": ["python", "api"],
+                },
+            }
+        )
+
+    total, items, _, _, _ = marketplace_leads.list_leads()
+
+    assert total == 1
+    assert items[0].duplicate_count == 2
+
+
+def test_marketplace_leads_do_not_merge_distinct_roles_same_company() -> None:
+    remotive = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=40",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "remotive_api"},
+        }
+    )
+    for guid, title, skills in (
+        ("same-company-react", "Senior Full-stack React Developer", ["react", "python", "next.js"]),
+        ("same-company-golang", "Senior Golang Developer", ["golang", "grpc", "postgres"]),
+    ):
+        raw_entries.create_entry(
+            {
+                "source_id": remotive.id,
+                "guid": guid,
+                "title": title,
+                "summary": f"{title} | Remote",
+                "content": "Contract software role.",
+                "link": f"https://remotive.com/jobs/{guid}",
+                "author": "Lemon.io",
+                "tags": ["marketplace", "remotive"],
+                "metadata": {
+                    "platform": "Remotive",
+                    "category": "Software Development",
+                    "engagement": "contract",
+                    "location": "Remote",
+                    "skills": skills,
+                },
+            }
+        )
+
+    total, items, _, _, _ = marketplace_leads.list_leads()
+
+    assert total == 2
+    assert all(item.duplicate_count == 1 for item in items)

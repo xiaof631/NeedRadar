@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from urllib.parse import urlsplit
 
 from app.db.storage import db
 from app.models import RawEntry, SourceType
@@ -216,15 +217,19 @@ def _classify_lead_tier(
 
 
 def _merge_duplicate_leads(leads: list[MarketplaceLead]) -> list[MarketplaceLead]:
-    grouped: dict[str, MarketplaceLead] = {}
+    grouped: list[MarketplaceLead] = []
     for lead in leads:
-        key = _canonical_lead_key(lead)
-        existing = grouped.get(key)
-        if existing is None:
-            grouped[key] = lead
+        matching_indexes = [index for index, existing in enumerate(grouped) if _looks_like_duplicate(existing, lead)]
+        if not matching_indexes:
+            grouped.append(lead)
             continue
-        grouped[key] = _merge_lead_pair(existing, lead)
-    merged = list(grouped.values())
+        primary_index = matching_indexes[0]
+        merged_lead = _merge_lead_pair(grouped[primary_index], lead)
+        for index in reversed(matching_indexes[1:]):
+            merged_lead = _merge_lead_pair(merged_lead, grouped[index])
+            del grouped[index]
+        grouped[primary_index] = merged_lead
+    merged = grouped
     merged.sort(
         key=lambda item: (
             item.lead_status == MarketplaceLeadStatus.CONTACTED,
@@ -299,6 +304,44 @@ def _canonical_lead_key(lead: MarketplaceLead) -> str:
     if lead.normalized_budget:
         return f"{normalized}|{lead.normalized_budget}"
     return normalized
+
+
+def _looks_like_duplicate(left: MarketplaceLead, right: MarketplaceLead) -> bool:
+    left_link = _normalized_link_key(left.link)
+    right_link = _normalized_link_key(right.link)
+    if left_link and right_link and left_link == right_link:
+        return True
+
+    left_author = _normalized_entity_key(left.author)
+    right_author = _normalized_entity_key(right.author)
+    title_overlap = _title_overlap_ratio(left.title, right.title)
+    shared_title_tokens = _shared_title_token_count(left.title, right.title)
+
+    if left_author and right_author and left_author == right_author:
+        if title_overlap >= 0.7 and shared_title_tokens >= 2:
+            return True
+
+    left_title_key = _title_similarity_key(left.title)
+    right_title_key = _title_similarity_key(right.title)
+    if left_title_key and left_title_key == right_title_key:
+        if left.normalized_budget and right.normalized_budget and left.normalized_budget == right.normalized_budget:
+            return True
+        left_skill_key = _skill_signature(left.skills)
+        right_skill_key = _skill_signature(right.skills)
+        left_location = _normalized_entity_key(left.location)
+        right_location = _normalized_entity_key(right.location)
+        if (
+            left_skill_key
+            and right_skill_key
+            and left_skill_key == right_skill_key
+            and (
+                (left_location and right_location and left_location == right_location)
+                or (left_author and right_author and left_author == right_author)
+            )
+        ):
+            return True
+
+    return False
 
 
 def _count_tiers(leads: list[MarketplaceLead]) -> dict[str, int]:
@@ -409,6 +452,59 @@ def _to_string_list(value: object) -> list[str]:
         if text:
             values.append(text)
     return values
+
+
+def _normalized_link_key(value: str | None) -> str | None:
+    if not value:
+        return None
+    parsed = urlsplit(value)
+    netloc = parsed.netloc.lower()
+    path = parsed.path.rstrip("/").lower()
+    if not netloc and not path:
+        return None
+    return f"{netloc}{path}"
+
+
+def _normalized_entity_key(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = _NON_WORD_RE.sub(" ", value.lower()).strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized or None
+
+
+def _title_similarity_key(value: str) -> str:
+    tokens = _title_tokens(value)
+    return " ".join(tokens)
+
+
+def _title_tokens(value: str) -> list[str]:
+    tokens = [token for token in _NON_WORD_RE.split(value.lower()) if token]
+    return [token for token in tokens if token not in _TITLE_STOPWORDS]
+
+
+def _title_overlap_ratio(left: str, right: str) -> float:
+    left_tokens = set(_title_tokens(left))
+    right_tokens = set(_title_tokens(right))
+    if not left_tokens or not right_tokens:
+        return 0.0
+    return len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
+
+
+def _shared_title_token_count(left: str, right: str) -> int:
+    return len(set(_title_tokens(left)) & set(_title_tokens(right)))
+
+
+def _skill_signature(skills: list[str]) -> str | None:
+    normalized_skills = {
+        token
+        for skill in skills
+        for token in _NON_WORD_RE.split(skill.lower())
+        if token and token not in _SKILL_STOPWORDS
+    }
+    if len(normalized_skills) < 2:
+        return None
+    return "|".join(sorted(normalized_skills))
 
 
 def _diversify_by_source(items: list[MarketplaceLead]) -> list[MarketplaceLead]:
@@ -581,3 +677,26 @@ _REVIEWABLE_LEAD_KINDS = (
     MarketplaceLeadKind.PROJECT,
     MarketplaceLeadKind.CONTRACT_ROLE,
 )
+
+_TITLE_STOPWORDS = {
+    "senior",
+    "jr",
+    "junior",
+    "lead",
+    "staff",
+    "principal",
+    "remote",
+    "contract",
+    "freelance",
+    "role",
+}
+
+_SKILL_STOPWORDS = {
+    "software",
+    "development",
+    "engineering",
+    "engineer",
+    "developer",
+    "marketplace",
+    "remote",
+}
