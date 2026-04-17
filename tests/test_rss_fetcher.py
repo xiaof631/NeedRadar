@@ -221,6 +221,47 @@ SAMPLE_REMOTIVE_JSON = """{
   ]
 }"""
 
+SAMPLE_JOBICY_JSON = """{
+  "apiVersion": "2.2.13",
+  "jobCount": 2,
+  "jobs": [
+    {
+      "id": 3001,
+      "url": "https://jobicy.com/jobs/3001-senior-python-developer-code-migration-specialist",
+      "jobTitle": "Senior Python Developer – Code Migration Specialist",
+      "companyName": "Mindrift",
+      "jobIndustry": ["Software Engineering"],
+      "jobType": ["Full-Time"],
+      "jobGeo": "Philippines",
+      "jobLevel": "Senior",
+      "jobExcerpt": "Participation is project-based, not permanent employment.",
+      "jobDescription": "<p>Freelance project-based collaboration for a senior Python developer. 20-30 hours per week.</p>",
+      "pubDate": "2026-04-15T11:44:40+00:00",
+      "salaryMin": 24000,
+      "salaryCurrency": "USD",
+      "salaryPeriod": "yearly"
+    },
+    {
+      "id": 3002,
+      "url": "https://jobicy.com/jobs/3002-full-stack-web-developer",
+      "jobTitle": "Full Stack Web Developer",
+      "companyName": "CIAT",
+      "jobIndustry": ["Programming"],
+      "jobType": ["Full-Time"],
+      "jobGeo": "USA",
+      "jobLevel": "Any",
+      "jobExcerpt": "Remote full-time web developer role.",
+      "jobDescription": "<p>Employment Type: Full-time</p>",
+      "pubDate": "2026-04-15T10:44:40+00:00",
+      "salaryMin": 85000,
+      "salaryMax": 95000,
+      "salaryCurrency": "USD",
+      "salaryPeriod": "yearly"
+    }
+  ],
+  "success": true
+}"""
+
 
 def test_fetch_rss_source_success_and_deduplicate() -> None:
     async def _run() -> None:
@@ -426,6 +467,38 @@ def test_parse_remotive_api_contract_jobs() -> None:
     assert item.metadata["budget"] == "$100,000 - $120,000"
     assert item.metadata["location"] == "Worldwide"
     assert item.metadata["skills"] == ["React", "TypeScript", "Frontend"]
+
+
+def test_parse_jobicy_api_contract_jobs() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Jobicy Contract Developer Roles",
+            "url": "https://jobicy.com/api/v2/remote-jobs?count=100&tag=developer",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {
+                "adapter": "jobicy_api",
+                "item_limit": 10,
+                "exclude_keywords": "trainer,data scientist,data science,analyst,physics,chemistry,civil engineer,mathematics",
+            },
+        }
+    )
+
+    items = marketplace_fetcher._filter_marketplace_items(
+        source,
+        marketplace_fetcher._parse_marketplace_page(source, SAMPLE_JOBICY_JSON),
+    )
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.title == "Senior Python Developer – Code Migration Specialist"
+    assert item.author == "Mindrift"
+    assert item.link == "https://jobicy.com/jobs/3001-senior-python-developer-code-migration-specialist"
+    assert item.metadata["platform"] == "Jobicy"
+    assert item.metadata["engagement"] == "hourly-contract"
+    assert item.metadata["budget"] == "$24,000+/yearly"
+    assert item.metadata["location"] == "Philippines"
+    assert "python" in item.metadata["skills"]
 
 
 def test_fetch_rss_source_http_failure() -> None:
@@ -744,6 +817,41 @@ def test_fetch_remotive_marketplace_source_success() -> None:
         assert entries[0].metadata["platform"] == "Remotive"
         assert entries[0].metadata["engagement"] == "contract"
         assert entries[0].author == "Acme Labs"
+
+    asyncio.run(_run())
+
+
+def test_fetch_jobicy_marketplace_source_success() -> None:
+    async def _run() -> None:
+        source = rss_sources.create_source(
+            {
+                "name": "Jobicy Contract Developer Roles",
+                "url": "https://jobicy.com/api/v2/remote-jobs?count=100&tag=developer",
+                "frequency": 21600,
+                "source_type": SourceType.FREELANCE_MARKETPLACE,
+                "config": {
+                    "adapter": "jobicy_api",
+                    "item_limit": 5,
+                },
+            }
+        )
+
+        def handler(_: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, text=SAMPLE_JOBICY_JSON, headers={"content-type": "application/json"})
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert result.status == FetchStatus.SUCCESS
+        assert result.fetched_entries == 1
+        assert result.new_entries == 1
+
+        total, entries = raw_entries.list_entries(source_id=source.id)
+        assert total == 1
+        assert entries[0].title == "Senior Python Developer – Code Migration Specialist"
+        assert entries[0].metadata["platform"] == "Jobicy"
+        assert entries[0].metadata["engagement"] == "hourly-contract"
+        assert entries[0].author == "Mindrift"
 
     asyncio.run(_run())
 

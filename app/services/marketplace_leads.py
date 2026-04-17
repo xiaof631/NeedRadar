@@ -414,6 +414,8 @@ _STRONG_HIGH_PURITY_KEYWORDS = (
     "frontend engineer",
     "backend developer",
     "backend engineer",
+    "python developer",
+    "software developer",
     "full stack developer",
     "full stack engineer",
     "full-stack developer",

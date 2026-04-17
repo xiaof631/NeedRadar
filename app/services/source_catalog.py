@@ -173,6 +173,19 @@ _MARKETPLACE_PUBLIC_BASELINE: tuple[CatalogEntry, ...] = (
         },
     },
     {
+        "name": "Jobicy Contract Developer Roles",
+        "url": "https://jobicy.com/api/v2/remote-jobs?count=50&tag=python%20developer",
+        "category": "freelance-marketplace",
+        "frequency": 21600,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "jobicy_api",
+            "item_limit": 12,
+            "topic": "software-contracting",
+            "exclude_keywords": "data scientist,data science,analyst,physics,chemistry,civil engineer,mathematics",
+        },
+    },
+    {
         "name": "Contra Featured Remote Jobs",
         "url": "https://contra.com/featured-jobs/freelance-creative-jobs",
         "category": "freelance-marketplace",

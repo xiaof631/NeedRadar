@@ -426,6 +426,47 @@ def test_remotive_full_stack_react_contract_is_high_purity() -> None:
     assert tier_breakdown["expanded"] == 0
 
 
+def test_jobicy_python_developer_contract_is_high_purity() -> None:
+    jobicy = rss_sources.create_source(
+        {
+            "name": "Jobicy Contract Developer Roles",
+            "url": "https://jobicy.com/api/v2/remote-jobs?count=100&tag=developer",
+            "frequency": 21600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "jobicy_api"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": jobicy.id,
+            "guid": "jobicy-python-developer",
+            "title": "Senior Python Developer – Code Migration Specialist",
+            "summary": "Senior Python Developer – Code Migration Specialist | Philippines",
+            "content": "Freelance project-based collaboration for a senior Python developer. 20-30 hours per week.",
+            "link": "https://jobicy.com/jobs/3001-senior-python-developer-code-migration-specialist",
+            "tags": ["marketplace", "jobicy", "remote", "project-based"],
+            "metadata": {
+                "platform": "Jobicy",
+                "category": "Software Engineering",
+                "timeline": "Philippines",
+                "engagement": "hourly-contract",
+                "location": "Philippines",
+                "skills": ["python", "docker", "Software Engineering"],
+            },
+        }
+    )
+
+    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
+        tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    )
+
+    assert total == 1
+    assert items[0].source_name == "Jobicy Contract Developer Roles"
+    assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
+    assert tier_breakdown["high_purity"] == 1
+    assert tier_breakdown["expanded"] == 0
+
+
 def test_peopleperhour_kiosk_project_stays_expanded() -> None:
     pph = rss_sources.create_source(
         {

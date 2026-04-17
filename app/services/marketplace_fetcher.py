@@ -45,6 +45,63 @@ _WWR_COMPENSATION_RE = re.compile(
 )
 _WWR_COMPANY_RE = re.compile(r"^(?P<company>[^:]+):\s*(?P<title>.+)$")
 _WWR_CONTRACT_HINTS = ("contract", "contract-based", "freelance", "project-based", "/hr", "hourly")
+_JOBICY_DEV_TITLE_HINTS = (
+    "developer",
+    "engineer",
+    "full stack",
+    "full-stack",
+    "frontend",
+    "backend",
+    "web developer",
+    "mobile engineer",
+    "software developer",
+)
+_JOBICY_CONTRACT_HINTS = (
+    "freelance",
+    "project-based",
+    "part-time, non-permanent",
+    "non-permanent projects",
+    "flexible participation",
+    "hours per week",
+    "hour equivalent",
+    "b2b",
+)
+_JOBICY_EXCLUDE_HINTS = (
+    "trainer",
+    "data scientist",
+    "data science",
+    "analyst",
+    "physics",
+    "chemistry",
+    "civil engineer",
+    "mathematics",
+)
+_MARKETPLACE_SKILL_HINTS = (
+    "react",
+    "next.js",
+    "python",
+    "django",
+    "node.js",
+    "node",
+    "typescript",
+    "javascript",
+    "php",
+    "laravel",
+    "wordpress",
+    "android",
+    "ios",
+    "flutter",
+    "react native",
+    ".net",
+    "c#",
+    "api",
+    "graphql",
+    "sql",
+    "postgres",
+    "postgresql",
+    "docker",
+    "kubernetes",
+)
 
 
 @dataclass(slots=True)
@@ -189,6 +246,8 @@ def _parse_marketplace_page(source: RssSource, payload: str) -> list[ParsedMarke
         return _parse_contra_featured_jobs(payload, source=source, item_limit=item_limit)
     if adapter == "peopleperhour_technology":
         return _parse_peopleperhour_technology(payload, source=source, item_limit=item_limit)
+    if adapter == "jobicy_api":
+        return _parse_jobicy_api(payload, source=source, item_limit=item_limit)
     if adapter == "remotive_api":
         return _parse_remotive_api(payload, source=source, item_limit=item_limit)
     if adapter == "wwr_programming_rss":
@@ -583,6 +642,98 @@ def _parse_remotive_api(
     return items
 
 
+def _parse_jobicy_api(
+    payload: str,
+    *,
+    source: RssSource,
+    item_limit: int,
+) -> list[ParsedMarketplaceLead]:
+    try:
+        document = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise ValueError("failed to parse jobicy api response") from exc
+
+    jobs = document.get("jobs")
+    if not isinstance(jobs, list):
+        raise ValueError("failed to parse jobicy api response")
+
+    items: list[ParsedMarketplaceLead] = []
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        link = _normalize_text(job.get("url"))
+        title = _normalize_text(job.get("jobTitle"))
+        if not link or not title:
+            continue
+
+        company = _normalize_text(job.get("companyName"))
+        description_html = _normalize_text(job.get("jobDescription"))
+        description = _strip_html_tags(description_html or "")
+        excerpt = _normalize_text(job.get("jobExcerpt"))
+        location = _normalize_text(job.get("jobGeo"))
+        level = _normalize_text(job.get("jobLevel"))
+        industries = [
+            text
+            for item in job.get("jobIndustry", [])
+            if (text := _normalize_text(item))
+        ]
+        industry = ", ".join(industries) or None
+        job_types = [
+            text
+            for item in job.get("jobType", [])
+            if (text := _normalize_text(item))
+        ]
+        title_haystack = " ".join(part for part in (title, industry or "") if part).lower()
+        contract_haystack = " ".join(
+            part for part in (title, excerpt or "", description or "", industry or "") if part
+        ).lower()
+
+        if not any(keyword in title_haystack for keyword in _JOBICY_DEV_TITLE_HINTS):
+            continue
+        if any(keyword in title_haystack for keyword in _JOBICY_EXCLUDE_HINTS):
+            continue
+        if not any(keyword in contract_haystack for keyword in _JOBICY_CONTRACT_HINTS):
+            continue
+
+        salary = _format_jobicy_salary(job)
+        engagement = _infer_jobicy_engagement(job_types, contract_haystack)
+        tags = ["marketplace", "jobicy", "remote"]
+        if industry:
+            tags.append(industry)
+        if engagement:
+            tags.append(engagement)
+
+        items.append(
+            ParsedMarketplaceLead(
+                guid=link,
+                title=title,
+                summary=_join_summary(title, budget=salary, timeline=location, platform="Jobicy"),
+                description=description or excerpt,
+                link=link,
+                published_at=_parse_datetime(job.get("pubDate")),
+                author=company,
+                tags=list(dict.fromkeys(tags)),
+                metadata={
+                    "platform": "Jobicy",
+                    "category": industry,
+                    "budget": salary,
+                    "timeline": location,
+                    "engagement": engagement,
+                    "location": location,
+                    "skills": _extract_jobicy_skills(title, description, industry),
+                    "bids": None,
+                    "level": level,
+                },
+            )
+        )
+        if len(items) >= item_limit:
+            break
+
+    if not items:
+        raise ValueError("failed to parse jobicy api response")
+    return items
+
+
 def _parse_wwr_programming_rss(
     payload: str,
     *,
@@ -938,6 +1089,39 @@ def _parse_datetime(value: object) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
+def _format_jobicy_salary(job: dict[str, Any]) -> str | None:
+    currency = _normalize_text(job.get("salaryCurrency"))
+    period = _normalize_text(job.get("salaryPeriod"))
+    minimum = job.get("salaryMin")
+    maximum = job.get("salaryMax")
+    if minimum in (None, "") and maximum in (None, ""):
+        return None
+
+    prefix = "$" if currency == "USD" else f"{currency or ''} ".strip()
+    if minimum not in (None, "") and maximum not in (None, ""):
+        amount = f"{prefix}{minimum:,} - {prefix}{maximum:,}"
+    elif minimum not in (None, ""):
+        amount = f"{prefix}{minimum:,}+"
+    else:
+        amount = f"up to {prefix}{maximum:,}"
+    return f"{amount}/{period}" if period else amount
+
+
+def _infer_jobicy_engagement(job_types: list[str], haystack: str) -> str:
+    normalized_types = {job_type.lower() for job_type in job_types}
+    if "contract" in normalized_types:
+        return "contract"
+    if "freelance" in normalized_types:
+        return "freelance"
+    if "hour equivalent" in haystack or "hours per week" in haystack:
+        return "hourly-contract"
+    if "project-based" in haystack or "non-permanent" in haystack or "freelance" in haystack:
+        return "project-based"
+    if "b2b" in haystack:
+        return "b2b"
+    return "contract-like"
+
+
 def _extract_remotive_skills(job: dict[str, Any]) -> list[str]:
     candidates = job.get("tags")
     if not isinstance(candidates, list):
@@ -948,6 +1132,17 @@ def _extract_remotive_skills(job: dict[str, Any]) -> list[str]:
         if text:
             skills.append(text)
     return skills
+
+
+def _extract_jobicy_skills(title: str | None, description: str | None, industry: str | None) -> list[str]:
+    haystack = " ".join(part for part in (title or "", description or "", industry or "") if part).lower()
+    skills: list[str] = []
+    for keyword in _MARKETPLACE_SKILL_HINTS:
+        if keyword in haystack:
+            skills.append(keyword)
+    if industry:
+        skills.append(industry)
+    return list(dict.fromkeys(skills))
 
 
 def _coerce_item_limit(value: Any) -> int:
