@@ -37,7 +37,11 @@ from app.schemas.filter_rules import (
     FilterRuleRead,
     FilterRuleUpdate,
 )
-from app.schemas.marketplace_leads import MarketplaceLeadList, MarketplaceLeadRead
+from app.schemas.marketplace_leads import (
+    MarketplaceLeadList,
+    MarketplaceLeadRead,
+    MarketplaceLeadStatusUpdate,
+)
 from app.schemas.raw_entries import (
     RawEntryBulkStatusUpdate,
     RawEntryList,
@@ -90,6 +94,7 @@ __all__ = [
     "FilterRuleUpdate",
     "MarketplaceLeadList",
     "MarketplaceLeadRead",
+    "MarketplaceLeadStatusUpdate",
     "SourceFilterMetricRead",
     "RawEntryBulkStatusUpdate",
     "RawEntryList",

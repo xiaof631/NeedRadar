@@ -269,8 +269,10 @@ export interface MarketplaceLead {
   description: string | null;
   category: string | null;
   budget: string | null;
+  normalized_budget: string | null;
   engagement: string | null;
   timeline: string | null;
+  normalized_timeline: string | null;
   location: string | null;
   published_at: string | null;
   author: string | null;
@@ -279,6 +281,9 @@ export interface MarketplaceLead {
   link: string | null;
   lead_tier: 'high_purity' | 'expanded';
   tier_reason: string;
+  lead_status: 'new' | 'watching' | 'contacted' | 'ignored';
+  duplicate_count: number;
+  duplicate_sources: string[];
   created_at: string;
   updated_at: string;
 }
@@ -286,6 +291,7 @@ export interface MarketplaceLead {
 export interface MarketplaceLeadListResponse {
   total: number;
   tier_breakdown: Record<string, number>;
+  status_breakdown: Record<string, number>;
   items: MarketplaceLead[];
 }
 
@@ -295,6 +301,7 @@ export interface MarketplaceLeadQueryParams {
   source_id?: number;
   search?: string;
   tier?: 'high_purity' | 'expanded';
+  lead_status?: 'new' | 'watching' | 'contacted' | 'ignored';
 }
 
 export async function fetchMarketplaceLeads(
@@ -302,6 +309,16 @@ export async function fetchMarketplaceLeads(
 ): Promise<MarketplaceLeadListResponse> {
   const response = await apiClient.get('/api/v1/marketplace-leads/', {
     params
+  });
+  return response.data;
+}
+
+export async function updateMarketplaceLeadStatus(
+  leadId: number,
+  status: MarketplaceLead['lead_status']
+): Promise<MarketplaceLead> {
+  const response = await apiClient.put(`/api/v1/marketplace-leads/${leadId}/status`, {
+    status
   });
   return response.data;
 }

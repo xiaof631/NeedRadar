@@ -17,8 +17,10 @@ class MarketplaceLeadRead(BaseModel):
     description: str | None = None
     category: str | None = None
     budget: str | None = None
+    normalized_budget: str | None = None
     engagement: str | None = None
     timeline: str | None = None
+    normalized_timeline: str | None = None
     location: str | None = None
     published_at: datetime | None = None
     author: str | None = None
@@ -27,6 +29,9 @@ class MarketplaceLeadRead(BaseModel):
     link: str | None = None
     lead_tier: str
     tier_reason: str
+    lead_status: str
+    duplicate_count: int = 1
+    duplicate_sources: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -36,4 +41,9 @@ class MarketplaceLeadRead(BaseModel):
 class MarketplaceLeadList(BaseModel):
     total: int
     tier_breakdown: dict[str, int] = Field(default_factory=dict)
+    status_breakdown: dict[str, int] = Field(default_factory=dict)
     items: list[MarketplaceLeadRead]
+
+
+class MarketplaceLeadStatusUpdate(BaseModel):
+    status: str

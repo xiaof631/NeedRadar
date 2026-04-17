@@ -62,9 +62,14 @@ def test_list_marketplace_leads_returns_structured_fields(client: TestClient) ->
     assert item["platform"] == "Freelancer"
     assert item["source_name"] == "Freelancer Web Development Jobs"
     assert item["budget"] == "$500 Avg Bid"
+    assert item["normalized_budget"] == "$500 Avg Bid"
     assert item["timeline"] == "6 days left"
+    assert item["normalized_timeline"] == "6 days"
     assert item["skills"] == ["Web Development", "Laravel"]
     assert item["lead_tier"] == "high_purity"
+    assert item["lead_status"] == "new"
+    assert item["duplicate_count"] == 1
+    assert payload["status_breakdown"]["new"] == 1
 
 
 def test_list_marketplace_leads_diversifies_sources() -> None:
@@ -123,7 +128,7 @@ def test_list_marketplace_leads_diversifies_sources() -> None:
         }
     )
 
-    total, items, tier_breakdown = marketplace_leads.list_leads(limit=3)
+    total, items, tier_breakdown, _ = marketplace_leads.list_leads(limit=3)
 
     assert total == 3
     source_ids = [item.source_id for item in items]
@@ -167,7 +172,7 @@ def test_list_marketplace_leads_supports_tier_filtering() -> None:
         }
     )
 
-    total, items, tier_breakdown = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.EXPANDED
     )
 
@@ -176,6 +181,91 @@ def test_list_marketplace_leads_supports_tier_filtering() -> None:
     assert items[0].lead_tier == marketplace_leads.MarketplaceLeadTier.EXPANDED
     assert tier_breakdown["high_purity"] == 1
     assert tier_breakdown["expanded"] == 1
+
+
+def test_list_marketplace_leads_merges_duplicates_across_sources() -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    freelancer = rss_sources.create_source(
+        {
+            "name": "Freelancer Web Development Jobs",
+            "url": "https://www.freelancer.com/jobs/web-development/",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "freelancer_jobs"},
+        }
+    )
+    for source in (pph, freelancer):
+        raw_entries.create_entry(
+            {
+                "source_id": source.id,
+                "guid": f"lead-{source.id}",
+                "title": "Frontend Developer React Next.js",
+                "summary": "Frontend Developer React Next.js | $1200 | 7 days",
+                "content": "Build React and Next.js frontend for a SaaS dashboard.",
+                "link": f"https://example.com/{source.id}",
+                "tags": ["marketplace"],
+                "metadata": {
+                    "platform": source.name,
+                    "budget": "$1200",
+                    "timeline": "7 days",
+                    "skills": ["React", "Next.js"],
+                },
+            }
+        )
+
+    total, items, _, status_breakdown = marketplace_leads.list_leads()
+
+    assert total == 1
+    assert items[0].duplicate_count == 2
+    assert len(items[0].duplicate_sources) == 2
+    assert status_breakdown["new"] == 1
+
+
+def test_update_marketplace_lead_status(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-status",
+            "title": "Full-Stack Web Developer",
+            "summary": "Full-Stack Web Developer | $2K | 7 days",
+            "content": "Build a full-stack web application.",
+            "link": "https://example.com/full-stack",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$2K",
+                "timeline": "7 days",
+                "skills": ["Python", "Django"],
+            },
+        }
+    )
+
+    response = client.put(f"/api/v1/marketplace-leads/{lead.id}/status", json={"status": "watching"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["lead_status"] == "watching"
+
+    list_response = client.get("/api/v1/marketplace-leads/", params={"lead_status": "watching"})
+    assert list_response.status_code == 200
+    assert list_response.json()["total"] == 1
 
 
 def test_peopleperhour_frontend_project_is_high_purity() -> None:
@@ -207,7 +297,7 @@ def test_peopleperhour_frontend_project_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -246,7 +336,7 @@ def test_peopleperhour_full_stack_project_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -285,7 +375,7 @@ def test_peopleperhour_hubspot_cms_project_is_high_purity() -> None:
         }
     )
 
-    total, items, tier_breakdown = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.HIGH_PURITY
     )
 
@@ -324,7 +414,7 @@ def test_peopleperhour_kiosk_project_stays_expanded() -> None:
         }
     )
 
-    total, items, tier_breakdown = marketplace_leads.list_leads(
+    total, items, tier_breakdown, _ = marketplace_leads.list_leads(
         tier=marketplace_leads.MarketplaceLeadTier.EXPANDED
     )
 

@@ -109,6 +109,8 @@
       "total": "Total leads",
       "highPurity": "High-purity leads",
       "expanded": "Expanded leads",
+      "watching": "Watching",
+      "contacted": "Contacted",
       "activeSources": "Active sources",
       "pausedSources": "Paused sources"
     },
@@ -124,6 +126,14 @@
         "expanded": "Expanded",
         "all": "All leads"
       },
+      "status": "Lead status",
+      "statusOptions": {
+        "all": "All statuses",
+        "new": "New",
+        "watching": "Watching",
+        "contacted": "Contacted",
+        "ignored": "Ignored"
+      },
       "sourceOptions": {
         "all": "All marketplace sources"
       }
@@ -136,8 +146,15 @@
       "skills": "Skills / category",
       "source": "Source",
       "queue": "Queue",
+      "status": "Status",
       "published": "Published at",
+      "actions": "Actions",
+      "duplicates": "{count} duplicates",
+      "hasLink": "Source link",
       "empty": "No marketplace leads"
+    },
+    "feedback": {
+      "statusUpdated": "Updated to {status}"
     }
   },
   "filterMonitor": {

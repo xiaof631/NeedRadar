@@ -1,20 +1,39 @@
-"""外包项目线索查询。"""
+"""外包项目线索查询与状态管理。"""
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import re
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from app.db.storage import db
 from app.models import RawEntry, SourceType
 from app.services import raw_entries, rss_sources
+
+_NON_WORD_RE = re.compile(r"[^a-z0-9\u4e00-\u9fff]+")
+_USD_RANGE_RE = re.compile(r"^\$(?P<start>\d[\d,.]*)(?P<start_suffix>k)?\s*(?:to|-)\s*\$(?P<end>\d[\d,.]*)(?P<end_suffix>k)?(?P<unit>/hr)?$", re.IGNORECASE)
+_USD_SINGLE_RE = re.compile(r"^\$(?P<value>\d[\d,.]*)(?P<suffix>k)?(?P<unit>/hr)?$", re.IGNORECASE)
+_CNY_RANGE_RE = re.compile(r"^(?P<start>\d+)千\s*[~\-]\s*(?P<end>\d+)千$")
+_CNY_UPPER_RE = re.compile(r"^(?P<value>\d+)千以下$")
+_CNY_SINGLE_RE = re.compile(r"^￥(?P<value>\d[\d,]*)$")
+_CN_DAY_RE = re.compile(r"(?P<days>\d+)\s*天")
+_EN_DAY_RE = re.compile(r"(?P<days>\d+)\s*days?", re.IGNORECASE)
+_HOURS_PER_WEEK_RE = re.compile(r"(?P<hours>\d+\s*hrs/wk)", re.IGNORECASE)
 
 
 class MarketplaceLeadTier(StrEnum):
     HIGH_PURITY = "high_purity"
     EXPANDED = "expanded"
+
+
+class MarketplaceLeadStatus(StrEnum):
+    NEW = "new"
+    WATCHING = "watching"
+    CONTACTED = "contacted"
+    IGNORED = "ignored"
 
 
 @dataclass(slots=True)
@@ -28,8 +47,10 @@ class MarketplaceLead:
     description: str | None
     category: str | None
     budget: str | None
+    normalized_budget: str | None
     engagement: str | None
     timeline: str | None
+    normalized_timeline: str | None
     location: str | None
     published_at: datetime | None
     author: str | None
@@ -38,6 +59,9 @@ class MarketplaceLead:
     link: str | None
     lead_tier: MarketplaceLeadTier
     tier_reason: str
+    lead_status: MarketplaceLeadStatus
+    duplicate_count: int
+    duplicate_sources: list[str]
     created_at: datetime
     updated_at: datetime
 
@@ -47,9 +71,10 @@ def list_leads(
     search: str | None = None,
     source_id: int | None = None,
     tier: MarketplaceLeadTier | None = None,
+    lead_status: MarketplaceLeadStatus | None = None,
     skip: int = 0,
     limit: int = 20,
-) -> tuple[int, list[MarketplaceLead], dict[str, int]]:
+) -> tuple[int, list[MarketplaceLead], dict[str, int], dict[str, int]]:
     _, items = raw_entries.list_entries(
         source_id=source_id,
         source_type=SourceType.FREELANCE_MARKETPLACE,
@@ -57,21 +82,43 @@ def list_leads(
         skip=0,
         limit=None,
     )
-    leads = [_to_marketplace_lead(item) for item in items]
+    leads = _merge_duplicate_leads([_to_marketplace_lead(item) for item in items])
     tier_breakdown = _count_tiers(leads)
+    status_breakdown = _count_statuses(leads)
     if tier is not None:
         leads = [lead for lead in leads if lead.lead_tier == tier]
+    if lead_status is not None:
+        leads = [lead for lead in leads if lead.lead_status == lead_status]
     if source_id is None:
         leads = _diversify_by_source(leads)
     total = len(leads)
     leads = leads[skip : skip + limit]
-    return total, leads, tier_breakdown
+    return total, leads, tier_breakdown, status_breakdown
+
+
+def update_lead_status(entry_id: int, status: MarketplaceLeadStatus) -> MarketplaceLead:
+    entry = raw_entries.get_entry(entry_id)
+    source = rss_sources.get_source(entry.source_id)
+    if source is None or source.source_type != SourceType.FREELANCE_MARKETPLACE:
+        raise ValueError("marketplace lead not found")
+
+    def _apply(model: RawEntry) -> None:
+        metadata = dict(model.metadata or {})
+        metadata["lead_status"] = status.value
+        model.metadata = metadata
+
+    updated = db.update_raw_entry(entry_id, _apply)
+    return _to_marketplace_lead(updated)
 
 
 def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
     source = rss_sources.get_source(item.source_id)
+    if source is None:
+        raise ValueError(f"source #{item.source_id} not found")
     metadata = dict(item.metadata or {})
     lead_tier, tier_reason = _classify_lead_tier(source.name, item, metadata)
+    budget = _to_string(metadata.get("budget"))
+    timeline = _to_string(metadata.get("timeline"))
     return MarketplaceLead(
         id=item.id,
         source_id=item.source_id,
@@ -81,9 +128,11 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         summary=item.summary,
         description=item.content,
         category=_to_string(metadata.get("category")),
-        budget=_to_string(metadata.get("budget")),
+        budget=budget,
+        normalized_budget=_normalize_budget(budget, _to_string(metadata.get("engagement"))),
         engagement=_to_string(metadata.get("engagement")),
-        timeline=_to_string(metadata.get("timeline")),
+        timeline=timeline,
+        normalized_timeline=_normalize_timeline(timeline),
         location=_to_string(metadata.get("location")),
         published_at=item.published_at,
         author=item.author,
@@ -92,6 +141,9 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         link=item.link,
         lead_tier=lead_tier,
         tier_reason=tier_reason,
+        lead_status=_to_lead_status(metadata.get("lead_status")),
+        duplicate_count=1,
+        duplicate_sources=[source.name],
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
@@ -147,6 +199,90 @@ def _classify_lead_tier(
     )
 
 
+def _merge_duplicate_leads(leads: list[MarketplaceLead]) -> list[MarketplaceLead]:
+    grouped: dict[str, MarketplaceLead] = {}
+    for lead in leads:
+        key = _canonical_lead_key(lead)
+        existing = grouped.get(key)
+        if existing is None:
+            grouped[key] = lead
+            continue
+        grouped[key] = _merge_lead_pair(existing, lead)
+    merged = list(grouped.values())
+    merged.sort(
+        key=lambda item: (
+            item.lead_status == MarketplaceLeadStatus.CONTACTED,
+            item.lead_status == MarketplaceLeadStatus.WATCHING,
+            item.lead_tier == MarketplaceLeadTier.HIGH_PURITY,
+            item.published_at or item.created_at,
+        ),
+        reverse=True,
+    )
+    return merged
+
+
+def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> MarketplaceLead:
+    representative = left
+    alternate = right
+    if _lead_sort_key(right) > _lead_sort_key(left):
+        representative, alternate = right, left
+    status = max(left.lead_status, right.lead_status, key=_lead_status_rank)
+    duplicate_sources = list(dict.fromkeys([*left.duplicate_sources, *right.duplicate_sources]))
+    return MarketplaceLead(
+        id=representative.id,
+        source_id=representative.source_id,
+        source_name=representative.source_name,
+        platform=representative.platform,
+        title=representative.title,
+        summary=representative.summary or alternate.summary,
+        description=representative.description or alternate.description,
+        category=representative.category or alternate.category,
+        budget=representative.budget or alternate.budget,
+        normalized_budget=representative.normalized_budget or alternate.normalized_budget,
+        engagement=representative.engagement or alternate.engagement,
+        timeline=representative.timeline or alternate.timeline,
+        normalized_timeline=representative.normalized_timeline or alternate.normalized_timeline,
+        location=representative.location or alternate.location,
+        published_at=representative.published_at or alternate.published_at,
+        author=representative.author or alternate.author,
+        tags=list(dict.fromkeys([*representative.tags, *alternate.tags])),
+        skills=list(dict.fromkeys([*representative.skills, *alternate.skills])),
+        link=representative.link or alternate.link,
+        lead_tier=representative.lead_tier,
+        tier_reason=representative.tier_reason,
+        lead_status=status,
+        duplicate_count=left.duplicate_count + right.duplicate_count,
+        duplicate_sources=duplicate_sources,
+        created_at=min(left.created_at, right.created_at),
+        updated_at=max(left.updated_at, right.updated_at),
+    )
+
+
+def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, datetime]:
+    return (
+        1 if lead.lead_tier == MarketplaceLeadTier.HIGH_PURITY else 0,
+        _lead_status_rank(lead.lead_status),
+        lead.published_at or lead.created_at,
+    )
+
+
+def _lead_status_rank(status: MarketplaceLeadStatus) -> int:
+    return {
+        MarketplaceLeadStatus.IGNORED: 0,
+        MarketplaceLeadStatus.NEW: 1,
+        MarketplaceLeadStatus.WATCHING: 2,
+        MarketplaceLeadStatus.CONTACTED: 3,
+    }[status]
+
+
+def _canonical_lead_key(lead: MarketplaceLead) -> str:
+    normalized = _NON_WORD_RE.sub(" ", lead.title.lower()).strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+    if lead.normalized_budget:
+        return f"{normalized}|{lead.normalized_budget}"
+    return normalized
+
+
 def _count_tiers(leads: list[MarketplaceLead]) -> dict[str, int]:
     return {
         MarketplaceLeadTier.HIGH_PURITY.value: sum(
@@ -156,6 +292,78 @@ def _count_tiers(leads: list[MarketplaceLead]) -> dict[str, int]:
             1 for lead in leads if lead.lead_tier == MarketplaceLeadTier.EXPANDED
         ),
     }
+
+
+def _count_statuses(leads: list[MarketplaceLead]) -> dict[str, int]:
+    return {
+        status.value: sum(1 for lead in leads if lead.lead_status == status)
+        for status in MarketplaceLeadStatus
+    }
+
+
+def _to_lead_status(value: object) -> MarketplaceLeadStatus:
+    if value is None:
+        return MarketplaceLeadStatus.NEW
+    try:
+        return MarketplaceLeadStatus(str(value))
+    except ValueError:
+        return MarketplaceLeadStatus.NEW
+
+
+def _normalize_budget(value: str | None, engagement: str | None) -> str | None:
+    if not value:
+        return None
+    text = value.strip()
+    lowered = text.lower()
+    if lowered in {"待商议", "面议", "open"}:
+        return "Negotiable"
+    if match := _USD_RANGE_RE.match(text):
+        return (
+            f"USD {_expand_number(match.group('start'), match.group('start_suffix'))}"
+            f"-{_expand_number(match.group('end'), match.group('end_suffix'))}"
+            f"{match.group('unit') or ''}"
+        )
+    if match := _USD_SINGLE_RE.match(text):
+        return f"USD {_expand_number(match.group('value'), match.group('suffix'))}{match.group('unit') or ''}"
+    if match := _CNY_RANGE_RE.match(text):
+        return f"CNY {match.group('start')}k-{match.group('end')}k"
+    if match := _CNY_UPPER_RE.match(text):
+        return f"CNY <= {match.group('value')}k"
+    if match := _CNY_SINGLE_RE.match(text):
+        return f"CNY {match.group('value').replace(',', '')}"
+    if engagement == "fixed-price":
+        return text
+    return text
+
+
+def _normalize_timeline(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = value.strip()
+    lowered = text.lower()
+    if "ago" in lowered or lowered in {"选标中", "圆满结束", "待商议"}:
+        return None
+    if "ongoing" in lowered:
+        hours = _HOURS_PER_WEEK_RE.search(lowered)
+        if hours:
+            return f"{hours.group('hours')} · Ongoing"
+        return "Ongoing"
+    if match := _CN_DAY_RE.search(text):
+        return f"{match.group('days')} days"
+    if match := _EN_DAY_RE.search(text):
+        return f"{match.group('days')} days"
+    if match := _HOURS_PER_WEEK_RE.search(text):
+        return match.group("hours")
+    return text
+
+
+def _expand_number(value: str, suffix: str | None) -> str:
+    if suffix and suffix.lower() == "k":
+        base = float(value.replace(",", ""))
+        expanded = int(base * 1000)
+        return str(expanded)
+    cleaned = value.replace(",", "")
+    return cleaned
 
 
 def _to_string(value: object) -> str | None:

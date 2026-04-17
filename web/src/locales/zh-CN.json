@@ -112,6 +112,8 @@
       "total": "线索总数",
       "highPurity": "高纯度线索",
       "expanded": "扩展线索",
+      "watching": "已关注",
+      "contacted": "已联系",
       "activeSources": "活跃项目源",
       "pausedSources": "暂停项目源"
     },
@@ -127,6 +129,14 @@
         "expanded": "扩展线索",
         "all": "全部线索"
       },
+      "status": "跟进状态",
+      "statusOptions": {
+        "all": "全部状态",
+        "new": "待查看",
+        "watching": "已关注",
+        "contacted": "已联系",
+        "ignored": "已忽略"
+      },
       "sourceOptions": {
         "all": "全部项目源"
       }
@@ -139,8 +149,15 @@
       "skills": "技能/分类",
       "source": "数据源",
       "queue": "队列",
+      "status": "状态",
       "published": "发布时间",
+      "actions": "操作",
+      "duplicates": "重复线索 {count}",
+      "hasLink": "原始链接",
       "empty": "暂无外包项目线索"
+    },
+    "feedback": {
+      "statusUpdated": "已更新为“{status}”"
     }
   },
   "filterMonitor": {

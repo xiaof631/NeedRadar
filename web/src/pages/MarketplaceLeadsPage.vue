@@ -23,6 +23,15 @@
           :placeholder="t('marketplace.filters.searchPlaceholder')"
           clearable
         />
+        <el-select v-model="statusFilter" class="status-select" :placeholder="t('marketplace.filters.status')">
+          <el-option :label="t('marketplace.filters.statusOptions.all')" value="all" />
+          <el-option
+            v-for="option in leadStatusOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
         <el-select v-model="sourceId" class="source-select" :placeholder="t('marketplace.filters.source')">
           <el-option :label="t('marketplace.filters.sourceOptions.all')" value="all" />
           <el-option
@@ -52,6 +61,14 @@
         <div class="metric-value">{{ expandedCount }}</div>
       </el-card>
       <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.watching') }}</div>
+        <div class="metric-value">{{ watchingCount }}</div>
+      </el-card>
+      <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.contacted') }}</div>
+        <div class="metric-value">{{ contactedCount }}</div>
+      </el-card>
+      <el-card shadow="never">
         <div class="metric-label">{{ t('marketplace.metrics.activeSources') }}</div>
         <div class="metric-value">{{ activeSourceCount }}</div>
       </el-card>
@@ -69,7 +86,7 @@
         <div v-for="source in marketplaceSources" :key="source.id" class="source-health-item">
           <div class="source-health-main">
             <span class="source-health-name">{{ source.name }}</span>
-            <el-tag size="small" :type="statusTagType(source.status)" effect="plain">
+            <el-tag size="small" :type="sourceStatusTagType(source.status)" effect="plain">
               {{ t(`sources.status.${source.status}`) }}
             </el-tag>
           </div>
@@ -83,22 +100,56 @@
     <el-card shadow="never">
       <el-table :data="leads" v-loading="leadsQuery.isFetching.value" :empty-text="t('marketplace.table.empty')">
         <el-table-column prop="platform" :label="t('marketplace.table.platform')" width="170" />
-        <el-table-column :label="t('marketplace.table.title')" min-width="320">
+        <el-table-column :label="t('marketplace.table.title')" min-width="340">
           <template #default="{ row }">
             <div class="title-cell">
               <a v-if="row.link" :href="row.link" class="lead-link" target="_blank" rel="noreferrer">
                 {{ row.title }}
               </a>
               <span v-else>{{ row.title }}</span>
+              <div class="tag-list">
+                <el-tag
+                  v-if="row.duplicate_count > 1"
+                  size="small"
+                  type="info"
+                  effect="plain"
+                >
+                  {{ t('marketplace.table.duplicates', { count: row.duplicate_count }) }}
+                </el-tag>
+                <el-tag
+                  v-if="row.link"
+                  size="small"
+                  type="success"
+                  effect="plain"
+                >
+                  {{ t('marketplace.table.hasLink') }}
+                </el-tag>
+              </div>
               <div v-if="row.summary" class="summary-text">{{ row.summary }}</div>
+              <div v-if="row.duplicate_count > 1" class="summary-text">
+                {{ row.duplicate_sources.join(' / ') }}
+              </div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column :label="t('marketplace.table.budget')" width="170">
-          <template #default="{ row }">{{ row.budget || '—' }}</template>
+        <el-table-column :label="t('marketplace.table.budget')" width="180">
+          <template #default="{ row }">
+            <div>{{ row.normalized_budget || row.budget || '—' }}</div>
+            <div v-if="row.normalized_budget && row.budget && row.normalized_budget !== row.budget" class="summary-text">
+              {{ row.budget }}
+            </div>
+          </template>
         </el-table-column>
         <el-table-column :label="t('marketplace.table.timeline')" width="190">
-          <template #default="{ row }">{{ row.timeline || '—' }}</template>
+          <template #default="{ row }">
+            <div>{{ row.normalized_timeline || row.timeline || '—' }}</div>
+            <div
+              v-if="row.normalized_timeline && row.timeline && row.normalized_timeline !== row.timeline"
+              class="summary-text"
+            >
+              {{ row.timeline }}
+            </div>
+          </template>
         </el-table-column>
         <el-table-column :label="t('marketplace.table.skills')" min-width="220">
           <template #default="{ row }">
@@ -120,8 +171,42 @@
             <div class="summary-text">{{ row.tier_reason }}</div>
           </template>
         </el-table-column>
+        <el-table-column :label="t('marketplace.table.status')" width="190">
+          <template #default="{ row }">
+            <el-tag :type="leadStatusTagType(row.lead_status)" effect="plain">
+              {{ leadStatusLabel(row.lead_status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('marketplace.table.published')" width="190">
           <template #default="{ row }">{{ formatDate(row.published_at || row.created_at) }}</template>
+        </el-table-column>
+        <el-table-column :label="t('marketplace.table.actions')" min-width="210" fixed="right">
+          <template #default="{ row }">
+            <div class="actions-cell">
+              <el-select
+                :model-value="row.lead_status"
+                size="small"
+                class="row-status-select"
+                @change="(value) => handleStatusChange(row.id, value)"
+              >
+                <el-option
+                  v-for="option in leadStatusOptions"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-button
+                v-if="row.link"
+                size="small"
+                text
+                @click="openExternal(row.link)"
+              >
+                {{ t('actions.view') }}
+              </el-button>
+            </div>
+          </template>
         </el-table-column>
       </el-table>
       <div class="pagination-row">
@@ -140,16 +225,30 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useQuery } from '@tanstack/vue-query';
+import { useMutation, useQuery } from '@tanstack/vue-query';
+import { ElMessage } from 'element-plus/es/components/message/index';
 import { useI18n } from 'vue-i18n';
-import { fetchMarketplaceLeads, fetchRssSources } from '../services/api';
+import {
+  fetchMarketplaceLeads,
+  fetchRssSources,
+  updateMarketplaceLeadStatus,
+  type MarketplaceLead
+} from '../services/api';
 
 const { t } = useI18n();
 const pageSize = 15;
 const page = ref(1);
 const search = ref('');
 const sourceId = ref<'all' | string>('all');
+const statusFilter = ref<'all' | MarketplaceLead['lead_status']>('all');
 const queueView = ref<'high_purity' | 'expanded' | 'all'>('high_purity');
+
+const leadStatusOptions = computed(() => [
+  { value: 'new' as const, label: t('marketplace.filters.statusOptions.new') },
+  { value: 'watching' as const, label: t('marketplace.filters.statusOptions.watching') },
+  { value: 'contacted' as const, label: t('marketplace.filters.statusOptions.contacted') },
+  { value: 'ignored' as const, label: t('marketplace.filters.statusOptions.ignored') }
+]);
 
 const sourcesQuery = useQuery({
   queryKey: ['marketplace-sources'],
@@ -174,7 +273,8 @@ const queryParams = computed(() => ({
   limit: pageSize,
   search: search.value.trim() || undefined,
   source_id: sourceId.value === 'all' ? undefined : Number(sourceId.value),
-  tier: queueView.value === 'all' ? undefined : queueView.value
+  tier: queueView.value === 'all' ? undefined : queueView.value,
+  lead_status: statusFilter.value === 'all' ? undefined : statusFilter.value
 }));
 
 const leadsQuery = useQuery({
@@ -184,10 +284,28 @@ const leadsQuery = useQuery({
   staleTime: 30_000
 });
 
+const statusMutation = useMutation({
+  mutationFn: ({ leadId, status }: { leadId: number; status: MarketplaceLead['lead_status'] }) =>
+    updateMarketplaceLeadStatus(leadId, status),
+  onSuccess: async (_, variables) => {
+    ElMessage.success(
+      t('marketplace.feedback.statusUpdated', {
+        status: leadStatusLabel(variables.status)
+      })
+    );
+    await leadsQuery.refetch();
+  },
+  onError: () => {
+    ElMessage.error(t('feedback.genericError'));
+  }
+});
+
 const leads = computed(() => leadsQuery.data.value?.items ?? []);
 const total = computed(() => leadsQuery.data.value?.total ?? 0);
 const highPurityCount = computed(() => leadsQuery.data.value?.tier_breakdown?.high_purity ?? 0);
 const expandedCount = computed(() => leadsQuery.data.value?.tier_breakdown?.expanded ?? 0);
+const watchingCount = computed(() => leadsQuery.data.value?.status_breakdown?.watching ?? 0);
+const contactedCount = computed(() => leadsQuery.data.value?.status_breakdown?.contacted ?? 0);
 
 const handlePageChange = (value: number) => {
   page.value = value;
@@ -198,10 +316,31 @@ const refetch = () => {
   void sourcesQuery.refetch();
 };
 
-const statusTagType = (status: 'active' | 'paused' | 'disabled') => {
+const sourceStatusTagType = (status: 'active' | 'paused' | 'disabled') => {
   if (status === 'active') return 'success';
   if (status === 'paused') return 'warning';
   return 'info';
+};
+
+const leadStatusTagType = (status: MarketplaceLead['lead_status']) => {
+  if (status === 'contacted') return 'success';
+  if (status === 'watching') return 'warning';
+  if (status === 'ignored') return 'info';
+  return '';
+};
+
+const leadStatusLabel = (status: MarketplaceLead['lead_status']) =>
+  t(`marketplace.filters.statusOptions.${status}`);
+
+const handleStatusChange = (leadId: number, value: string) => {
+  void statusMutation.mutate({
+    leadId,
+    status: value as MarketplaceLead['lead_status']
+  });
+};
+
+const openExternal = (link: string) => {
+  window.open(link, '_blank', 'noopener,noreferrer');
 };
 
 const formatDate = (value: string | null) => {
@@ -238,13 +377,14 @@ const formatDate = (value: string | null) => {
   width: 280px;
 }
 
-.source-select {
+.source-select,
+.status-select {
   width: 220px;
 }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 220px));
+  grid-template-columns: repeat(auto-fit, minmax(0, 220px));
   gap: 1rem;
 }
 
@@ -298,12 +438,6 @@ const formatDate = (value: string | null) => {
   gap: 0.75rem;
 }
 
-@media (max-width: 1080px) {
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 .source-health-name {
   font-weight: 600;
   color: #0f172a;
@@ -325,15 +459,20 @@ const formatDate = (value: string | null) => {
   text-decoration: underline;
 }
 
-.summary-text {
-  color: #64748b;
-  font-size: 0.875rem;
-}
-
 .tag-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.row-status-select {
+  width: 124px;
 }
 
 .pagination-row {
@@ -343,10 +482,6 @@ const formatDate = (value: string | null) => {
 }
 
 @media (max-width: 960px) {
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-
   .page-header,
   .actions {
     flex-direction: column;
@@ -354,7 +489,8 @@ const formatDate = (value: string | null) => {
   }
 
   .search-input,
-  .source-select {
+  .source-select,
+  .status-select {
     width: 100%;
   }
 }
