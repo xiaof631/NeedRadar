@@ -118,6 +118,8 @@
       "contacted": "已联系",
       "won": "已成交",
       "noResponse": "无回复",
+      "resolved": "已结案",
+      "winRate": "成交率",
       "activeSources": "活跃项目源",
       "pausedSources": "暂停项目源"
     },
@@ -150,6 +152,23 @@
         "expand_similar": "扩同类来源",
         "lower_frequency": "建议降频",
         "pause_candidate": "建议暂停"
+      }
+    },
+    "retrospective": {
+      "title": "转化复盘看板",
+      "segmentTitle": "线索类型复盘",
+      "subtitle": "基于已结案结果，判断哪些来源和哪类线索更容易真正转成机会。",
+      "empty": "暂无可复盘的转化数据",
+      "columns": {
+        "segment": "维度",
+        "total": "总量",
+        "resolved": "已结案",
+        "won": "已成交",
+        "lost": "已失败",
+        "noResponse": "无回复",
+        "notFit": "不匹配",
+        "resolutionRate": "结案率",
+        "winRate": "成交率"
       }
     },
     "todo": {

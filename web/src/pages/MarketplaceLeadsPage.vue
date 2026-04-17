@@ -101,6 +101,14 @@
         <div class="metric-value">{{ noResponseCount }}</div>
       </el-card>
       <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.resolved') }}</div>
+        <div class="metric-value">{{ resolvedCount }}</div>
+      </el-card>
+      <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.winRate') }}</div>
+        <div class="metric-value">{{ formatPercent(overallWinRate) }}</div>
+      </el-card>
+      <el-card shadow="never">
         <div class="metric-label">{{ t('marketplace.metrics.activeSources') }}</div>
         <div class="metric-value">{{ activeSourceCount }}</div>
       </el-card>
@@ -221,6 +229,53 @@
         </div>
       </div>
       <div v-else class="todo-empty">{{ t('marketplace.recommendations.empty') }}</div>
+    </el-card>
+
+    <el-card shadow="never">
+      <template #header>
+        <div class="source-health-title">{{ t('marketplace.retrospective.title') }}</div>
+      </template>
+      <p class="summary-text retrospective-summary">{{ t('marketplace.retrospective.subtitle') }}</p>
+      <el-table
+        :data="sourceConversionBreakdown"
+        size="small"
+        :empty-text="t('marketplace.retrospective.empty')"
+      >
+        <el-table-column prop="label" :label="t('marketplace.retrospective.columns.segment')" min-width="220" />
+        <el-table-column prop="total" :label="t('marketplace.retrospective.columns.total')" width="90" />
+        <el-table-column prop="resolved" :label="t('marketplace.retrospective.columns.resolved')" width="100" />
+        <el-table-column prop="won" :label="t('marketplace.retrospective.columns.won')" width="90" />
+        <el-table-column prop="lost" :label="t('marketplace.retrospective.columns.lost')" width="90" />
+        <el-table-column prop="no_response" :label="t('marketplace.retrospective.columns.noResponse')" width="110" />
+        <el-table-column prop="not_fit" :label="t('marketplace.retrospective.columns.notFit')" width="100" />
+        <el-table-column :label="t('marketplace.retrospective.columns.winRate')" width="110">
+          <template #default="{ row }">{{ formatPercent(row.win_rate) }}</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card shadow="never">
+      <template #header>
+        <div class="source-health-title">{{ t('marketplace.retrospective.segmentTitle') }}</div>
+      </template>
+      <el-table
+        :data="segmentConversionBreakdown"
+        size="small"
+        :empty-text="t('marketplace.retrospective.empty')"
+      >
+        <el-table-column :label="t('marketplace.retrospective.columns.segment')" min-width="220">
+          <template #default="{ row }">{{ conversionSegmentLabel(row.key, row.label) }}</template>
+        </el-table-column>
+        <el-table-column prop="total" :label="t('marketplace.retrospective.columns.total')" width="90" />
+        <el-table-column prop="resolved" :label="t('marketplace.retrospective.columns.resolved')" width="100" />
+        <el-table-column prop="won" :label="t('marketplace.retrospective.columns.won')" width="90" />
+        <el-table-column :label="t('marketplace.retrospective.columns.resolutionRate')" width="120">
+          <template #default="{ row }">{{ formatPercent(row.resolution_rate) }}</template>
+        </el-table-column>
+        <el-table-column :label="t('marketplace.retrospective.columns.winRate')" width="110">
+          <template #default="{ row }">{{ formatPercent(row.win_rate) }}</template>
+        </el-table-column>
+      </el-table>
     </el-card>
 
     <el-card shadow="never">
@@ -726,6 +781,22 @@ const watchingCount = computed(() => leadsQuery.data.value?.status_breakdown?.wa
 const contactedCount = computed(() => leadsQuery.data.value?.status_breakdown?.contacted ?? 0);
 const wonCount = computed(() => leadsQuery.data.value?.outcome_breakdown?.won ?? 0);
 const noResponseCount = computed(() => leadsQuery.data.value?.outcome_breakdown?.no_response ?? 0);
+const resolvedCount = computed(() =>
+  (leadsQuery.data.value?.outcome_breakdown?.won ?? 0) +
+  (leadsQuery.data.value?.outcome_breakdown?.lost ?? 0) +
+  (leadsQuery.data.value?.outcome_breakdown?.no_response ?? 0) +
+  (leadsQuery.data.value?.outcome_breakdown?.not_fit ?? 0)
+);
+const overallWinRate = computed(() => {
+  if (resolvedCount.value === 0) return 0;
+  return wonCount.value / resolvedCount.value;
+});
+const sourceConversionBreakdown = computed(
+  () => leadsQuery.data.value?.source_conversion_breakdown ?? []
+);
+const segmentConversionBreakdown = computed(
+  () => leadsQuery.data.value?.segment_conversion_breakdown ?? []
+);
 const highSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.high ?? 0);
 const mediumSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.medium ?? 0);
 
@@ -814,6 +885,26 @@ const recommendationSeverityTagType = (value: MarketplaceSourceRecommendation['s
   return 'info';
 };
 
+const conversionSegmentLabel = (key: string, fallback: string) => {
+  if (key.startsWith('tier:')) {
+    const tier = key.slice(5) as MarketplaceLead['lead_tier'];
+    return t(`marketplace.filters.queueOptions.${tier}`);
+  }
+  if (key.startsWith('kind:')) {
+    const kind = key.slice(5) as MarketplaceLead['lead_kind'];
+    return t(`marketplace.filters.leadKindOptions.${kind}`);
+  }
+  if (fallback.startsWith('queue:')) {
+    const tier = fallback.slice(6) as MarketplaceLead['lead_tier'];
+    return t(`marketplace.filters.queueOptions.${tier}`);
+  }
+  if (fallback.startsWith('kind:')) {
+    const kind = fallback.slice(5) as MarketplaceLead['lead_kind'];
+    return t(`marketplace.filters.leadKindOptions.${kind}`);
+  }
+  return fallback;
+};
+
 const handleStatusChange = (leadId: number, value: string) => {
   void statusMutation.mutate({
     leadId,
@@ -853,6 +944,12 @@ const formatDate = (value: string | null) => {
     timeStyle: 'short'
   }).format(new Date(value));
 };
+
+const formatPercent = (value: number) =>
+  new Intl.NumberFormat(undefined, {
+    style: 'percent',
+    maximumFractionDigits: 0
+  }).format(value);
 </script>
 
 <style scoped>
@@ -915,6 +1012,11 @@ const formatDate = (value: string | null) => {
   font-size: 0.8125rem;
   line-height: 1.4;
   color: #64748b;
+}
+
+.retrospective-summary {
+  margin-top: 0;
+  margin-bottom: 1rem;
 }
 
 .source-health-title {

@@ -112,6 +112,21 @@ class MarketplaceLeadSourceMetric:
 
 
 @dataclass(slots=True)
+class MarketplaceLeadConversionMetric:
+    key: str
+    label: str
+    total: int
+    resolved: int
+    won: int
+    lost: int
+    no_response: int
+    not_fit: int
+    contacted: int
+    resolution_rate: float
+    win_rate: float
+
+
+@dataclass(slots=True)
 class MarketplaceLeadReminder:
     lead_id: int
     title: str
@@ -149,6 +164,8 @@ class MarketplaceLeadQueryResult:
     status_breakdown: dict[str, int]
     outcome_breakdown: dict[str, int]
     source_breakdown: list[MarketplaceLeadSourceMetric]
+    source_conversion_breakdown: list[MarketplaceLeadConversionMetric]
+    segment_conversion_breakdown: list[MarketplaceLeadConversionMetric]
     source_recommendations: list[MarketplaceSourceRecommendation]
     todo_breakdown: dict[str, int]
     todo_queue: list[MarketplaceLeadReminder]
@@ -219,6 +236,8 @@ def query_leads(
     status_breakdown = _count_statuses(leads)
     outcome_breakdown = _count_outcomes(leads)
     source_breakdown = _build_source_breakdown(leads)
+    source_conversion_breakdown = _build_source_conversion_breakdown(leads)
+    segment_conversion_breakdown = _build_segment_conversion_breakdown(leads)
     priority_context = MarketplacePriorityContext(
         source_history={item.source_id: item for item in source_breakdown},
         now=datetime.now(UTC),
@@ -248,6 +267,8 @@ def query_leads(
         status_breakdown=status_breakdown,
         outcome_breakdown=outcome_breakdown,
         source_breakdown=source_breakdown,
+        source_conversion_breakdown=source_conversion_breakdown,
+        segment_conversion_breakdown=segment_conversion_breakdown,
         source_recommendations=source_recommendations,
         todo_breakdown=todo_breakdown,
         todo_queue=todo_queue[:8],
@@ -812,6 +833,94 @@ def _build_source_breakdown(leads: list[MarketplaceLead]) -> list[MarketplaceLea
         )
     metrics.sort(
         key=lambda item: (item.high_purity, item.reviewable, item.contacted, item.total, item.source_name),
+        reverse=True,
+    )
+    return metrics
+
+
+def _build_source_conversion_breakdown(
+    leads: list[MarketplaceLead],
+) -> list[MarketplaceLeadConversionMetric]:
+    grouped: dict[tuple[int, str], list[MarketplaceLead]] = {}
+    for lead in leads:
+        key = (lead.source_id, lead.source_name)
+        grouped.setdefault(key, []).append(lead)
+
+    metrics = [
+        _build_conversion_metric(
+            key=f"source:{source_id}",
+            label=source_name,
+            leads=items,
+        )
+        for (source_id, source_name), items in grouped.items()
+    ]
+    return _sort_conversion_metrics(metrics)
+
+
+def _build_segment_conversion_breakdown(
+    leads: list[MarketplaceLead],
+) -> list[MarketplaceLeadConversionMetric]:
+    grouped: dict[str, tuple[str, list[MarketplaceLead]]] = {}
+    for tier in MarketplaceLeadTier:
+        grouped[f"tier:{tier.value}"] = (
+            f"queue:{tier.value}",
+            [lead for lead in leads if lead.lead_tier == tier],
+        )
+    for kind in MarketplaceLeadKind:
+        grouped[f"kind:{kind.value}"] = (
+            f"kind:{kind.value}",
+            [lead for lead in leads if lead.lead_kind == kind],
+        )
+
+    metrics = [
+        _build_conversion_metric(key=key, label=label, leads=items)
+        for key, (label, items) in grouped.items()
+        if items
+    ]
+    return _sort_conversion_metrics(metrics)
+
+
+def _build_conversion_metric(
+    *,
+    key: str,
+    label: str,
+    leads: list[MarketplaceLead],
+) -> MarketplaceLeadConversionMetric:
+    total = len(leads)
+    won = sum(1 for lead in leads if lead.lead_outcome == MarketplaceLeadOutcome.WON)
+    lost = sum(1 for lead in leads if lead.lead_outcome == MarketplaceLeadOutcome.LOST)
+    no_response = sum(1 for lead in leads if lead.lead_outcome == MarketplaceLeadOutcome.NO_RESPONSE)
+    not_fit = sum(1 for lead in leads if lead.lead_outcome == MarketplaceLeadOutcome.NOT_FIT)
+    contacted = sum(1 for lead in leads if lead.lead_status == MarketplaceLeadStatus.CONTACTED)
+    resolved = won + lost + no_response + not_fit
+    resolution_rate = round(resolved / total, 4) if total else 0.0
+    win_rate = round(won / resolved, 4) if resolved else 0.0
+    return MarketplaceLeadConversionMetric(
+        key=key,
+        label=label,
+        total=total,
+        resolved=resolved,
+        won=won,
+        lost=lost,
+        no_response=no_response,
+        not_fit=not_fit,
+        contacted=contacted,
+        resolution_rate=resolution_rate,
+        win_rate=win_rate,
+    )
+
+
+def _sort_conversion_metrics(
+    metrics: list[MarketplaceLeadConversionMetric],
+) -> list[MarketplaceLeadConversionMetric]:
+    metrics.sort(
+        key=lambda item: (
+            item.won,
+            item.resolved,
+            item.contacted,
+            item.total,
+            item.label,
+        ),
         reverse=True,
     )
     return metrics

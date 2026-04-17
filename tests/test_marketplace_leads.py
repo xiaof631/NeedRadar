@@ -249,6 +249,94 @@ def test_marketplace_leads_returns_source_recommendations(client: TestClient) ->
     assert recommendations["Remotive Software Contracts"]["action"] == "pause_candidate"
 
 
+def test_marketplace_leads_returns_conversion_breakdowns(client: TestClient) -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    remotive = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/remote-jobs/software-dev",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "remotive_contracts"},
+        }
+    )
+    won = raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "conv-won",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $1200 | 2 days",
+            "content": "Build a frontend app.",
+            "link": "https://example.com/conv-won",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$1200",
+                "timeline": "2 days",
+                "lead_outcome": "won",
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "conv-lost",
+            "title": "Full-Stack Web Developer",
+            "summary": "Full-Stack Web Developer | $2K | 7 days",
+            "content": "Build a full-stack web application.",
+            "link": "https://example.com/conv-lost",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$2K",
+                "timeline": "7 days",
+                "lead_outcome": "lost",
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": remotive.id,
+            "guid": "conv-full-time",
+            "title": "Senior Backend Engineer",
+            "summary": "Senior Backend Engineer | Remote",
+            "content": "Employment type: full-time",
+            "link": "https://example.com/conv-full-time",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "Remotive",
+                "engagement": "full-time",
+                "lead_outcome": "not_fit",
+            },
+        }
+    )
+    marketplace_leads.update_lead_status(won.id, marketplace_leads.MarketplaceLeadStatus.CONTACTED)
+
+    response = client.get("/api/v1/marketplace-leads/")
+    assert response.status_code == 200
+    payload = response.json()
+
+    source_metrics = {item["label"]: item for item in payload["source_conversion_breakdown"]}
+    assert source_metrics["PeoplePerHour Technology Projects"]["won"] == 1
+    assert source_metrics["PeoplePerHour Technology Projects"]["lost"] == 1
+    assert source_metrics["PeoplePerHour Technology Projects"]["resolved"] == 2
+    assert source_metrics["PeoplePerHour Technology Projects"]["contacted"] == 1
+    assert source_metrics["Remotive Software Contracts"]["not_fit"] == 1
+
+    segment_metrics = {item["key"]: item for item in payload["segment_conversion_breakdown"]}
+    assert segment_metrics["tier:high_purity"]["resolved"] == 3
+    assert segment_metrics["kind:project"]["won"] == 1
+    assert segment_metrics["kind:full_time_job"]["not_fit"] == 1
+
+
 def test_list_marketplace_leads_diversifies_sources() -> None:
     sxsoft = rss_sources.create_source(
         {

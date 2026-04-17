@@ -96,6 +96,22 @@ class MarketplaceLeadSourceMetricRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MarketplaceLeadConversionMetricRead(BaseModel):
+    key: str
+    label: str
+    total: int
+    resolved: int
+    won: int
+    lost: int
+    no_response: int
+    not_fit: int
+    contacted: int
+    resolution_rate: float
+    win_rate: float
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MarketplaceLeadList(BaseModel):
     total: int
     tier_breakdown: dict[str, int] = Field(default_factory=dict)
@@ -104,6 +120,12 @@ class MarketplaceLeadList(BaseModel):
     outcome_breakdown: dict[str, int] = Field(default_factory=dict)
     todo_breakdown: dict[str, int] = Field(default_factory=dict)
     source_breakdown: list[MarketplaceLeadSourceMetricRead] = Field(default_factory=list)
+    source_conversion_breakdown: list[MarketplaceLeadConversionMetricRead] = Field(
+        default_factory=list
+    )
+    segment_conversion_breakdown: list[MarketplaceLeadConversionMetricRead] = Field(
+        default_factory=list
+    )
     source_recommendations: list[MarketplaceSourceRecommendationRead] = Field(default_factory=list)
     todo_queue: list[MarketplaceLeadReminderRead] = Field(default_factory=list)
     items: list[MarketplaceLeadRead]

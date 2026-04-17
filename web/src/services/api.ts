@@ -338,6 +338,20 @@ export interface MarketplaceSourceRecommendation {
   reason: string;
 }
 
+export interface MarketplaceLeadConversionMetric {
+  key: string;
+  label: string;
+  total: number;
+  resolved: number;
+  won: number;
+  lost: number;
+  no_response: number;
+  not_fit: number;
+  contacted: number;
+  resolution_rate: number;
+  win_rate: number;
+}
+
 export interface MarketplaceLeadListResponse {
   total: number;
   tier_breakdown: Record<string, number>;
@@ -346,6 +360,8 @@ export interface MarketplaceLeadListResponse {
   outcome_breakdown: Record<string, number>;
   todo_breakdown: Record<string, number>;
   source_breakdown: MarketplaceLeadSourceMetric[];
+  source_conversion_breakdown: MarketplaceLeadConversionMetric[];
+  segment_conversion_breakdown: MarketplaceLeadConversionMetric[];
   source_recommendations: MarketplaceSourceRecommendation[];
   todo_queue: MarketplaceLeadReminder[];
   items: MarketplaceLead[];

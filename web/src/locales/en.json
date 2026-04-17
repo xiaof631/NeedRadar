@@ -115,6 +115,8 @@
       "contacted": "Contacted",
       "won": "Won",
       "noResponse": "No response",
+      "resolved": "Resolved",
+      "winRate": "Win rate",
       "activeSources": "Active sources",
       "pausedSources": "Paused sources"
     },
@@ -147,6 +149,23 @@
         "expand_similar": "Expand similar sources",
         "lower_frequency": "Lower frequency",
         "pause_candidate": "Pause candidate"
+      }
+    },
+    "retrospective": {
+      "title": "Conversion retrospective",
+      "segmentTitle": "Lead segment retrospective",
+      "subtitle": "Use resolved outcomes to see which sources and lead shapes actually convert into opportunities.",
+      "empty": "No conversion data to review yet",
+      "columns": {
+        "segment": "Segment",
+        "total": "Total",
+        "resolved": "Resolved",
+        "won": "Won",
+        "lost": "Lost",
+        "noResponse": "No response",
+        "notFit": "Not fit",
+        "resolutionRate": "Resolution rate",
+        "winRate": "Win rate"
       }
     },
     "todo": {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.schemas import (
+    MarketplaceLeadConversionMetricRead,
     MarketplaceLeadEventRead,
     MarketplaceLeadList,
     MarketplaceLeadNotesUpdate,
@@ -59,6 +60,14 @@ async def list_marketplace_leads(
         todo_breakdown=result.todo_breakdown,
         source_breakdown=[
             MarketplaceLeadSourceMetricRead.model_validate(item) for item in result.source_breakdown
+        ],
+        source_conversion_breakdown=[
+            MarketplaceLeadConversionMetricRead.model_validate(item)
+            for item in result.source_conversion_breakdown
+        ],
+        segment_conversion_breakdown=[
+            MarketplaceLeadConversionMetricRead.model_validate(item)
+            for item in result.segment_conversion_breakdown
         ],
         source_recommendations=[
             MarketplaceSourceRecommendationRead.model_validate(item)
