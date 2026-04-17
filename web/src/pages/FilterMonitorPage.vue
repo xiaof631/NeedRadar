@@ -61,25 +61,25 @@ import { useI18n } from 'vue-i18n';
 import { fetchFilterMetrics, type FilterPerformance } from '../services/api';
 
 const { t } = useI18n();
+const EMPTY_FILTER_METRICS: FilterPerformance = {
+  total_entries: 0,
+  pending_entries: 0,
+  processed_entries: 0,
+  filtered_entries: 0,
+  promoted_entries: 0,
+  ignored_entries: 0,
+  promotion_rate: 0,
+  average_rule_score: null,
+  source_breakdown: []
+};
 
 const metricsQuery = useQuery({
   queryKey: ['filter-metrics'],
   queryFn: fetchFilterMetrics,
-  staleTime: 60_000,
-  initialData: {
-    total_entries: 0,
-    pending_entries: 0,
-    processed_entries: 0,
-    filtered_entries: 0,
-    promoted_entries: 0,
-    ignored_entries: 0,
-    promotion_rate: 0,
-    average_rule_score: null,
-    source_breakdown: []
-  } as FilterPerformance
+  staleTime: 60_000
 });
 
-const metrics = computed(() => metricsQuery.data.value!);
+const metrics = computed(() => metricsQuery.data.value ?? EMPTY_FILTER_METRICS);
 
 const ruleHitRate = computed(() => {
   if (!metrics.value.processed_entries) return 0;

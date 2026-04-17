@@ -72,34 +72,38 @@ import { useQuery } from '@tanstack/vue-query';
 import { useI18n } from 'vue-i18n';
 import StatCard from '../components/common/StatCard.vue';
 import DataTable from '../components/common/DataTable.vue';
-import { fetchDashboardMetrics, fetchRecentAlerts, type AlertItem } from '../services/api';
+import {
+  fetchDashboardMetrics,
+  fetchRecentAlerts,
+  type AlertItem,
+  type DashboardMetrics
+} from '../services/api';
 
 const { t } = useI18n();
+const EMPTY_DASHBOARD_METRICS: DashboardMetrics = {
+  sources: { total: 0, active: 0 },
+  raw_entries: { total: 0, by_status: {} },
+  candidate_needs: { total: 0, by_status: {} },
+  pending_sync_needs: 0,
+  fetch_logs: { total: 0, failures: 0 }
+};
 
 const metricsQuery = useQuery({
   queryKey: ['dashboard-metrics'],
   queryFn: fetchDashboardMetrics,
   retry: false,
-  staleTime: 30_000,
-  initialData: {
-    sources: { total: 0, active: 0 },
-    raw_entries: { total: 0, by_status: {} },
-    candidate_needs: { total: 0, by_status: {} },
-    pending_sync_needs: 0,
-    fetch_logs: { total: 0, failures: 0 }
-  }
+  staleTime: 30_000
 });
 
 const alertsQuery = useQuery({
   queryKey: ['recent-alerts'],
   queryFn: fetchRecentAlerts,
   retry: false,
-  staleTime: 30_000,
-  initialData: [] as AlertItem[]
+  staleTime: 30_000
 });
 
-const dashboardMetrics = computed(() => metricsQuery.data.value);
-const recentAlerts = computed(() => alertsQuery.data.value ?? []);
+const dashboardMetrics = computed(() => metricsQuery.data.value ?? EMPTY_DASHBOARD_METRICS);
+const recentAlerts = computed<AlertItem[]>(() => alertsQuery.data.value ?? []);
 const isFetching = computed(
   () => metricsQuery.isFetching.value || alertsQuery.isFetching.value
 );
