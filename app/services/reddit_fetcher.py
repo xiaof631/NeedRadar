@@ -222,6 +222,7 @@ def _normalize_rss_entry(
     tags.append("reddit_comment" if is_comments_source else "reddit_post")
     tags.extend(_infer_signal_tags(text_for_tags))
 
+    resolved_content: str | None
     if is_comments_source:
         resolved_summary = summary or _truncate_text(content or title, limit=140)
         resolved_content = content or summary or title

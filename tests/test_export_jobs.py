@@ -3,10 +3,9 @@ from pathlib import Path
 
 import pytest
 
+import app.services.export_jobs as export_jobs
 from app.db.storage import db
 from app.models import CandidateNeedStatus, ExportJobStatus, RawEntryStatus
-import app.services.export_jobs as export_jobs
-
 from app.services import candidate_needs, raw_entries, rss_sources
 
 

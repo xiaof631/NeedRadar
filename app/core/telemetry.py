@@ -8,30 +8,50 @@ from typing import Any
 from app.core.config import get_settings
 from fastapi import FastAPI
 
+ot_trace: Any | None = None
+FastAPIInstrumentor: Any | None = None
+OTLPSpanExporter: Any | None = None
+Resource: Any | None = None
+TracerProvider: Any | None = None
+BatchSpanProcessor: Any | None = None
+ConsoleSpanExporter: Any | None = None
+SpanExporter: Any | None = None
+TraceIdRatioBased: Any | None = None
+
 try:  # pragma: no cover - OpenTelemetry 为可选依赖
-    from opentelemetry import trace as ot_trace  # type: ignore
+    from opentelemetry import trace as _ot_trace  # type: ignore
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (  # type: ignore
-        OTLPSpanExporter,
+        OTLPSpanExporter as _OTLPSpanExporter,
     )
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # type: ignore
-    from opentelemetry.sdk.resources import Resource  # type: ignore
-    from opentelemetry.sdk.trace import TracerProvider  # type: ignore
+    from opentelemetry.instrumentation.fastapi import (
+        FastAPIInstrumentor as _FastAPIInstrumentor,  # type: ignore
+    )
+    from opentelemetry.sdk.resources import Resource as _Resource  # type: ignore
+    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider  # type: ignore
     from opentelemetry.sdk.trace.export import (  # type: ignore
-        BatchSpanProcessor,
-        ConsoleSpanExporter,
-        SpanExporter,
+        BatchSpanProcessor as _BatchSpanProcessor,
     )
-    from opentelemetry.sdk.trace.sampling import TraceIdRatioBased  # type: ignore
+    from opentelemetry.sdk.trace.export import (
+        ConsoleSpanExporter as _ConsoleSpanExporter,
+    )
+    from opentelemetry.sdk.trace.export import (
+        SpanExporter as _SpanExporter,
+    )
+    from opentelemetry.sdk.trace.sampling import (
+        TraceIdRatioBased as _TraceIdRatioBased,  # type: ignore
+    )
 except ImportError:  # pragma: no cover
-    ot_trace = None
-    FastAPIInstrumentor = None
-    OTLPSpanExporter = None
-    Resource = None
-    TracerProvider = None
-    BatchSpanProcessor = None
-    ConsoleSpanExporter = None
-    SpanExporter = None
-    TraceIdRatioBased = None
+    pass
+else:  # pragma: no cover
+    ot_trace = _ot_trace
+    FastAPIInstrumentor = _FastAPIInstrumentor
+    OTLPSpanExporter = _OTLPSpanExporter
+    Resource = _Resource
+    TracerProvider = _TracerProvider
+    BatchSpanProcessor = _BatchSpanProcessor
+    ConsoleSpanExporter = _ConsoleSpanExporter
+    SpanExporter = _SpanExporter
+    TraceIdRatioBased = _TraceIdRatioBased
 
 
 _instrumented = False
@@ -44,6 +64,13 @@ def instrument_app(app: FastAPI) -> None:
     settings = get_settings()
     if not settings.telemetry_enabled or _instrumented or _otel_missing():
         return
+
+    assert ot_trace is not None
+    assert FastAPIInstrumentor is not None
+    assert Resource is not None
+    assert TracerProvider is not None
+    assert BatchSpanProcessor is not None
+    assert TraceIdRatioBased is not None
 
     resource = Resource.create({"service.name": settings.telemetry_service_name})  # type: ignore[arg-type]
     provider = TracerProvider(  # type: ignore[call-arg]
@@ -77,6 +104,7 @@ def get_tracer(name: str) -> Any:
 def _build_exporter(*, endpoint: str | None, insecure: bool) -> Any:
     if endpoint and OTLPSpanExporter is not None:
         return OTLPSpanExporter(endpoint=endpoint, insecure=insecure)
+    assert ConsoleSpanExporter is not None
     return ConsoleSpanExporter()  # type: ignore[call-arg]
 
 

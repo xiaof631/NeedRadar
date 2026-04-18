@@ -12,18 +12,18 @@ from app.services import (
     filter_rules,
     github_fetcher,
     hacker_news_fetcher,
-    mq,
     llm_client,
     marketplace_fetcher,
     marketplace_leads,
+    mq,
     pipeline,
     raw_entries,
     reddit_fetcher,
+    rss_fetcher,
+    rss_sources,
     source_catalog,
     sync_audit,
     youtube_fetcher,
-    rss_fetcher,
-    rss_sources,
 )
 
 __all__ = [

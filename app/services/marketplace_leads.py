@@ -6,7 +6,7 @@ import re
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from urllib.parse import urlsplit
 
@@ -89,6 +89,9 @@ class MarketplaceLead:
     lead_outcome: MarketplaceLeadOutcome | None
     outcome_reason_tags: list[str]
     notes: str | None
+    next_follow_up_at: datetime | None
+    follow_up_reason: str | None
+    is_follow_up_overdue: bool
     priority_score: int
     priority_reason: str
     last_action_at: datetime
@@ -188,6 +191,7 @@ def list_leads(
     tier: MarketplaceLeadTier | None = None,
     lead_kind: MarketplaceLeadKind | None = None,
     reviewable_only: bool = False,
+    overdue_only: bool = False,
     lead_status: MarketplaceLeadStatus | None = None,
     lead_outcome: MarketplaceLeadOutcome | None = None,
     skip: int = 0,
@@ -206,6 +210,7 @@ def list_leads(
         tier=tier,
         lead_kind=lead_kind,
         reviewable_only=reviewable_only,
+        overdue_only=overdue_only,
         lead_status=lead_status,
         lead_outcome=lead_outcome,
         skip=skip,
@@ -228,6 +233,7 @@ def query_leads(
     tier: MarketplaceLeadTier | None = None,
     lead_kind: MarketplaceLeadKind | None = None,
     reviewable_only: bool = False,
+    overdue_only: bool = False,
     lead_status: MarketplaceLeadStatus | None = None,
     lead_outcome: MarketplaceLeadOutcome | None = None,
     skip: int = 0,
@@ -261,6 +267,8 @@ def query_leads(
         leads = [lead for lead in leads if lead.lead_kind == lead_kind]
     if reviewable_only:
         leads = [lead for lead in leads if lead.lead_kind in _REVIEWABLE_LEAD_KINDS]
+    if overdue_only:
+        leads = [lead for lead in leads if lead.is_follow_up_overdue]
     if lead_status is not None:
         leads = [lead for lead in leads if lead.lead_status == lead_status]
     if lead_outcome is not None:
@@ -428,6 +436,8 @@ def update_lead_outcome(
             metadata.pop("lead_outcome_reason_tags", None)
         else:
             metadata["lead_outcome"] = outcome.value
+            metadata.pop("next_follow_up_at", None)
+            metadata.pop("follow_up_reason", None)
             if normalized_reason_tags:
                 metadata["lead_outcome_reason_tags"] = normalized_reason_tags
             else:
@@ -439,6 +449,46 @@ def update_lead_outcome(
                 outcome_from=previous_outcome.value if previous_outcome else None,
                 outcome_to=outcome.value if outcome else None,
                 note=_stringify_outcome_reason_tags(normalized_reason_tags),
+            )
+        model.metadata = metadata
+
+    db.update_raw_entry(entry_id, _apply)
+    return get_lead(entry_id)
+
+
+def update_lead_follow_up(
+    entry_id: int,
+    next_follow_up_at: datetime | None,
+    reason: str | None,
+) -> MarketplaceLead:
+    entry = raw_entries.get_entry(entry_id)
+    source = rss_sources.get_source(entry.source_id)
+    if source is None or source.source_type != SourceType.FREELANCE_MARKETPLACE:
+        raise ValueError("marketplace lead not found")
+
+    normalized_next_follow_up_at = _ensure_utc(next_follow_up_at) if next_follow_up_at else None
+    normalized_reason = reason.strip() if isinstance(reason, str) else ""
+
+    def _apply(model: RawEntry) -> None:
+        metadata = dict(model.metadata or {})
+        previous_next_follow_up_at = _to_datetime(metadata.get("next_follow_up_at"))
+        previous_reason = _to_string(metadata.get("follow_up_reason"))
+        if normalized_next_follow_up_at is None:
+            metadata.pop("next_follow_up_at", None)
+        else:
+            metadata["next_follow_up_at"] = normalized_next_follow_up_at.isoformat()
+        if normalized_reason:
+            metadata["follow_up_reason"] = normalized_reason
+        else:
+            metadata.pop("follow_up_reason", None)
+        if (
+            previous_next_follow_up_at != normalized_next_follow_up_at
+            or (previous_reason or "") != normalized_reason
+        ):
+            metadata["lead_events"] = _append_lead_event(
+                metadata.get("lead_events"),
+                event_type="follow_up_scheduled",
+                note=_stringify_follow_up_schedule(normalized_next_follow_up_at, normalized_reason or None),
             )
         model.metadata = metadata
 
@@ -509,6 +559,23 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         [event.created_at for event in lead_events],
         default=_ensure_utc(item.updated_at),
     )
+    follow_up_anchor = _follow_up_anchor(
+        lead_events,
+        fallback=_ensure_utc(item.created_at),
+    )
+    lead_status = _to_lead_status(metadata.get("lead_status"))
+    lead_outcome = _to_lead_outcome(metadata.get("lead_outcome"))
+    next_follow_up_at = _resolve_next_follow_up_at(
+        lead_status=lead_status,
+        lead_outcome=lead_outcome,
+        metadata=metadata,
+        last_action_at=follow_up_anchor,
+    )
+    follow_up_reason = _resolve_follow_up_reason(
+        lead_status=lead_status,
+        lead_outcome=lead_outcome,
+        metadata=metadata,
+    )
     return MarketplaceLead(
         id=item.id,
         source_id=item.source_id,
@@ -532,10 +599,18 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         lead_kind=lead_kind,
         lead_tier=lead_tier,
         tier_reason=tier_reason,
-        lead_status=_to_lead_status(metadata.get("lead_status")),
-        lead_outcome=_to_lead_outcome(metadata.get("lead_outcome")),
+        lead_status=lead_status,
+        lead_outcome=lead_outcome,
         outcome_reason_tags=_normalize_reason_tags(metadata.get("lead_outcome_reason_tags")),
         notes=_to_string(metadata.get("lead_notes")),
+        next_follow_up_at=next_follow_up_at,
+        follow_up_reason=follow_up_reason,
+        is_follow_up_overdue=_is_follow_up_overdue(
+            lead_status=lead_status,
+            lead_outcome=lead_outcome,
+            next_follow_up_at=next_follow_up_at,
+            now=datetime.now(UTC),
+        ),
         priority_score=0,
         priority_reason="尚未计算优先级。",
         last_action_at=last_action_at,
@@ -630,6 +705,8 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         representative, alternate = right, left
     status = max(left.lead_status, right.lead_status, key=_lead_status_rank)
     duplicate_sources = list(dict.fromkeys([*left.duplicate_sources, *right.duplicate_sources]))
+    next_follow_up_at = _merge_follow_up_at(left.next_follow_up_at, right.next_follow_up_at)
+    lead_outcome = representative.lead_outcome or alternate.lead_outcome
     return MarketplaceLead(
         id=representative.id,
         source_id=representative.source_id,
@@ -654,11 +731,19 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         lead_tier=representative.lead_tier,
         tier_reason=representative.tier_reason,
         lead_status=status,
-        lead_outcome=representative.lead_outcome or alternate.lead_outcome,
+        lead_outcome=lead_outcome,
         outcome_reason_tags=list(
             dict.fromkeys([*representative.outcome_reason_tags, *alternate.outcome_reason_tags])
         ),
         notes=representative.notes or alternate.notes,
+        next_follow_up_at=next_follow_up_at,
+        follow_up_reason=representative.follow_up_reason or alternate.follow_up_reason,
+        is_follow_up_overdue=_is_follow_up_overdue(
+            lead_status=status,
+            lead_outcome=lead_outcome,
+            next_follow_up_at=next_follow_up_at,
+            now=datetime.now(UTC),
+        ),
         priority_score=max(left.priority_score, right.priority_score),
         priority_reason=representative.priority_reason or alternate.priority_reason,
         last_action_at=max(left.last_action_at, right.last_action_at),
@@ -670,7 +755,7 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
     )
 
 
-def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, datetime]:
+def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, int, int, datetime]:
     return (
         lead.priority_score,
         1 if lead.lead_kind in _REVIEWABLE_LEAD_KINDS else 0,
@@ -747,6 +832,10 @@ def _calculate_priority(lead: MarketplaceLead, context: MarketplacePriorityConte
     if lead.duplicate_count > 1:
         score -= min((lead.duplicate_count - 1) * 4, 12)
         reasons.append("重复线索降权")
+
+    if lead.is_follow_up_overdue:
+        score += 8
+        reasons.append("跟进已超时")
 
     source_metric = context.source_history.get(lead.source_id)
     if source_metric and source_metric.total >= 1:
@@ -875,6 +964,60 @@ def _count_outcome_reasons(leads: list[MarketplaceLead]) -> dict[str, int]:
             key=lambda item: (item[1], item[0]),
             reverse=True,
         )
+    )
+
+
+def _resolve_next_follow_up_at(
+    *,
+    lead_status: MarketplaceLeadStatus,
+    lead_outcome: MarketplaceLeadOutcome | None,
+    metadata: dict[str, object],
+    last_action_at: datetime,
+) -> datetime | None:
+    if lead_outcome is not None or lead_status not in {
+        MarketplaceLeadStatus.WATCHING,
+        MarketplaceLeadStatus.CONTACTED,
+    }:
+        return None
+    explicit = _to_datetime(metadata.get("next_follow_up_at"))
+    if explicit is not None:
+        return explicit
+    if lead_status == MarketplaceLeadStatus.WATCHING:
+        return last_action_at + timedelta(days=3)
+    return last_action_at + timedelta(days=5)
+
+
+def _resolve_follow_up_reason(
+    *,
+    lead_status: MarketplaceLeadStatus,
+    lead_outcome: MarketplaceLeadOutcome | None,
+    metadata: dict[str, object],
+) -> str | None:
+    if lead_outcome is not None or lead_status not in {
+        MarketplaceLeadStatus.WATCHING,
+        MarketplaceLeadStatus.CONTACTED,
+    }:
+        return None
+    explicit = _to_string(metadata.get("follow_up_reason"))
+    if explicit:
+        return explicit
+    if lead_status == MarketplaceLeadStatus.WATCHING:
+        return "watching_checkin"
+    return "contacted_follow_up"
+
+
+def _is_follow_up_overdue(
+    *,
+    lead_status: MarketplaceLeadStatus,
+    lead_outcome: MarketplaceLeadOutcome | None,
+    next_follow_up_at: datetime | None,
+    now: datetime,
+) -> bool:
+    return (
+        lead_outcome is None
+        and lead_status in {MarketplaceLeadStatus.WATCHING, MarketplaceLeadStatus.CONTACTED}
+        and next_follow_up_at is not None
+        and next_follow_up_at <= now
     )
 
 
@@ -1089,6 +1232,23 @@ def _build_todo_queue(leads: list[MarketplaceLead], now: datetime) -> list[Marke
             continue
         reminder_anchor = _last_follow_up_at(lead)
         stale_days = max((now - reminder_anchor).days, 0)
+        if lead.is_follow_up_overdue and lead.next_follow_up_at is not None:
+            overdue_days = max((now - lead.next_follow_up_at).days, 0)
+            reminders.append(
+                MarketplaceLeadReminder(
+                    lead_id=lead.id,
+                    title=lead.title,
+                    source_name=lead.source_name,
+                    lead_status=lead.lead_status,
+                    priority_score=lead.priority_score,
+                    reminder_type="follow_up_overdue",
+                    severity="high" if overdue_days >= 3 else "medium",
+                    message=f"下次跟进已超时 {overdue_days} 天，原因：{lead.follow_up_reason or 'scheduled_follow_up'}。",
+                    last_action_at=lead.next_follow_up_at,
+                    stale_days=overdue_days,
+                )
+            )
+            continue
         if lead.lead_status == MarketplaceLeadStatus.NEW and lead.priority_score >= 85:
             reminders.append(
                 MarketplaceLeadReminder(
@@ -1227,14 +1387,19 @@ def _count_todo_queue(reminders: list[MarketplaceLeadReminder]) -> dict[str, int
         "new_high_priority": sum(1 for item in reminders if item.reminder_type == "new_high_priority"),
         "watching_stale": sum(1 for item in reminders if item.reminder_type == "watching_stale"),
         "contacted_stale": sum(1 for item in reminders if item.reminder_type == "contacted_stale"),
+        "follow_up_overdue": sum(1 for item in reminders if item.reminder_type == "follow_up_overdue"),
     }
 
 
 def _last_follow_up_at(lead: MarketplaceLead) -> datetime:
-    follow_up_events = [event.created_at for event in lead.lead_events if event.event_type != "captured"]
+    return _follow_up_anchor(lead.lead_events, fallback=lead.last_action_at)
+
+
+def _follow_up_anchor(events: list[MarketplaceLeadEvent], fallback: datetime) -> datetime:
+    follow_up_events = [event.created_at for event in events if event.event_type != "captured"]
     if follow_up_events:
         return max(follow_up_events)
-    return lead.last_action_at
+    return fallback
 
 
 def _reminder_severity_rank(value: str) -> int:
@@ -1275,6 +1440,14 @@ def _ratio_to_percent(value: float) -> str:
     return f"{value * 100:.1f}%"
 
 
+def _merge_follow_up_at(left: datetime | None, right: datetime | None) -> datetime | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return min(left, right)
+
+
 def _to_lead_status(value: object) -> MarketplaceLeadStatus:
     if value is None:
         return MarketplaceLeadStatus.NEW
@@ -1289,6 +1462,16 @@ def _to_lead_outcome(value: object) -> MarketplaceLeadOutcome | None:
         return None
     try:
         return MarketplaceLeadOutcome(str(value))
+    except ValueError:
+        return None
+
+
+def _to_datetime(value: object) -> datetime | None:
+    text = _to_string(value)
+    if not text:
+        return None
+    try:
+        return _ensure_utc(datetime.fromisoformat(text))
     except ValueError:
         return None
 
@@ -1318,6 +1501,17 @@ def _stringify_outcome_reason_tags(reason_tags: list[str]) -> str | None:
     if not reason_tags:
         return None
     return "reasons: " + ", ".join(reason_tags)
+
+
+def _stringify_follow_up_schedule(next_follow_up_at: datetime | None, reason: str | None) -> str | None:
+    if next_follow_up_at is None and not reason:
+        return None
+    parts: list[str] = []
+    if next_follow_up_at is not None:
+        parts.append(f"due: {next_follow_up_at.isoformat()}")
+    if reason:
+        parts.append(f"reason: {reason}")
+    return " / ".join(parts)
 
 
 def _normalize_budget(value: str | None, engagement: str | None) -> str | None:

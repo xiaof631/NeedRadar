@@ -9,6 +9,7 @@ from io import StringIO
 from pathlib import Path
 from typing import Annotated, Any
 
+import app.services.export_jobs as export_jobs
 import typer
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
@@ -21,8 +22,6 @@ from app.models import (
     SyncChannel,
 )
 from app.schemas import CandidateNeedRead, RawEntryRead
-import app.services.export_jobs as export_jobs
-
 from app.services import (
     candidate_needs,
     fetch_logs,

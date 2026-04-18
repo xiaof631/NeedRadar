@@ -187,7 +187,8 @@
       "types": {
         "new_high_priority": "New high-priority lead",
         "watching_stale": "Watching overdue",
-        "contacted_stale": "Contact follow-up due"
+        "contacted_stale": "Contact follow-up due",
+        "follow_up_overdue": "Scheduled follow-up overdue"
       }
     },
     "details": {
@@ -201,6 +202,8 @@
       "published": "Published",
       "updated": "Updated",
       "lastActionAt": "Last action",
+      "nextFollowUp": "Next follow-up",
+      "followUpState": "Follow-up state",
       "outcome": "Outcome",
       "reason": "Why it entered the queue",
       "priority": "Priority",
@@ -213,9 +216,12 @@
       "outcomePlaceholder": "Select final outcome",
       "outcomeReasonPlaceholder": "Add outcome reason tags, e.g. price_mismatch",
       "outcomeReasons": "Outcome reason tags",
+      "followUpSchedule": "Follow-up schedule",
+      "followUpReasonPlaceholder": "Add a reminder reason, e.g. proposal_sent",
       "notesPlaceholder": "Capture your judgement, outreach, or next action",
       "saveOutcome": "Save outcome",
-      "saveNotes": "Save notes"
+      "saveNotes": "Save notes",
+      "saveFollowUp": "Save follow-up"
     },
     "activity": {
       "title": "Follow-up timeline",
@@ -223,13 +229,19 @@
       "captured": "Lead captured",
       "statusChanged": "Status changed from {from} to {to}",
       "outcomeUpdated": "Outcome changed from {from} to {to}",
-      "notesUpdated": "Follow-up notes updated"
+      "notesUpdated": "Follow-up notes updated",
+      "followUpScheduled": "Next follow-up updated",
+      "notesHistory": "Notes history",
+      "outcomeHistory": "Outcome and reminder history",
+      "emptyNotesHistory": "No note history yet",
+      "emptyOutcomeHistory": "No outcome or reminder history yet"
     },
     "filters": {
       "searchPlaceholder": "Search by title or description",
       "source": "Source",
       "leadKind": "Lead kind",
       "outcome": "Outcome",
+      "followUp": "Follow-up filter",
       "leadKindOptions": {
         "reviewable": "Default reviewable",
         "project": "Project",
@@ -257,6 +269,10 @@
         "no_response": "No response",
         "not_fit": "Not fit"
       },
+      "followUpOptions": {
+        "all": "All follow-ups",
+        "overdue": "Overdue only"
+      },
       "sourceOptions": {
         "all": "All marketplace sources"
       }
@@ -273,6 +289,10 @@
       "priority": "Priority",
       "status": "Status",
       "outcome": "Outcome",
+      "lastActionAt": "Last action",
+      "nextFollowUp": "Next follow-up",
+      "followUpState": "Follow-up",
+      "followUpOverdue": "Overdue",
       "published": "Published at",
       "actions": "Actions",
       "details": "Details",
@@ -290,7 +310,12 @@
       "statusUpdated": "Updated to {status}",
       "outcomeUpdated": "Outcome saved",
       "bulkOutcomeUpdated": "Updated outcomes for {count} leads",
-      "notesUpdated": "Notes saved"
+      "notesUpdated": "Notes saved",
+      "followUpUpdated": "Follow-up schedule saved"
+    },
+    "followUpReasons": {
+      "watching_checkin": "Check in after watching",
+      "contacted_follow_up": "Follow up after contact"
     }
   },
   "filterMonitor": {

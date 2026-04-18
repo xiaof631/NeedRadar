@@ -71,6 +71,9 @@ class MarketplaceLeadRead(BaseModel):
     lead_outcome: str | None = None
     outcome_reason_tags: list[str] = Field(default_factory=list)
     notes: str | None = None
+    next_follow_up_at: datetime | None = None
+    follow_up_reason: str | None = None
+    is_follow_up_overdue: bool = False
     priority_score: int
     priority_reason: str
     duplicate_count: int = 1
@@ -150,3 +153,8 @@ class MarketplaceLeadBulkOutcomeUpdate(BaseModel):
 
 class MarketplaceLeadNotesUpdate(BaseModel):
     notes: str | None = None
+
+
+class MarketplaceLeadFollowUpUpdate(BaseModel):
+    next_follow_up_at: str | None = None
+    follow_up_reason: str | None = None

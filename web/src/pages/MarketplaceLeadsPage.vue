@@ -48,6 +48,10 @@
             :value="option.value"
           />
         </el-select>
+        <el-select v-model="followUpFilter" class="status-select" :placeholder="t('marketplace.filters.followUp')">
+          <el-option :label="t('marketplace.filters.followUpOptions.all')" value="all" />
+          <el-option :label="t('marketplace.filters.followUpOptions.overdue')" value="overdue" />
+        </el-select>
         <el-select v-model="sourceId" class="source-select" :placeholder="t('marketplace.filters.source')">
           <el-option :label="t('marketplace.filters.sourceOptions.all')" value="all" />
           <el-option
@@ -446,6 +450,25 @@
             <span v-else>—</span>
           </template>
         </el-table-column>
+        <el-table-column :label="t('marketplace.table.lastActionAt')" width="190">
+          <template #default="{ row }">{{ formatDate(row.last_action_at) }}</template>
+        </el-table-column>
+        <el-table-column :label="t('marketplace.table.nextFollowUp')" width="220">
+          <template #default="{ row }">
+            <div>{{ formatDate(row.next_follow_up_at) }}</div>
+            <div v-if="row.follow_up_reason" class="summary-text">
+              {{ followUpReasonLabel(row.follow_up_reason) }}
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('marketplace.table.followUpState')" width="130">
+          <template #default="{ row }">
+            <el-tag v-if="row.is_follow_up_overdue" type="danger" effect="plain">
+              {{ t('marketplace.table.followUpOverdue') }}
+            </el-tag>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('marketplace.table.published')" width="190">
           <template #default="{ row }">{{ formatDate(row.published_at || row.created_at) }}</template>
         </el-table-column>
@@ -569,6 +592,22 @@
               <span class="detail-label">{{ t('marketplace.details.outcome') }}</span>
               <span>{{ selectedLead.lead_outcome ? leadOutcomeLabel(selectedLead.lead_outcome) : '—' }}</span>
             </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.nextFollowUp') }}</span>
+              <span>{{ formatDate(selectedLead.next_follow_up_at) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.followUpState') }}</span>
+              <span>
+                {{
+                  selectedLead.is_follow_up_overdue
+                    ? t('marketplace.table.followUpOverdue')
+                    : selectedLead.follow_up_reason
+                      ? followUpReasonLabel(selectedLead.follow_up_reason)
+                      : '—'
+                }}
+              </span>
+            </div>
           </div>
 
           <div class="details-section">
@@ -618,6 +657,29 @@
                 @click="saveLeadOutcome"
               >
                 {{ t('marketplace.details.saveOutcome') }}
+              </el-button>
+            </div>
+          </div>
+
+          <div class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.followUpSchedule') }}</div>
+            <input
+              v-model="followUpDraft"
+              class="native-datetime-input"
+              type="datetime-local"
+            />
+            <el-input
+              v-model="followUpReasonDraft"
+              :placeholder="t('marketplace.details.followUpReasonPlaceholder')"
+            />
+            <div class="details-actions">
+              <el-button
+                type="primary"
+                size="small"
+                :loading="followUpMutation.isPending.value"
+                @click="saveLeadFollowUp"
+              >
+                {{ t('marketplace.details.saveFollowUp') }}
               </el-button>
             </div>
           </div>
@@ -683,6 +745,34 @@
             <p v-else class="detail-paragraph">{{ t('marketplace.activity.empty') }}</p>
           </div>
 
+          <div class="details-section history-grid">
+            <div>
+              <div class="detail-label">{{ t('marketplace.activity.notesHistory') }}</div>
+              <div v-if="notesHistory.length" class="history-list">
+                <div v-for="event in notesHistory" :key="`${event.created_at}-${event.note || ''}`" class="history-item">
+                  <div class="summary-text">{{ formatDate(event.created_at) }}</div>
+                  <p class="detail-paragraph">{{ event.note || '—' }}</p>
+                </div>
+              </div>
+              <p v-else class="detail-paragraph">{{ t('marketplace.activity.emptyNotesHistory') }}</p>
+            </div>
+            <div>
+              <div class="detail-label">{{ t('marketplace.activity.outcomeHistory') }}</div>
+              <div v-if="outcomeHistory.length" class="history-list">
+                <div
+                  v-for="event in outcomeHistory"
+                  :key="`${event.created_at}-${event.outcome_to || ''}-${event.note || ''}`"
+                  class="history-item"
+                >
+                  <div class="summary-text">{{ formatDate(event.created_at) }}</div>
+                  <p class="detail-paragraph">{{ formatLeadEvent(event) }}</p>
+                  <p v-if="event.note" class="detail-paragraph timeline-note">{{ event.note }}</p>
+                </div>
+              </div>
+              <p v-else class="detail-paragraph">{{ t('marketplace.activity.emptyOutcomeHistory') }}</p>
+            </div>
+          </div>
+
           <div class="details-section">
             <div class="detail-label">{{ t('marketplace.details.notes') }}</div>
             <el-input
@@ -718,6 +808,7 @@ import {
   fetchMarketplaceLead,
   fetchMarketplaceLeads,
   fetchRssSources,
+  updateMarketplaceLeadFollowUp,
   updateMarketplaceLeadNotes,
   updateMarketplaceLeadOutcome,
   updateMarketplaceLeadStatus,
@@ -734,6 +825,7 @@ const search = ref('');
 const sourceId = ref<'all' | string>('all');
 const statusFilter = ref<'all' | MarketplaceLead['lead_status']>('all');
 const outcomeFilter = ref<'all' | NonNullable<MarketplaceLead['lead_outcome']>>('all');
+const followUpFilter = ref<'all' | 'overdue'>('all');
 const queueView = ref<'high_purity' | 'expanded' | 'all'>('high_purity');
 const leadKindView = ref<'reviewable' | 'project' | 'contract_role' | 'full_time_job' | 'all'>('reviewable');
 const detailsVisible = ref(false);
@@ -743,6 +835,8 @@ const selectedLeadIds = ref<number[]>([]);
 const notesDraft = ref('');
 const outcomeDraft = ref<MarketplaceLead['lead_outcome']>(null);
 const outcomeReasonDraft = ref<string[]>([]);
+const followUpDraft = ref('');
+const followUpReasonDraft = ref('');
 const bulkOutcomeDraft = ref<NonNullable<MarketplaceLead['lead_outcome']> | null>(null);
 const bulkReasonTagsDraft = ref<string[]>([]);
 
@@ -791,6 +885,7 @@ const queryParams = computed(() => ({
       ? leadKindView.value
       : undefined,
   reviewable_only: leadKindView.value === 'reviewable' ? true : undefined,
+  overdue_only: followUpFilter.value === 'overdue' ? true : undefined,
   lead_status: statusFilter.value === 'all' ? undefined : statusFilter.value,
   lead_outcome: outcomeFilter.value === 'all' ? undefined : outcomeFilter.value
 }));
@@ -834,6 +929,27 @@ const notesMutation = useMutation({
   onSuccess: async (lead) => {
     notesDraft.value = lead.notes ?? '';
     ElMessage.success(t('marketplace.feedback.notesUpdated'));
+    await Promise.all([leadsQuery.refetch(), detailsQuery.refetch()]);
+  },
+  onError: () => {
+    ElMessage.error(t('feedback.genericError'));
+  }
+});
+
+const followUpMutation = useMutation({
+  mutationFn: ({
+    leadId,
+    nextFollowUpAt,
+    followUpReason
+  }: {
+    leadId: number;
+    nextFollowUpAt: string | null;
+    followUpReason: string | null;
+  }) => updateMarketplaceLeadFollowUp(leadId, nextFollowUpAt, followUpReason),
+  onSuccess: async (lead) => {
+    followUpDraft.value = toDatetimeLocal(lead.next_follow_up_at);
+    followUpReasonDraft.value = lead.follow_up_reason ?? '';
+    ElMessage.success(t('marketplace.feedback.followUpUpdated'));
     await Promise.all([leadsQuery.refetch(), detailsQuery.refetch()]);
   },
   onError: () => {
@@ -895,6 +1011,14 @@ const total = computed(() => leadsQuery.data.value?.total ?? 0);
 const sourceBreakdown = computed(() => leadsQuery.data.value?.source_breakdown ?? []);
 const sourceRecommendations = computed(() => leadsQuery.data.value?.source_recommendations ?? []);
 const todoQueue = computed(() => leadsQuery.data.value?.todo_queue ?? []);
+const notesHistory = computed(() =>
+  (selectedLead.value?.lead_events ?? []).filter((event) => event.event_type === 'notes_updated')
+);
+const outcomeHistory = computed(() =>
+  (selectedLead.value?.lead_events ?? []).filter((event) =>
+    ['outcome_updated', 'follow_up_scheduled'].includes(event.event_type)
+  )
+);
 const highPurityCount = computed(() => leadsQuery.data.value?.tier_breakdown?.high_purity ?? 0);
 const expandedCount = computed(() => leadsQuery.data.value?.tier_breakdown?.expanded ?? 0);
 const projectCount = computed(() => leadsQuery.data.value?.kind_breakdown?.project ?? 0);
@@ -929,7 +1053,7 @@ const topOutcomeReasons = computed(() =>
 const highSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.high ?? 0);
 const mediumSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.medium ?? 0);
 
-watch([search, sourceId, statusFilter, outcomeFilter, queueView, leadKindView], () => {
+watch([search, sourceId, statusFilter, outcomeFilter, followUpFilter, queueView, leadKindView], () => {
   page.value = 1;
 });
 
@@ -939,6 +1063,8 @@ watch(
     notesDraft.value = value?.notes ?? '';
     outcomeDraft.value = value?.lead_outcome ?? null;
     outcomeReasonDraft.value = value?.outcome_reason_tags ?? [];
+    followUpDraft.value = toDatetimeLocal(value?.next_follow_up_at ?? null);
+    followUpReasonDraft.value = value?.follow_up_reason ?? '';
   },
   { immediate: true }
 );
@@ -1001,7 +1127,18 @@ const formatLeadEvent = (event: MarketplaceLeadEvent) => {
       to: event.outcome_to ? leadOutcomeLabel(event.outcome_to) : '—'
     });
   }
+  if (event.event_type === 'follow_up_scheduled') {
+    return t('marketplace.activity.followUpScheduled');
+  }
   return event.event_type;
+};
+
+const followUpReasonLabel = (reason: string) => {
+  const normalized = reason.trim().toLowerCase();
+  if (normalized === 'watching_checkin' || normalized === 'contacted_follow_up') {
+    return t(`marketplace.followUpReasons.${normalized}`);
+  }
+  return reason;
 };
 
 const reminderTypeLabel = (value: MarketplaceLeadReminder['reminder_type']) =>
@@ -1077,6 +1214,15 @@ const saveLeadOutcome = () => {
   });
 };
 
+const saveLeadFollowUp = () => {
+  if (selectedLeadId.value === null) return;
+  void followUpMutation.mutate({
+    leadId: selectedLeadId.value,
+    nextFollowUpAt: fromDatetimeLocal(followUpDraft.value),
+    followUpReason: followUpReasonDraft.value.trim() || null
+  });
+};
+
 const openExternal = (link: string) => {
   window.open(link, '_blank', 'noopener,noreferrer');
 };
@@ -1088,6 +1234,18 @@ const formatDate = (value: string | null) => {
     timeStyle: 'short'
   }).format(new Date(value));
 };
+
+function toDatetimeLocal(value: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  const pad = (input: number) => String(input).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function fromDatetimeLocal(value: string) {
+  if (!value) return null;
+  return new Date(value).toISOString();
+}
 
 const formatPercent = (value: number) =>
   new Intl.NumberFormat(undefined, {
@@ -1398,6 +1556,20 @@ const formatPercent = (value: number) =>
   width: 240px;
 }
 
+.native-datetime-input {
+  width: 240px;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #d0d7de;
+  border-radius: 0.5rem;
+  font: inherit;
+  color: #0f172a;
+}
+
+.native-datetime-input:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.2);
+  border-color: #2563eb;
+}
+
 .activity-timeline {
   margin-top: 0.75rem;
 }
@@ -1409,6 +1581,25 @@ const formatPercent = (value: number) =>
 
 .timeline-note {
   margin-top: 0.35rem;
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.history-item {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
 }
 
 @media (max-width: 960px) {
@@ -1427,6 +1618,10 @@ const formatPercent = (value: number) =>
   }
 
   .details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-grid {
     grid-template-columns: 1fr;
   }
 

@@ -260,7 +260,7 @@ export type CandidateNeedSourceType =
   | SourceType;
 
 export interface MarketplaceLeadEvent {
-  event_type: 'captured' | 'status_changed' | 'notes_updated' | string;
+  event_type: 'captured' | 'status_changed' | 'notes_updated' | 'outcome_updated' | 'follow_up_scheduled' | string;
   created_at: string;
   status_from: MarketplaceLead['lead_status'] | null;
   status_to: MarketplaceLead['lead_status'] | null;
@@ -296,6 +296,9 @@ export interface MarketplaceLead {
   lead_outcome: 'won' | 'lost' | 'no_response' | 'not_fit' | null;
   outcome_reason_tags: string[];
   notes: string | null;
+  next_follow_up_at: string | null;
+  follow_up_reason: string | null;
+  is_follow_up_overdue: boolean;
   priority_score: number;
   priority_reason: string;
   duplicate_count: number;
@@ -377,6 +380,7 @@ export interface MarketplaceLeadQueryParams {
   tier?: 'high_purity' | 'expanded';
   lead_kind?: 'project' | 'contract_role' | 'full_time_job';
   reviewable_only?: boolean;
+  overdue_only?: boolean;
   lead_status?: 'new' | 'watching' | 'contacted' | 'ignored';
   lead_outcome?: 'won' | 'lost' | 'no_response' | 'not_fit';
 }
@@ -436,6 +440,18 @@ export async function updateMarketplaceLeadNotes(
 ): Promise<MarketplaceLead> {
   const response = await apiClient.put(`/api/v1/marketplace-leads/${leadId}/notes`, {
     notes
+  });
+  return response.data;
+}
+
+export async function updateMarketplaceLeadFollowUp(
+  leadId: number,
+  nextFollowUpAt: string | null,
+  followUpReason: string | null
+): Promise<MarketplaceLead> {
+  const response = await apiClient.put(`/api/v1/marketplace-leads/${leadId}/follow-up`, {
+    next_follow_up_at: nextFollowUpAt,
+    follow_up_reason: followUpReason
   });
   return response.data;
 }

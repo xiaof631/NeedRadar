@@ -190,7 +190,8 @@
       "types": {
         "new_high_priority": "新高优先级线索",
         "watching_stale": "已关注超时",
-        "contacted_stale": "已联系待跟进"
+        "contacted_stale": "已联系待跟进",
+        "follow_up_overdue": "计划跟进已超时"
       }
     },
     "details": {
@@ -204,6 +205,8 @@
       "published": "发布时间",
       "updated": "最近更新",
       "lastActionAt": "最近操作",
+      "nextFollowUp": "下次跟进",
+      "followUpState": "跟进状态",
       "outcome": "跟进结果",
       "reason": "入队原因",
       "priority": "优先级",
@@ -216,9 +219,12 @@
       "outcomePlaceholder": "选择最终结果",
       "outcomeReasonPlaceholder": "输入结果原因标签，例如 price_mismatch",
       "outcomeReasons": "结果原因标签",
+      "followUpSchedule": "跟进计划",
+      "followUpReasonPlaceholder": "输入提醒原因，例如 proposal_sent",
       "notesPlaceholder": "记录你的判断、联系动作或下一步计划",
       "saveOutcome": "保存结果",
-      "saveNotes": "保存备注"
+      "saveNotes": "保存备注",
+      "saveFollowUp": "保存跟进计划"
     },
     "activity": {
       "title": "跟进时间线",
@@ -226,13 +232,19 @@
       "captured": "线索入库",
       "statusChanged": "状态从“{from}”更新为“{to}”",
       "outcomeUpdated": "结果从“{from}”更新为“{to}”",
-      "notesUpdated": "更新了跟进备注"
+      "notesUpdated": "更新了跟进备注",
+      "followUpScheduled": "更新了下次跟进时间",
+      "notesHistory": "备注历史",
+      "outcomeHistory": "结果与提醒历史",
+      "emptyNotesHistory": "暂无备注历史",
+      "emptyOutcomeHistory": "暂无结果或提醒历史"
     },
     "filters": {
       "searchPlaceholder": "输入标题或描述关键词",
       "source": "项目源",
       "leadKind": "线索类型",
       "outcome": "跟进结果",
+      "followUp": "跟进筛选",
       "leadKindOptions": {
         "reviewable": "默认可跟进",
         "project": "项目型",
@@ -260,6 +272,10 @@
         "no_response": "无回复",
         "not_fit": "不匹配"
       },
+      "followUpOptions": {
+        "all": "全部跟进",
+        "overdue": "仅看已超时"
+      },
       "sourceOptions": {
         "all": "全部项目源"
       }
@@ -276,6 +292,10 @@
       "priority": "优先级",
       "status": "状态",
       "outcome": "结果",
+      "lastActionAt": "最近操作",
+      "nextFollowUp": "下次跟进",
+      "followUpState": "跟进",
+      "followUpOverdue": "已超时",
       "published": "发布时间",
       "actions": "操作",
       "details": "详情",
@@ -293,7 +313,12 @@
       "statusUpdated": "已更新为“{status}”",
       "outcomeUpdated": "结果已更新",
       "bulkOutcomeUpdated": "已批量更新 {count} 条线索结果",
-      "notesUpdated": "备注已保存"
+      "notesUpdated": "备注已保存",
+      "followUpUpdated": "跟进计划已保存"
+    },
+    "followUpReasons": {
+      "watching_checkin": "关注后检查进展",
+      "contacted_follow_up": "联系后等待回复"
     }
   },
   "filterMonitor": {

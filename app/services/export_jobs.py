@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Sequence, Tuple
+from typing import Any
 
 from app.core import metrics
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.storage import db
-from app.models import CandidateNeedStatus, CandidateNeedType, ExportJob, ExportJobStatus, SourceType, SyncChannel
+from app.models import (
+    CandidateNeedStatus,
+    CandidateNeedType,
+    ExportJob,
+    ExportJobStatus,
+    SourceType,
+    SyncChannel,
+)
 from app.schemas import CandidateNeedRead
 from app.services import candidate_needs, sync_audit
 
@@ -101,10 +108,15 @@ def run_candidate_export_job(job_id: int) -> ExportJob:
     try:
         rendered, models = _render_candidates(job)
     except Exception as exc:  # pragma: no cover - 兜底
-        logger.exception("export-job.render.failed", job_id=job_id)
+        logger.error(
+            "export-job.render.failed",
+            job_id=job_id,
+            error=str(exc),
+        )
+        error_message = str(exc)
         job = db.update_export_job(
             job_id,
-            lambda model: _mark_failed(model, str(exc)),
+            lambda model: _mark_failed(model, error_message),
         )
         metrics.record_export_job_result(ExportJobStatus.FAILED.value)
         return job
@@ -119,7 +131,7 @@ def run_candidate_export_job(job_id: int) -> ExportJob:
     return job
 
 
-def _render_candidates(job: ExportJob) -> Tuple[dict[str, Any], list[CandidateNeedRead]]:
+def _render_candidates(job: ExportJob) -> tuple[dict[str, Any], list[CandidateNeedRead]]:
     filters = job.filters or {}
     statuses = filters.get("statuses")
     parsed_statuses = None
@@ -148,7 +160,7 @@ def _render_candidates(job: ExportJob) -> Tuple[dict[str, Any], list[CandidateNe
             )
             content.append(payload)
         return {"format": "json", "content": content}, models
-    buffer = [
+    buffer: list[list[object]] = [
         [
             "id",
             "raw_entry_id",

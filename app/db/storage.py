@@ -60,11 +60,25 @@ class SQLDatabase:
             session.close()
 
     def reset(self) -> None:
-        # Rebuild the schema instead of only truncating rows so tests pick up
-        # newly added columns on existing SQLite files.
+        # Keep the current schema but clear all rows between tests.
         sync_engine = get_sync_engine()
-        Base.metadata.drop_all(bind=sync_engine)
-        Base.metadata.create_all(bind=sync_engine)
+        if sync_engine.dialect.name == "sqlite" and sync_engine.url.database not in {
+            None,
+            "",
+            ":memory:",
+        }:
+            with sync_engine.begin() as connection:
+                connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+                for table in reversed(Base.metadata.sorted_tables):
+                    connection.execute(table.delete())
+                try:
+                    connection.exec_driver_sql("DELETE FROM sqlite_sequence")
+                except Exception:
+                    pass
+                connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+            return
+        Base.metadata.drop_all(bind=sync_engine, checkfirst=True)
+        Base.metadata.create_all(bind=sync_engine, checkfirst=True)
 
     # RSS 源
     def create_source(self, data: dict) -> RssSource:

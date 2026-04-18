@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import os
+import tempfile
+from pathlib import Path
 
 from app.core import config as config_module
 from app.db import session as db_session
 
-
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./data/test-multisource.db"
-TEST_ALEMBIC_DATABASE_URL = "sqlite:///./data/test-multisource.db"
+TEST_DB_DIR = Path(tempfile.mkdtemp(prefix="needradar-test-db-"))
+TEST_DB_PATH = TEST_DB_DIR / "test-multisource.db"
+TEST_DATABASE_URL = f"sqlite+aiosqlite:///{TEST_DB_PATH}"
+TEST_ALEMBIC_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 
 os.environ["NEEDRADAR_DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["NEEDRADAR_ALEMBIC_DATABASE_URL"] = TEST_ALEMBIC_DATABASE_URL
