@@ -130,6 +130,25 @@ def backfill_marketplace_outcomes(
     typer.echo(f"已回填 {len(updated)} 条 marketplace 线索结果")
 
 
+@marketplace_app.command("retrospective-report")
+def marketplace_retrospective_report(
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="输出 Markdown 文件路径；不传则打印到标准输出"),
+    ] = None,
+) -> None:
+    """导出 marketplace 复盘 Markdown。"""
+
+    markdown = marketplace_leads.build_retrospective_markdown()
+    if output is None:
+        typer.echo(markdown)
+        return
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(markdown + "\n", encoding="utf-8")
+    typer.echo(f"已生成复盘报告：{output}")
+
+
 @rules_app.command("list")
 def list_rules(
     enabled: Annotated[

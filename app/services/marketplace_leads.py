@@ -287,6 +287,91 @@ def query_leads(
     )
 
 
+def build_retrospective_markdown(*, as_of: datetime | None = None) -> str:
+    report_time = _ensure_utc(as_of or datetime.now(UTC))
+    result = query_leads(limit=1000)
+    recommendations_by_source = {
+        item.source_id: item for item in result.source_recommendations
+    }
+    resolved = sum(
+        result.outcome_breakdown.get(key, 0)
+        for key in (
+            MarketplaceLeadOutcome.WON.value,
+            MarketplaceLeadOutcome.LOST.value,
+            MarketplaceLeadOutcome.NO_RESPONSE.value,
+            MarketplaceLeadOutcome.NOT_FIT.value,
+        )
+    )
+    lines = [
+        f"# Marketplace 复盘记录（{report_time.date().isoformat()}）",
+        "",
+        f"- 生成时间：{report_time.isoformat()}",
+        f"- 线索总量：{result.total}",
+        f"- 已结案：{resolved}",
+        f"- 未结案：{result.outcome_breakdown.get('unresolved', 0)}",
+        f"- 待办队列：{result.todo_breakdown.get('total', 0)}",
+        "",
+        "## 结果概览",
+        f"- 成交：{result.outcome_breakdown.get(MarketplaceLeadOutcome.WON.value, 0)}",
+        f"- 失败：{result.outcome_breakdown.get(MarketplaceLeadOutcome.LOST.value, 0)}",
+        f"- 无回复：{result.outcome_breakdown.get(MarketplaceLeadOutcome.NO_RESPONSE.value, 0)}",
+        f"- 不匹配：{result.outcome_breakdown.get(MarketplaceLeadOutcome.NOT_FIT.value, 0)}",
+        "",
+        "## 来源复盘",
+    ]
+    for metric in result.source_conversion_breakdown:
+        recommendation = recommendations_by_source.get(
+            int(metric.key.removeprefix("source:"))
+        )
+        recommendation_text = (
+            f"{_recommendation_action_label(recommendation.action)}；{recommendation.reason}"
+            if recommendation is not None
+            else "继续观察结果样本"
+        )
+        lines.append(
+            "- "
+            f"{metric.label}：总量 {metric.total}，已结案 {metric.resolved}，"
+            f"won {metric.won} / lost {metric.lost} / no_response {metric.no_response} / not_fit {metric.not_fit}，"
+            f"成交率 {_ratio_to_percent(metric.win_rate)}，建议：{recommendation_text}"
+        )
+
+    lines.extend(["", "## 队列与类型复盘"])
+    for metric in result.segment_conversion_breakdown:
+        lines.append(
+            "- "
+            f"{metric.label}：总量 {metric.total}，已结案 {metric.resolved}，"
+            f"结案率 {_ratio_to_percent(metric.resolution_rate)}，成交率 {_ratio_to_percent(metric.win_rate)}"
+        )
+
+    lines.extend(["", "## 高频结果原因"])
+    if result.outcome_reason_breakdown:
+        for tag, count in list(result.outcome_reason_breakdown.items())[:8]:
+            lines.append(f"- `{tag}`：{count}")
+    else:
+        lines.append("- 暂无结果原因标签。")
+
+    lines.extend(["", "## 本周待办"])
+    if result.todo_queue:
+        for item in result.todo_queue[:5]:
+            lines.append(
+                "- "
+                f"{item.title}（{item.source_name}，{item.reminder_type}，优先级 {item.priority_score}）"
+            )
+    else:
+        lines.append("- 当前没有新的待办。")
+
+    lines.extend(
+        [
+            "",
+            "## 节奏提醒",
+            "- 每周一次来源复盘：更新来源效果、成交率、噪音来源和扩源建议。",
+            "- 每两周一次规则复盘：复核高纯度/扩展线索边界，决定收紧或放宽过滤。",
+            "- 每次复盘后，把结论同步到 `docs/marketplace-retrospectives/`，并回写来源建议或过滤规则。",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def update_lead_status(entry_id: int, status: MarketplaceLeadStatus) -> MarketplaceLead:
     entry = raw_entries.get_entry(entry_id)
     source = rss_sources.get_source(entry.source_id)
@@ -1175,6 +1260,19 @@ def _recommendation_action_rank(value: str) -> int:
         "lower_frequency": 2,
         "keep": 1,
     }.get(value, 0)
+
+
+def _recommendation_action_label(value: str) -> str:
+    return {
+        "expand_similar": "扩同类来源",
+        "pause_candidate": "建议暂停",
+        "lower_frequency": "建议降频",
+        "keep": "继续保留",
+    }.get(value, value)
+
+
+def _ratio_to_percent(value: float) -> str:
+    return f"{value * 100:.1f}%"
 
 
 def _to_lead_status(value: object) -> MarketplaceLeadStatus:

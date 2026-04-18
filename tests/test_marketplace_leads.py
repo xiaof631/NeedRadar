@@ -337,6 +337,75 @@ def test_marketplace_leads_returns_conversion_breakdowns(client: TestClient) -> 
     assert segment_metrics["kind:full_time_job"]["not_fit"] == 1
 
 
+def test_build_marketplace_retrospective_markdown() -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    remotive = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/remote-jobs/software-dev",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "remotive_contracts"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "retro-won",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $1200 | 2 days",
+            "content": "Build a frontend app.",
+            "link": "https://example.com/retro-won",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$1200",
+                "timeline": "2 days",
+                "lead_outcome": "won",
+                "lead_outcome_reason_tags": ["scope_fit", "fast_response"],
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": remotive.id,
+            "guid": "retro-fulltime",
+            "title": "Senior Backend Engineer",
+            "summary": "Senior Backend Engineer | Remote",
+            "content": "Employment type: full-time",
+            "link": "https://example.com/retro-fulltime",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "Remotive",
+                "engagement": "full-time",
+                "lead_outcome": "not_fit",
+                "lead_outcome_reason_tags": ["full_time_hiring"],
+            },
+        }
+    )
+
+    markdown = marketplace_leads.build_retrospective_markdown(
+        as_of=datetime(2026, 4, 18, 12, 0, tzinfo=UTC)
+    )
+
+    assert "# Marketplace 复盘记录（2026-04-18）" in markdown
+    assert "- 线索总量：2" in markdown
+    assert "- 已结案：2" in markdown
+    assert "## 来源复盘" in markdown
+    assert "PeoplePerHour Technology Projects：总量 1，已结案 1" in markdown
+    assert "## 高频结果原因" in markdown
+    assert "`scope_fit`：1" in markdown
+    assert "## 节奏提醒" in markdown
+
+
 def test_list_marketplace_leads_diversifies_sources() -> None:
     sxsoft = rss_sources.create_source(
         {

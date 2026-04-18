@@ -1,0 +1,11 @@
+lead_id,outcome,reason_tags,notes
+496,won,scope_fit;fast_response,Backfilled from prior outreach tracker
+495,no_response,ghosted;slow_process,Archived follow-up stalled after initial quote
+494,lost,budget_low;scope_unclear,Scope expansion request exceeded quoted range
+456,won,clear_budget;repeatable_domain,Archived as a qualified custom system deal
+455,lost,scope_creep;timeline_risk,Multi-end rollout exceeded acceptable delivery window
+476,won,domain_fit;budget_confirmed,Qualified app request moved into paid discovery
+477,no_response,budget_low;ghosted,Low budget and no reply after clarification
+479,lost,backend_only;scope_unclear,Maintenance-oriented backend ask was not a fit
+493,not_fit,hardware_specialist;out_of_scope,Device provisioning scope is outside target delivery range
+499,not_fit,full_time_hiring;recruiter_listing,Full-time hiring style listing is not a marketplace project
