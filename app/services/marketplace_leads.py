@@ -87,6 +87,7 @@ class MarketplaceLead:
     tier_reason: str
     lead_status: MarketplaceLeadStatus
     lead_outcome: MarketplaceLeadOutcome | None
+    outcome_reason_tags: list[str]
     notes: str | None
     priority_score: int
     priority_reason: str
@@ -163,12 +164,21 @@ class MarketplaceLeadQueryResult:
     kind_breakdown: dict[str, int]
     status_breakdown: dict[str, int]
     outcome_breakdown: dict[str, int]
+    outcome_reason_breakdown: dict[str, int]
     source_breakdown: list[MarketplaceLeadSourceMetric]
     source_conversion_breakdown: list[MarketplaceLeadConversionMetric]
     segment_conversion_breakdown: list[MarketplaceLeadConversionMetric]
     source_recommendations: list[MarketplaceSourceRecommendation]
     todo_breakdown: dict[str, int]
     todo_queue: list[MarketplaceLeadReminder]
+
+
+@dataclass(slots=True)
+class MarketplaceLeadOutcomeBackfillRow:
+    lead_id: int
+    outcome: MarketplaceLeadOutcome | None
+    reason_tags: list[str]
+    notes: str | None = None
 
 
 def list_leads(
@@ -235,6 +245,7 @@ def query_leads(
     kind_breakdown = _count_kinds(leads)
     status_breakdown = _count_statuses(leads)
     outcome_breakdown = _count_outcomes(leads)
+    outcome_reason_breakdown = _count_outcome_reasons(leads)
     source_breakdown = _build_source_breakdown(leads)
     source_conversion_breakdown = _build_source_conversion_breakdown(leads)
     segment_conversion_breakdown = _build_segment_conversion_breakdown(leads)
@@ -266,6 +277,7 @@ def query_leads(
         kind_breakdown=kind_breakdown,
         status_breakdown=status_breakdown,
         outcome_breakdown=outcome_breakdown,
+        outcome_reason_breakdown=outcome_reason_breakdown,
         source_breakdown=source_breakdown,
         source_conversion_breakdown=source_conversion_breakdown,
         segment_conversion_breakdown=segment_conversion_breakdown,
@@ -311,30 +323,65 @@ def get_lead(entry_id: int) -> MarketplaceLead:
     return _to_marketplace_lead(entry)
 
 
-def update_lead_outcome(entry_id: int, outcome: MarketplaceLeadOutcome | None) -> MarketplaceLead:
+def update_lead_outcome(
+    entry_id: int,
+    outcome: MarketplaceLeadOutcome | None,
+    reason_tags: Iterable[str] | None = None,
+) -> MarketplaceLead:
     entry = raw_entries.get_entry(entry_id)
     source = rss_sources.get_source(entry.source_id)
     if source is None or source.source_type != SourceType.FREELANCE_MARKETPLACE:
         raise ValueError("marketplace lead not found")
+    normalized_reason_tags = _normalize_reason_tags(reason_tags)
 
     def _apply(model: RawEntry) -> None:
         metadata = dict(model.metadata or {})
         previous_outcome = _to_lead_outcome(metadata.get("lead_outcome"))
+        previous_reason_tags = _normalize_reason_tags(metadata.get("lead_outcome_reason_tags"))
         if outcome is None:
             metadata.pop("lead_outcome", None)
+            metadata.pop("lead_outcome_reason_tags", None)
         else:
             metadata["lead_outcome"] = outcome.value
-        if previous_outcome != outcome:
+            if normalized_reason_tags:
+                metadata["lead_outcome_reason_tags"] = normalized_reason_tags
+            else:
+                metadata.pop("lead_outcome_reason_tags", None)
+        if previous_outcome != outcome or previous_reason_tags != normalized_reason_tags:
             metadata["lead_events"] = _append_lead_event(
                 metadata.get("lead_events"),
                 event_type="outcome_updated",
                 outcome_from=previous_outcome.value if previous_outcome else None,
                 outcome_to=outcome.value if outcome else None,
+                note=_stringify_outcome_reason_tags(normalized_reason_tags),
             )
         model.metadata = metadata
 
     db.update_raw_entry(entry_id, _apply)
     return get_lead(entry_id)
+
+
+def bulk_update_lead_outcome(
+    entry_ids: Iterable[int],
+    outcome: MarketplaceLeadOutcome | None,
+    reason_tags: Iterable[str] | None = None,
+) -> list[MarketplaceLead]:
+    updated: list[MarketplaceLead] = []
+    for entry_id in entry_ids:
+        updated.append(update_lead_outcome(entry_id, outcome, reason_tags))
+    return updated
+
+
+def backfill_lead_outcomes(
+    rows: Iterable[MarketplaceLeadOutcomeBackfillRow],
+) -> list[MarketplaceLead]:
+    updated: list[MarketplaceLead] = []
+    for row in rows:
+        lead = update_lead_outcome(row.lead_id, row.outcome, row.reason_tags)
+        if row.notes is not None:
+            lead = update_lead_notes(row.lead_id, row.notes)
+        updated.append(lead)
+    return updated
 
 
 def update_lead_notes(entry_id: int, notes: str | None) -> MarketplaceLead:
@@ -402,6 +449,7 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         tier_reason=tier_reason,
         lead_status=_to_lead_status(metadata.get("lead_status")),
         lead_outcome=_to_lead_outcome(metadata.get("lead_outcome")),
+        outcome_reason_tags=_normalize_reason_tags(metadata.get("lead_outcome_reason_tags")),
         notes=_to_string(metadata.get("lead_notes")),
         priority_score=0,
         priority_reason="尚未计算优先级。",
@@ -522,6 +570,9 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         tier_reason=representative.tier_reason,
         lead_status=status,
         lead_outcome=representative.lead_outcome or alternate.lead_outcome,
+        outcome_reason_tags=list(
+            dict.fromkeys([*representative.outcome_reason_tags, *alternate.outcome_reason_tags])
+        ),
         notes=representative.notes or alternate.notes,
         priority_score=max(left.priority_score, right.priority_score),
         priority_reason=representative.priority_reason or alternate.priority_reason,
@@ -724,6 +775,22 @@ def _count_outcomes(leads: list[MarketplaceLead]) -> dict[str, int]:
         else:
             breakdown[lead.lead_outcome.value] += 1
     return breakdown
+
+
+def _count_outcome_reasons(leads: list[MarketplaceLead]) -> dict[str, int]:
+    breakdown: dict[str, int] = {}
+    for lead in leads:
+        if lead.lead_outcome is None:
+            continue
+        for reason_tag in lead.outcome_reason_tags:
+            breakdown[reason_tag] = breakdown.get(reason_tag, 0) + 1
+    return dict(
+        sorted(
+            breakdown.items(),
+            key=lambda item: (item[1], item[0]),
+            reverse=True,
+        )
+    )
 
 
 def _append_lead_event(
@@ -1126,6 +1193,33 @@ def _to_lead_outcome(value: object) -> MarketplaceLeadOutcome | None:
         return MarketplaceLeadOutcome(str(value))
     except ValueError:
         return None
+
+
+def _normalize_reason_tags(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_items = re.split(r"[;,|]", value)
+    elif isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray)):
+        raw_items = [str(item) for item in value if item is not None]
+    else:
+        raw_items = [str(value)]
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw_items:
+        cleaned = _NON_WORD_RE.sub("_", item.strip().lower()).strip("_")
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        normalized.append(cleaned)
+    return normalized
+
+
+def _stringify_outcome_reason_tags(reason_tags: list[str]) -> str | None:
+    if not reason_tags:
+        return None
+    return "reasons: " + ", ".join(reason_tags)
 
 
 def _normalize_budget(value: str | None, engagement: str | None) -> str | None:

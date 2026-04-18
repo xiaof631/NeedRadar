@@ -7,13 +7,13 @@
       </div>
       <div class="actions">
         <el-radio-group v-model="queueView" size="small">
-          <el-radio-button label="high_purity">
+          <el-radio-button value="high_purity">
             {{ t('marketplace.filters.queueOptions.high_purity') }}
           </el-radio-button>
-          <el-radio-button label="expanded">
+          <el-radio-button value="expanded">
             {{ t('marketplace.filters.queueOptions.expanded') }}
           </el-radio-button>
-          <el-radio-button label="all">
+          <el-radio-button value="all">
             {{ t('marketplace.filters.queueOptions.all') }}
           </el-radio-button>
         </el-radio-group>
@@ -57,6 +57,37 @@
             :value="String(source.id)"
           />
         </el-select>
+        <el-select
+          v-model="bulkOutcomeDraft"
+          class="status-select"
+          :placeholder="t('marketplace.bulk.outcomePlaceholder')"
+        >
+          <el-option
+            v-for="option in leadOutcomeOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <el-select
+          v-model="bulkReasonTagsDraft"
+          class="reason-select"
+          multiple
+          filterable
+          allow-create
+          default-first-option
+          collapse-tags
+          collapse-tags-tooltip
+          :placeholder="t('marketplace.bulk.reasonPlaceholder')"
+        />
+        <el-button
+          type="success"
+          :disabled="!selectedLeadIds.length || !bulkOutcomeDraft"
+          :loading="bulkOutcomeMutation.isPending.value"
+          @click="applyBulkOutcome"
+        >
+          {{ t('marketplace.bulk.apply', { count: selectedLeadIds.length }) }}
+        </el-button>
         <el-button type="primary" @click="refetch" :loading="leadsQuery.isFetching.value">
           {{ t('actions.refresh') }}
         </el-button>
@@ -279,7 +310,33 @@
     </el-card>
 
     <el-card shadow="never">
-      <el-table :data="leads" v-loading="leadsQuery.isFetching.value" :empty-text="t('marketplace.table.empty')">
+      <template #header>
+        <div class="source-health-title">{{ t('marketplace.reasonBreakdown.title') }}</div>
+      </template>
+      <div v-if="topOutcomeReasons.length" class="tag-list">
+        <el-tag
+          v-for="item in topOutcomeReasons"
+          :key="item.reason"
+          size="small"
+          effect="plain"
+          type="warning"
+        >
+          {{ item.reason }} × {{ item.count }}
+        </el-tag>
+      </div>
+      <div v-else class="todo-empty">{{ t('marketplace.reasonBreakdown.empty') }}</div>
+    </el-card>
+
+    <el-card shadow="never">
+      <el-table
+        ref="leadsTableRef"
+        :data="leads"
+        row-key="id"
+        v-loading="leadsQuery.isFetching.value"
+        :empty-text="t('marketplace.table.empty')"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="48" reserve-selection />
         <el-table-column prop="platform" :label="t('marketplace.table.platform')" width="170" />
         <el-table-column :label="t('marketplace.table.title')" min-width="340">
           <template #default="{ row }">
@@ -542,6 +599,17 @@
                 :value="option.value"
               />
             </el-select>
+            <el-select
+              v-model="outcomeReasonDraft"
+              class="outcome-select"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              collapse-tags
+              collapse-tags-tooltip
+              :placeholder="t('marketplace.details.outcomeReasonPlaceholder')"
+            />
             <div class="details-actions">
               <el-button
                 type="primary"
@@ -559,6 +627,21 @@
             <div class="tag-list">
               <el-tag v-for="skill in selectedLead.skills" :key="skill" size="small" effect="plain">
                 {{ skill }}
+              </el-tag>
+            </div>
+          </div>
+
+          <div v-if="selectedLead.outcome_reason_tags.length" class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.outcomeReasons') }}</div>
+            <div class="tag-list">
+              <el-tag
+                v-for="reason in selectedLead.outcome_reason_tags"
+                :key="reason"
+                size="small"
+                effect="plain"
+                type="warning"
+              >
+                {{ reason }}
               </el-tag>
             </div>
           </div>
@@ -631,6 +714,7 @@ import { useMutation, useQuery } from '@tanstack/vue-query';
 import { ElMessage } from 'element-plus/es/components/message/index';
 import { useI18n } from 'vue-i18n';
 import {
+  bulkUpdateMarketplaceLeadOutcome,
   fetchMarketplaceLead,
   fetchMarketplaceLeads,
   fetchRssSources,
@@ -654,8 +738,13 @@ const queueView = ref<'high_purity' | 'expanded' | 'all'>('high_purity');
 const leadKindView = ref<'reviewable' | 'project' | 'contract_role' | 'full_time_job' | 'all'>('reviewable');
 const detailsVisible = ref(false);
 const selectedLeadId = ref<number | null>(null);
+const leadsTableRef = ref<{ clearSelection?: () => void } | null>(null);
+const selectedLeadIds = ref<number[]>([]);
 const notesDraft = ref('');
 const outcomeDraft = ref<MarketplaceLead['lead_outcome']>(null);
+const outcomeReasonDraft = ref<string[]>([]);
+const bulkOutcomeDraft = ref<NonNullable<MarketplaceLead['lead_outcome']> | null>(null);
+const bulkReasonTagsDraft = ref<string[]>([]);
 
 const leadStatusOptions = computed(() => [
   { value: 'new' as const, label: t('marketplace.filters.statusOptions.new') },
@@ -753,11 +842,46 @@ const notesMutation = useMutation({
 });
 
 const outcomeMutation = useMutation({
-  mutationFn: ({ leadId, outcome }: { leadId: number; outcome: MarketplaceLead['lead_outcome'] }) =>
-    updateMarketplaceLeadOutcome(leadId, outcome),
+  mutationFn: ({
+    leadId,
+    outcome,
+    reasonTags
+  }: {
+    leadId: number;
+    outcome: MarketplaceLead['lead_outcome'];
+    reasonTags: string[];
+  }) => updateMarketplaceLeadOutcome(leadId, outcome, reasonTags),
   onSuccess: async (lead) => {
     outcomeDraft.value = lead.lead_outcome;
+    outcomeReasonDraft.value = lead.outcome_reason_tags;
     ElMessage.success(t('marketplace.feedback.outcomeUpdated'));
+    await Promise.all([leadsQuery.refetch(), detailsQuery.refetch()]);
+  },
+  onError: () => {
+    ElMessage.error(t('feedback.genericError'));
+  }
+});
+
+const bulkOutcomeMutation = useMutation({
+  mutationFn: ({
+    leadIds,
+    outcome,
+    reasonTags
+  }: {
+    leadIds: number[];
+    outcome: NonNullable<MarketplaceLead['lead_outcome']>;
+    reasonTags: string[];
+  }) => bulkUpdateMarketplaceLeadOutcome(leadIds, outcome, reasonTags),
+  onSuccess: async (_, variables) => {
+    ElMessage.success(
+      t('marketplace.feedback.bulkOutcomeUpdated', {
+        count: variables.leadIds.length
+      })
+    );
+    selectedLeadIds.value = [];
+    bulkOutcomeDraft.value = null;
+    bulkReasonTagsDraft.value = [];
+    leadsTableRef.value?.clearSelection?.();
     await Promise.all([leadsQuery.refetch(), detailsQuery.refetch()]);
   },
   onError: () => {
@@ -797,6 +921,11 @@ const sourceConversionBreakdown = computed(
 const segmentConversionBreakdown = computed(
   () => leadsQuery.data.value?.segment_conversion_breakdown ?? []
 );
+const topOutcomeReasons = computed(() =>
+  Object.entries(leadsQuery.data.value?.outcome_reason_breakdown ?? {})
+    .slice(0, 8)
+    .map(([reason, count]) => ({ reason, count }))
+);
 const highSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.high ?? 0);
 const mediumSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.medium ?? 0);
 
@@ -809,12 +938,17 @@ watch(
   (value) => {
     notesDraft.value = value?.notes ?? '';
     outcomeDraft.value = value?.lead_outcome ?? null;
+    outcomeReasonDraft.value = value?.outcome_reason_tags ?? [];
   },
   { immediate: true }
 );
 
 const handlePageChange = (value: number) => {
   page.value = value;
+};
+
+const handleSelectionChange = (rows: MarketplaceLead[]) => {
+  selectedLeadIds.value = rows.map((row) => row.id);
 };
 
 const refetch = () => {
@@ -832,7 +966,7 @@ const leadStatusTagType = (status: MarketplaceLead['lead_status']) => {
   if (status === 'contacted') return 'success';
   if (status === 'watching') return 'warning';
   if (status === 'ignored') return 'info';
-  return '';
+  return 'info';
 };
 
 const leadStatusLabel = (status: MarketplaceLead['lead_status']) =>
@@ -912,6 +1046,15 @@ const handleStatusChange = (leadId: number, value: string) => {
   });
 };
 
+const applyBulkOutcome = () => {
+  if (!selectedLeadIds.value.length || !bulkOutcomeDraft.value) return;
+  void bulkOutcomeMutation.mutate({
+    leadIds: selectedLeadIds.value,
+    outcome: bulkOutcomeDraft.value,
+    reasonTags: bulkReasonTagsDraft.value
+  });
+};
+
 const openLeadDetails = (leadId: number) => {
   selectedLeadId.value = leadId;
   detailsVisible.value = true;
@@ -929,7 +1072,8 @@ const saveLeadOutcome = () => {
   if (selectedLeadId.value === null) return;
   void outcomeMutation.mutate({
     leadId: selectedLeadId.value,
-    outcome: outcomeDraft.value
+    outcome: outcomeDraft.value,
+    reasonTags: outcomeReasonDraft.value
   });
 };
 
@@ -979,7 +1123,8 @@ const formatPercent = (value: number) =>
 
 .source-select,
 .status-select,
-.kind-select {
+.kind-select,
+.reason-select {
   width: 220px;
 }
 
@@ -1276,7 +1421,8 @@ const formatPercent = (value: number) =>
   .search-input,
   .source-select,
   .status-select,
-  .kind-select {
+  .kind-select,
+  .reason-select {
     width: 100%;
   }
 

@@ -294,6 +294,7 @@ export interface MarketplaceLead {
   tier_reason: string;
   lead_status: 'new' | 'watching' | 'contacted' | 'ignored';
   lead_outcome: 'won' | 'lost' | 'no_response' | 'not_fit' | null;
+  outcome_reason_tags: string[];
   notes: string | null;
   priority_score: number;
   priority_reason: string;
@@ -358,6 +359,7 @@ export interface MarketplaceLeadListResponse {
   kind_breakdown: Record<string, number>;
   status_breakdown: Record<string, number>;
   outcome_breakdown: Record<string, number>;
+  outcome_reason_breakdown: Record<string, number>;
   todo_breakdown: Record<string, number>;
   source_breakdown: MarketplaceLeadSourceMetric[];
   source_conversion_breakdown: MarketplaceLeadConversionMetric[];
@@ -405,10 +407,25 @@ export async function fetchMarketplaceLead(leadId: number): Promise<MarketplaceL
 
 export async function updateMarketplaceLeadOutcome(
   leadId: number,
-  outcome: MarketplaceLead['lead_outcome']
+  outcome: MarketplaceLead['lead_outcome'],
+  reasonTags: string[] = []
 ): Promise<MarketplaceLead> {
   const response = await apiClient.put(`/api/v1/marketplace-leads/${leadId}/outcome`, {
-    outcome
+    outcome,
+    reason_tags: reasonTags
+  });
+  return response.data;
+}
+
+export async function bulkUpdateMarketplaceLeadOutcome(
+  leadIds: number[],
+  outcome: MarketplaceLead['lead_outcome'],
+  reasonTags: string[] = []
+): Promise<MarketplaceLead[]> {
+  const response = await apiClient.post('/api/v1/marketplace-leads/bulk-outcome', {
+    ids: leadIds,
+    outcome,
+    reason_tags: reasonTags
   });
   return response.data;
 }

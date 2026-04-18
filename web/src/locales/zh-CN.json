@@ -154,6 +154,10 @@
         "pause_candidate": "建议暂停"
       }
     },
+    "reasonBreakdown": {
+      "title": "失败原因分布",
+      "empty": "暂无失败原因标签数据"
+    },
     "retrospective": {
       "title": "转化复盘看板",
       "segmentTitle": "线索类型复盘",
@@ -210,6 +214,8 @@
       "description": "原始正文",
       "notes": "跟进备注",
       "outcomePlaceholder": "选择最终结果",
+      "outcomeReasonPlaceholder": "输入结果原因标签，例如 price_mismatch",
+      "outcomeReasons": "结果原因标签",
       "notesPlaceholder": "记录你的判断、联系动作或下一步计划",
       "saveOutcome": "保存结果",
       "saveNotes": "保存备注"
@@ -278,9 +284,15 @@
       "hasLink": "原始链接",
       "empty": "暂无外包项目线索"
     },
+    "bulk": {
+      "outcomePlaceholder": "批量设置结果",
+      "reasonPlaceholder": "批量添加结果原因标签",
+      "apply": "批量更新结果 ({count})"
+    },
     "feedback": {
       "statusUpdated": "已更新为“{status}”",
       "outcomeUpdated": "结果已更新",
+      "bulkOutcomeUpdated": "已批量更新 {count} 条线索结果",
       "notesUpdated": "备注已保存"
     }
   },

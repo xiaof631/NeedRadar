@@ -28,6 +28,7 @@ from app.services import (
     fetch_logs,
     filter_engine,
     filter_rules,
+    marketplace_leads,
     pipeline,
     raw_entries,
     rss_sources,
@@ -50,10 +51,12 @@ rss_app = typer.Typer(help="RSS 源管理")
 entries_app = typer.Typer(help="原始条目管理")
 rules_app = typer.Typer(help="筛选规则管理")
 candidates_app = typer.Typer(help="候选需求管理")
+marketplace_app = typer.Typer(help="外包项目线索管理")
 app.add_typer(rss_app, name="rss")
 app.add_typer(entries_app, name="entries")
 app.add_typer(rules_app, name="rules")
 app.add_typer(candidates_app, name="candidates")
+app.add_typer(marketplace_app, name="marketplace")
 
 
 @app.command()
@@ -71,6 +74,60 @@ def init_db() -> None:
 
     rss_sources.reset_storage()
     typer.echo("已重置内存数据库")
+
+
+@marketplace_app.command("backfill-outcomes")
+def backfill_marketplace_outcomes(
+    file: Annotated[Path, typer.Argument(help="CSV 文件路径，需包含 lead_id/outcome/reason_tags/notes 列")],
+    reason_separator: Annotated[
+        str,
+        typer.Option("--reason-separator", help="结果原因标签分隔符"),
+    ] = ";",
+) -> None:
+    """从 CSV 批量回填外包项目线索结果。"""
+
+    if not file.exists():
+        raise typer.BadParameter("文件不存在", param_hint="file")
+
+    with file.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        rows: list[marketplace_leads.MarketplaceLeadOutcomeBackfillRow] = []
+        for index, record in enumerate(reader, start=2):
+            lead_id_raw = (record.get("lead_id") or "").strip()
+            if not lead_id_raw:
+                raise typer.BadParameter(f"第 {index} 行缺少 lead_id")
+            try:
+                lead_id = int(lead_id_raw)
+            except ValueError as exc:
+                raise typer.BadParameter(f"第 {index} 行 lead_id 非法: {lead_id_raw}") from exc
+
+            outcome_raw = (record.get("outcome") or "").strip()
+            try:
+                outcome = (
+                    marketplace_leads.MarketplaceLeadOutcome(outcome_raw)
+                    if outcome_raw
+                    else None
+                )
+            except ValueError as exc:
+                raise typer.BadParameter(f"第 {index} 行 outcome 非法: {outcome_raw}") from exc
+
+            reason_tags = [
+                item.strip()
+                for item in (record.get("reason_tags") or "").split(reason_separator)
+                if item.strip()
+            ]
+            notes = (record.get("notes") or "").strip() or None
+            rows.append(
+                marketplace_leads.MarketplaceLeadOutcomeBackfillRow(
+                    lead_id=lead_id,
+                    outcome=outcome,
+                    reason_tags=reason_tags,
+                    notes=notes,
+                )
+            )
+
+    updated = marketplace_leads.backfill_lead_outcomes(rows)
+    typer.echo(f"已回填 {len(updated)} 条 marketplace 线索结果")
 
 
 @rules_app.command("list")

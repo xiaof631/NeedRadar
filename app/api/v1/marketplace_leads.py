@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.schemas import (
+    MarketplaceLeadBulkOutcomeUpdate,
     MarketplaceLeadConversionMetricRead,
     MarketplaceLeadEventRead,
     MarketplaceLeadList,
@@ -57,6 +58,7 @@ async def list_marketplace_leads(
         kind_breakdown=result.kind_breakdown,
         status_breakdown=result.status_breakdown,
         outcome_breakdown=result.outcome_breakdown,
+        outcome_reason_breakdown=result.outcome_reason_breakdown,
         todo_breakdown=result.todo_breakdown,
         source_breakdown=[
             MarketplaceLeadSourceMetricRead.model_validate(item) for item in result.source_breakdown
@@ -110,10 +112,37 @@ async def update_marketplace_lead_outcome(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="unsupported marketplace lead outcome") from exc
     try:
-        item = marketplace_leads.update_lead_outcome(lead_id, outcome)
+        item = marketplace_leads.update_lead_outcome(lead_id, outcome, payload.reason_tags)
     except Exception as exc:
         raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
     return _to_marketplace_lead_read(item)
+
+
+@router.post(
+    "/bulk-outcome",
+    response_model=list[MarketplaceLeadRead],
+    summary="批量更新外包项目线索结果",
+)
+async def bulk_update_marketplace_lead_outcome(
+    payload: MarketplaceLeadBulkOutcomeUpdate,
+) -> list[MarketplaceLeadRead]:
+    try:
+        outcome = (
+            marketplace_leads.MarketplaceLeadOutcome(payload.outcome)
+            if payload.outcome is not None
+            else None
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="unsupported marketplace lead outcome") from exc
+    try:
+        items = marketplace_leads.bulk_update_lead_outcome(
+            payload.ids,
+            outcome,
+            payload.reason_tags,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
+    return [_to_marketplace_lead_read(item) for item in items]
 
 
 @router.get("/{lead_id}", response_model=MarketplaceLeadRead, summary="获取单条外包项目线索详情")
