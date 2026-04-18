@@ -563,15 +563,121 @@ def test_update_marketplace_lead_outcome(client: TestClient) -> None:
         }
     )
 
-    response = client.put(f"/api/v1/marketplace-leads/{lead.id}/outcome", json={"outcome": "won"})
+    response = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/outcome",
+        json={
+            "outcome": "won",
+            "reason_tags": ["price_mismatch", "timeline_risk"],
+        },
+    )
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["lead_outcome"] == "won"
+    assert payload["outcome_reason_tags"] == ["price_mismatch", "timeline_risk"]
     assert any(
         _event_value(event, "event_type") == "outcome_updated"
         and _event_value(event, "outcome_to") == "won"
+        and _event_value(event, "note") == "reasons: price_mismatch, timeline_risk"
         for event in payload["lead_events"]
+    )
+
+
+def test_bulk_update_marketplace_lead_outcome(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    lead_ids = [
+        raw_entries.create_entry(
+            {
+                "source_id": source.id,
+                "guid": f"lead-bulk-{index}",
+                "title": f"Bulk lead {index}",
+                "summary": "Bulk lead | $2K | 7 days",
+                "content": "Build a full-stack web application.",
+                "link": f"https://example.com/full-stack-bulk-{index}",
+                "tags": ["marketplace"],
+                "metadata": {
+                    "platform": "PeoplePerHour",
+                    "budget": "$2K",
+                    "timeline": "7 days",
+                    "skills": ["Python", "Django"],
+                },
+            }
+        ).id
+        for index in range(2)
+    ]
+
+    response = client.post(
+        "/api/v1/marketplace-leads/bulk-outcome",
+        json={
+            "ids": lead_ids,
+            "outcome": "lost",
+            "reason_tags": ["budget_low", "scope_unclear"],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert len(payload) == 2
+    assert {item["id"] for item in payload} == set(lead_ids)
+    assert all(item["lead_outcome"] == "lost" for item in payload)
+    assert all(item["outcome_reason_tags"] == ["budget_low", "scope_unclear"] for item in payload)
+
+
+def test_backfill_marketplace_lead_outcomes() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-backfill",
+            "title": "Backfill lead",
+            "summary": "Backfill lead | $2K | 7 days",
+            "content": "Build a full-stack web application.",
+            "link": "https://example.com/full-stack-backfill",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$2K",
+                "timeline": "7 days",
+            },
+        }
+    )
+
+    updated = marketplace_leads.backfill_lead_outcomes(
+        [
+            marketplace_leads.MarketplaceLeadOutcomeBackfillRow(
+                lead_id=lead.id,
+                outcome=marketplace_leads.MarketplaceLeadOutcome.NO_RESPONSE,
+                reason_tags=["ghosted", "slow_process"],
+                notes="Backfilled from April outreach sheet",
+            )
+        ]
+    )
+
+    assert len(updated) == 1
+    detail = marketplace_leads.get_lead(lead.id)
+    assert detail.lead_outcome == marketplace_leads.MarketplaceLeadOutcome.NO_RESPONSE
+    assert detail.outcome_reason_tags == ["ghosted", "slow_process"]
+    assert detail.notes == "Backfilled from April outreach sheet"
+    assert any(
+        event.event_type == "outcome_updated"
+        and event.note == "reasons: ghosted, slow_process"
+        for event in detail.lead_events
     )
 
 
@@ -710,6 +816,7 @@ def test_marketplace_lead_list_supports_outcome_filtering(client: TestClient) ->
             "metadata": {
                 "platform": "PeoplePerHour",
                 "lead_outcome": "won",
+                "lead_outcome_reason_tags": ["price_mismatch"],
             },
         }
     )
@@ -736,6 +843,7 @@ def test_marketplace_lead_list_supports_outcome_filtering(client: TestClient) ->
     assert payload["items"][0]["id"] == won_lead.id
     assert payload["outcome_breakdown"]["won"] == 1
     assert payload["outcome_breakdown"]["unresolved"] == 1
+    assert payload["outcome_reason_breakdown"]["price_mismatch"] == 1
 
 
 def test_peopleperhour_frontend_project_is_high_purity() -> None:

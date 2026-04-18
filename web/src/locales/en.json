@@ -151,6 +151,10 @@
         "pause_candidate": "Pause candidate"
       }
     },
+    "reasonBreakdown": {
+      "title": "Failure reason breakdown",
+      "empty": "No failure reason tags yet"
+    },
     "retrospective": {
       "title": "Conversion retrospective",
       "segmentTitle": "Lead segment retrospective",
@@ -207,6 +211,8 @@
       "description": "Original description",
       "notes": "Follow-up notes",
       "outcomePlaceholder": "Select final outcome",
+      "outcomeReasonPlaceholder": "Add outcome reason tags, e.g. price_mismatch",
+      "outcomeReasons": "Outcome reason tags",
       "notesPlaceholder": "Capture your judgement, outreach, or next action",
       "saveOutcome": "Save outcome",
       "saveNotes": "Save notes"
@@ -275,9 +281,15 @@
       "hasLink": "Source link",
       "empty": "No marketplace leads"
     },
+    "bulk": {
+      "outcomePlaceholder": "Set outcome in bulk",
+      "reasonPlaceholder": "Add bulk outcome reason tags",
+      "apply": "Update outcomes ({count})"
+    },
     "feedback": {
       "statusUpdated": "Updated to {status}",
       "outcomeUpdated": "Outcome saved",
+      "bulkOutcomeUpdated": "Updated outcomes for {count} leads",
       "notesUpdated": "Notes saved"
     }
   },

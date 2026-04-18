@@ -69,6 +69,7 @@ class MarketplaceLeadRead(BaseModel):
     tier_reason: str
     lead_status: str
     lead_outcome: str | None = None
+    outcome_reason_tags: list[str] = Field(default_factory=list)
     notes: str | None = None
     priority_score: int
     priority_reason: str
@@ -118,6 +119,7 @@ class MarketplaceLeadList(BaseModel):
     kind_breakdown: dict[str, int] = Field(default_factory=dict)
     status_breakdown: dict[str, int] = Field(default_factory=dict)
     outcome_breakdown: dict[str, int] = Field(default_factory=dict)
+    outcome_reason_breakdown: dict[str, int] = Field(default_factory=dict)
     todo_breakdown: dict[str, int] = Field(default_factory=dict)
     source_breakdown: list[MarketplaceLeadSourceMetricRead] = Field(default_factory=list)
     source_conversion_breakdown: list[MarketplaceLeadConversionMetricRead] = Field(
@@ -137,6 +139,13 @@ class MarketplaceLeadStatusUpdate(BaseModel):
 
 class MarketplaceLeadOutcomeUpdate(BaseModel):
     outcome: str | None = None
+    reason_tags: list[str] = Field(default_factory=list)
+
+
+class MarketplaceLeadBulkOutcomeUpdate(BaseModel):
+    ids: list[int] = Field(min_length=1)
+    outcome: str | None = None
+    reason_tags: list[str] = Field(default_factory=list)
 
 
 class MarketplaceLeadNotesUpdate(BaseModel):
