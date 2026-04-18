@@ -50,6 +50,31 @@ class MarketplaceLeadOutcome(StrEnum):
     NOT_FIT = "not_fit"
 
 
+class MarketplaceBudgetBand(StrEnum):
+    LT_1K = "lt_1k"
+    ONE_K_TO_FIVE_K = "1k_5k"
+    FIVE_K_TO_TWENTY_K = "5k_20k"
+    GT_20K = "gt_20k"
+    NEGOTIABLE = "negotiable"
+
+
+class MarketplaceDeliveryScope(StrEnum):
+    WEBSITE = "website"
+    APP = "app"
+    BACKEND = "backend"
+    PLUGIN = "plugin"
+    AUTOMATION = "automation"
+    DATA_TOOL = "data_tool"
+    EMBEDDED = "embedded"
+
+
+class MarketplaceRegion(StrEnum):
+    CHINA = "china"
+    APAC = "apac"
+    EUROPE_AMERICAS = "europe_americas"
+    GLOBAL = "global"
+
+
 @dataclass(slots=True)
 class MarketplaceLeadEvent:
     event_type: str
@@ -73,10 +98,15 @@ class MarketplaceLead:
     category: str | None
     budget: str | None
     normalized_budget: str | None
+    budget_band: MarketplaceBudgetBand | None
     engagement: str | None
     timeline: str | None
     normalized_timeline: str | None
+    delivery_scope: MarketplaceDeliveryScope | None
+    tech_stack_normalized: list[str]
     location: str | None
+    region: MarketplaceRegion | None
+    timezone_fit: bool | None
     published_at: datetime | None
     author: str | None
     tags: list[str]
@@ -190,6 +220,11 @@ def list_leads(
     source_id: int | None = None,
     tier: MarketplaceLeadTier | None = None,
     lead_kind: MarketplaceLeadKind | None = None,
+    budget_band: MarketplaceBudgetBand | None = None,
+    delivery_scope: MarketplaceDeliveryScope | None = None,
+    tech_stack: str | None = None,
+    region: MarketplaceRegion | None = None,
+    timezone_fit: bool | None = None,
     reviewable_only: bool = False,
     overdue_only: bool = False,
     lead_status: MarketplaceLeadStatus | None = None,
@@ -209,6 +244,11 @@ def list_leads(
         source_id=source_id,
         tier=tier,
         lead_kind=lead_kind,
+        budget_band=budget_band,
+        delivery_scope=delivery_scope,
+        tech_stack=tech_stack,
+        region=region,
+        timezone_fit=timezone_fit,
         reviewable_only=reviewable_only,
         overdue_only=overdue_only,
         lead_status=lead_status,
@@ -232,6 +272,11 @@ def query_leads(
     source_id: int | None = None,
     tier: MarketplaceLeadTier | None = None,
     lead_kind: MarketplaceLeadKind | None = None,
+    budget_band: MarketplaceBudgetBand | None = None,
+    delivery_scope: MarketplaceDeliveryScope | None = None,
+    tech_stack: str | None = None,
+    region: MarketplaceRegion | None = None,
+    timezone_fit: bool | None = None,
     reviewable_only: bool = False,
     overdue_only: bool = False,
     lead_status: MarketplaceLeadStatus | None = None,
@@ -265,6 +310,17 @@ def query_leads(
         leads = [lead for lead in leads if lead.lead_tier == tier]
     if lead_kind is not None:
         leads = [lead for lead in leads if lead.lead_kind == lead_kind]
+    if budget_band is not None:
+        leads = [lead for lead in leads if lead.budget_band == budget_band]
+    if delivery_scope is not None:
+        leads = [lead for lead in leads if lead.delivery_scope == delivery_scope]
+    if tech_stack is not None:
+        normalized_stack = tech_stack.strip().lower()
+        leads = [lead for lead in leads if normalized_stack in lead.tech_stack_normalized]
+    if region is not None:
+        leads = [lead for lead in leads if lead.region == region]
+    if timezone_fit is not None:
+        leads = [lead for lead in leads if lead.timezone_fit is timezone_fit]
     if reviewable_only:
         leads = [lead for lead in leads if lead.lead_kind in _REVIEWABLE_LEAD_KINDS]
     if overdue_only:
@@ -553,7 +609,11 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
     lead_kind = _classify_lead_kind(source.name, item, metadata)
     lead_tier, tier_reason = _classify_lead_tier(source.name, item, metadata)
     budget = _to_string(metadata.get("budget"))
+    normalized_budget = _normalize_budget(budget, _to_string(metadata.get("engagement")))
     timeline = _to_string(metadata.get("timeline"))
+    delivery_scope = _resolve_delivery_scope(item, metadata)
+    tech_stack_normalized = _normalize_tech_stack(item, metadata)
+    region = _resolve_region(item, metadata)
     lead_events = _to_lead_events(item, metadata)
     last_action_at = max(
         [event.created_at for event in lead_events],
@@ -586,11 +646,16 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         description=item.content,
         category=_to_string(metadata.get("category")),
         budget=budget,
-        normalized_budget=_normalize_budget(budget, _to_string(metadata.get("engagement"))),
+        normalized_budget=normalized_budget,
+        budget_band=_resolve_budget_band(budget, normalized_budget),
         engagement=_to_string(metadata.get("engagement")),
         timeline=timeline,
         normalized_timeline=_normalize_timeline(timeline),
+        delivery_scope=delivery_scope,
+        tech_stack_normalized=tech_stack_normalized,
         location=_to_string(metadata.get("location")),
+        region=region,
+        timezone_fit=_resolve_timezone_fit(region, _to_string(metadata.get("location"))),
         published_at=item.published_at,
         author=item.author,
         tags=list(item.tags),
@@ -627,6 +692,10 @@ def _classify_lead_tier(
     item: RawEntry,
     metadata: dict[str, object],
 ) -> tuple[MarketplaceLeadTier, str]:
+    delivery_scope = _resolve_delivery_scope(item, metadata)
+    tech_stack_normalized = _normalize_tech_stack(item, metadata)
+    region = _resolve_region(item, metadata)
+    timezone_fit = _resolve_timezone_fit(region, _to_string(metadata.get("location")))
     title_haystack = " ".join(
         filter(
             None,
@@ -650,6 +719,23 @@ def _classify_lead_tier(
         return (
             MarketplaceLeadTier.HIGH_PURITY,
             "标题直接体现前后端、全栈或 CMS 交付，属于明确的软件开发项目。",
+        )
+    if (
+        delivery_scope
+        in {
+            MarketplaceDeliveryScope.WEBSITE,
+            MarketplaceDeliveryScope.APP,
+            MarketplaceDeliveryScope.BACKEND,
+            MarketplaceDeliveryScope.PLUGIN,
+            MarketplaceDeliveryScope.AUTOMATION,
+            MarketplaceDeliveryScope.DATA_TOOL,
+        }
+        and tech_stack_normalized
+        and timezone_fit is not False
+    ):
+        return (
+            MarketplaceLeadTier.HIGH_PURITY,
+            "画像字段显示交付范围明确、技术栈清晰且时区可承接，进入高纯度队列。",
         )
     if any(keyword in detail_haystack for keyword in _EXPANDED_KEYWORDS):
         return (
@@ -718,10 +804,19 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         category=representative.category or alternate.category,
         budget=representative.budget or alternate.budget,
         normalized_budget=representative.normalized_budget or alternate.normalized_budget,
+        budget_band=representative.budget_band or alternate.budget_band,
         engagement=representative.engagement or alternate.engagement,
         timeline=representative.timeline or alternate.timeline,
         normalized_timeline=representative.normalized_timeline or alternate.normalized_timeline,
+        delivery_scope=representative.delivery_scope or alternate.delivery_scope,
+        tech_stack_normalized=list(
+            dict.fromkeys(
+                [*representative.tech_stack_normalized, *alternate.tech_stack_normalized]
+            )
+        ),
         location=representative.location or alternate.location,
+        region=representative.region or alternate.region,
+        timezone_fit=_merge_timezone_fit(representative.timezone_fit, alternate.timezone_fit),
         published_at=representative.published_at or alternate.published_at,
         author=representative.author or alternate.author,
         tags=list(dict.fromkeys([*representative.tags, *alternate.tags])),
@@ -850,6 +945,47 @@ def _calculate_priority(lead: MarketplaceLead, context: MarketplacePriorityConte
     if lead.notes:
         score += 4
         reasons.append("已有备注")
+
+    if lead.delivery_scope in {
+        MarketplaceDeliveryScope.WEBSITE,
+        MarketplaceDeliveryScope.APP,
+        MarketplaceDeliveryScope.BACKEND,
+        MarketplaceDeliveryScope.PLUGIN,
+        MarketplaceDeliveryScope.AUTOMATION,
+        MarketplaceDeliveryScope.DATA_TOOL,
+    }:
+        score += 8
+        reasons.append("交付范围匹配")
+    elif lead.delivery_scope == MarketplaceDeliveryScope.EMBEDDED:
+        score -= 6
+        reasons.append("嵌入式项目谨慎评估")
+
+    if lead.budget_band == MarketplaceBudgetBand.LT_1K:
+        score -= 6
+        reasons.append("预算偏低")
+    elif lead.budget_band == MarketplaceBudgetBand.ONE_K_TO_FIVE_K:
+        score += 4
+        reasons.append("预算带 1k-5k")
+    elif lead.budget_band == MarketplaceBudgetBand.FIVE_K_TO_TWENTY_K:
+        score += 10
+        reasons.append("预算带 5k-20k")
+    elif lead.budget_band == MarketplaceBudgetBand.GT_20K:
+        score += 6
+        reasons.append("高客单预算")
+    elif lead.budget_band == MarketplaceBudgetBand.NEGOTIABLE:
+        score += 2
+        reasons.append("预算可议")
+
+    if lead.timezone_fit is True:
+        score += 8
+        reasons.append("时区匹配")
+    elif lead.timezone_fit is False:
+        score -= 10
+        reasons.append("时区不匹配")
+
+    if lead.tech_stack_normalized:
+        score += min(len(lead.tech_stack_normalized), 3) * 2
+        reasons.append("技术栈清晰")
 
     return score, " / ".join(reasons)
 
@@ -1514,6 +1650,117 @@ def _stringify_follow_up_schedule(next_follow_up_at: datetime | None, reason: st
     return " / ".join(parts)
 
 
+def _resolve_budget_band(
+    raw_budget: str | None,
+    normalized_budget: str | None,
+) -> MarketplaceBudgetBand | None:
+    text = (normalized_budget or raw_budget or "").strip().lower()
+    if not text:
+        return None
+    if text in {"待商议", "面议", "open", "negotiable"}:
+        return MarketplaceBudgetBand.NEGOTIABLE
+
+    normalized = text.replace("千", "k")
+    values: list[float] = []
+    for match in re.finditer(r"(?P<value>\d[\d,.]*)(?P<suffix>k)?", normalized):
+        value = float(match.group("value").replace(",", ""))
+        if match.group("suffix"):
+            value *= 1000
+        values.append(value)
+    if not values:
+        return None
+
+    amount = max(values)
+    if "/hr" in normalized:
+        amount *= 80
+
+    if amount < 1000:
+        return MarketplaceBudgetBand.LT_1K
+    if amount <= 5000:
+        return MarketplaceBudgetBand.ONE_K_TO_FIVE_K
+    if amount <= 20000:
+        return MarketplaceBudgetBand.FIVE_K_TO_TWENTY_K
+    return MarketplaceBudgetBand.GT_20K
+
+
+def _resolve_delivery_scope(
+    item: RawEntry,
+    metadata: dict[str, object],
+) -> MarketplaceDeliveryScope | None:
+    haystack = _profile_haystack(item, metadata)
+    if _contains_any(haystack, _DELIVERY_SCOPE_KEYWORDS[MarketplaceDeliveryScope.EMBEDDED]):
+        return MarketplaceDeliveryScope.EMBEDDED
+    if _contains_any(haystack, _DELIVERY_SCOPE_KEYWORDS[MarketplaceDeliveryScope.PLUGIN]):
+        return MarketplaceDeliveryScope.PLUGIN
+    if _contains_any(haystack, _DELIVERY_SCOPE_KEYWORDS[MarketplaceDeliveryScope.AUTOMATION]):
+        return MarketplaceDeliveryScope.AUTOMATION
+    if _contains_any(haystack, _DELIVERY_SCOPE_KEYWORDS[MarketplaceDeliveryScope.APP]):
+        return MarketplaceDeliveryScope.APP
+    if _contains_any(haystack, _DELIVERY_SCOPE_KEYWORDS[MarketplaceDeliveryScope.WEBSITE]):
+        return MarketplaceDeliveryScope.WEBSITE
+    if _contains_any(haystack, _DELIVERY_SCOPE_KEYWORDS[MarketplaceDeliveryScope.BACKEND]):
+        return MarketplaceDeliveryScope.BACKEND
+    if _contains_any(haystack, _DELIVERY_SCOPE_KEYWORDS[MarketplaceDeliveryScope.DATA_TOOL]):
+        return MarketplaceDeliveryScope.DATA_TOOL
+    return None
+
+
+def _normalize_tech_stack(item: RawEntry, metadata: dict[str, object]) -> list[str]:
+    haystack = _profile_haystack(item, metadata)
+    matched: list[str] = []
+    for normalized_name, variants in _TECH_STACK_ALIASES.items():
+        if _contains_any(haystack, variants):
+            matched.append(normalized_name)
+    return matched
+
+
+def _resolve_region(
+    item: RawEntry,
+    metadata: dict[str, object],
+) -> MarketplaceRegion | None:
+    location = " ".join(
+        filter(
+            None,
+            [
+                _to_string(metadata.get("location")),
+                item.title,
+                item.summary or "",
+            ],
+        )
+    ).lower()
+    if not location:
+        return None
+    if _contains_any(location, _GLOBAL_REGION_KEYWORDS):
+        return MarketplaceRegion.GLOBAL
+
+    has_china = _contains_any(location, _CHINA_REGION_KEYWORDS)
+    has_apac = _contains_any(location, _APAC_REGION_KEYWORDS)
+    has_west = _contains_any(location, _EUROPE_AMERICAS_REGION_KEYWORDS)
+    if has_china:
+        return MarketplaceRegion.CHINA
+    if has_apac and has_west:
+        return MarketplaceRegion.GLOBAL
+    if has_apac:
+        return MarketplaceRegion.APAC
+    if has_west:
+        return MarketplaceRegion.EUROPE_AMERICAS
+    return None
+
+
+def _resolve_timezone_fit(
+    region: MarketplaceRegion | None,
+    location: str | None,
+) -> bool | None:
+    if region in {MarketplaceRegion.CHINA, MarketplaceRegion.APAC, MarketplaceRegion.GLOBAL}:
+        return True
+    if region == MarketplaceRegion.EUROPE_AMERICAS:
+        return False
+    normalized_location = (location or "").strip().lower()
+    if _contains_any(normalized_location, _GLOBAL_REGION_KEYWORDS):
+        return True
+    return None
+
+
 def _normalize_budget(value: str | None, engagement: str | None) -> str | None:
     if not value:
         return None
@@ -1575,6 +1822,27 @@ def _to_string(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _profile_haystack(item: RawEntry, metadata: dict[str, object]) -> str:
+    return " ".join(
+        filter(
+            None,
+            [
+                item.title.lower(),
+                (item.summary or "").lower(),
+                (item.content or "").lower(),
+                (_to_string(metadata.get("category")) or "").lower(),
+                (_to_string(metadata.get("engagement")) or "").lower(),
+                (_to_string(metadata.get("location")) or "").lower(),
+                " ".join(skill.lower() for skill in _to_string_list(metadata.get("skills"))),
+            ],
+        )
+    )
+
+
+def _contains_any(haystack: str, candidates: tuple[str, ...]) -> bool:
+    return any(candidate in haystack for candidate in candidates)
 
 
 def _to_string_list(value: object) -> list[str]:
@@ -1641,6 +1909,14 @@ def _skill_signature(skills: list[str]) -> str | None:
     if len(normalized_skills) < 2:
         return None
     return "|".join(sorted(normalized_skills))
+
+
+def _merge_timezone_fit(left: bool | None, right: bool | None) -> bool | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return left or right
 
 
 def _diversify_by_source(items: list[MarketplaceLead]) -> list[MarketplaceLead]:
@@ -1836,3 +2112,192 @@ _SKILL_STOPWORDS = {
     "marketplace",
     "remote",
 }
+
+_DELIVERY_SCOPE_KEYWORDS: dict[MarketplaceDeliveryScope, tuple[str, ...]] = {
+    MarketplaceDeliveryScope.WEBSITE: (
+        "website",
+        "web app",
+        "web development",
+        "landing page",
+        "wordpress",
+        "cms",
+        "webflow",
+        "shopify",
+        "frontend",
+        "网页",
+        "网站",
+        "官网",
+        "商城",
+        "hubl",
+    ),
+    MarketplaceDeliveryScope.APP: (
+        "mobile app",
+        "mobile",
+        "app",
+        "ios",
+        "android",
+        "flutter",
+        "react native",
+        "小程序",
+        "鸿蒙",
+    ),
+    MarketplaceDeliveryScope.BACKEND: (
+        "backend",
+        "api",
+        "database",
+        "postgres",
+        "postgresql",
+        "mysql",
+        "crm",
+        "erp",
+        "saas",
+        "admin dashboard",
+        "后台",
+        "后端",
+        "数据库",
+    ),
+    MarketplaceDeliveryScope.PLUGIN: (
+        "plugin",
+        "extension",
+        "woocommerce",
+        "chrome extension",
+        "shopify app",
+        "wordpress plugin",
+        "插件",
+        "扩展",
+    ),
+    MarketplaceDeliveryScope.AUTOMATION: (
+        "automation",
+        "workflow",
+        "zapier",
+        "make.com",
+        "n8n",
+        "bot",
+        "scraper",
+        "爬虫",
+        "自动化",
+        "集成",
+    ),
+    MarketplaceDeliveryScope.DATA_TOOL: (
+        "dashboard",
+        "analytics",
+        "reporting",
+        "etl",
+        "data pipeline",
+        "data tool",
+        "scraping",
+        "bi",
+        "数据采集",
+        "数据分析",
+        "报表",
+    ),
+    MarketplaceDeliveryScope.EMBEDDED: (
+        "embedded",
+        "firmware",
+        "hardware",
+        "iot",
+        "oem",
+        "kiosk",
+        "device owner",
+        "rk3568",
+        "嵌入式",
+        "硬件",
+    ),
+}
+
+_TECH_STACK_ALIASES: dict[str, tuple[str, ...]] = {
+    "react": ("react",),
+    "nextjs": ("next.js", "nextjs"),
+    "vue": ("vue", "vue.js", "vuejs"),
+    "angular": ("angular",),
+    "typescript": ("typescript",),
+    "javascript": ("javascript",),
+    "nodejs": ("node.js", "nodejs"),
+    "python": ("python",),
+    "django": ("django",),
+    "fastapi": ("fastapi",),
+    "flask": ("flask",),
+    "php": ("php",),
+    "laravel": ("laravel",),
+    "wordpress": ("wordpress", "woocommerce"),
+    "java": ("java",),
+    "spring": ("spring",),
+    "go": ("golang", "grpc"),
+    "dotnet": (".net", "c#", "asp.net"),
+    "postgres": ("postgres", "postgresql"),
+    "mysql": ("mysql",),
+    "mongodb": ("mongodb", "mongo"),
+    "docker": ("docker",),
+    "kubernetes": ("kubernetes", "k8s"),
+    "graphql": ("graphql",),
+    "android": ("android",),
+    "ios": ("ios",),
+    "flutter": ("flutter",),
+    "react_native": ("react native",),
+    "shopify": ("shopify",),
+    "webflow": ("webflow",),
+    "llm": ("openai", "rag", "langchain", "ai agent"),
+}
+
+_CHINA_REGION_KEYWORDS = (
+    "china",
+    "beijing",
+    "shanghai",
+    "shenzhen",
+    "guangzhou",
+    "hangzhou",
+    "中国",
+    "国内",
+    "北京",
+    "上海",
+    "深圳",
+    "广州",
+    "杭州",
+)
+
+_APAC_REGION_KEYWORDS = (
+    "apac",
+    "asia",
+    "oceania",
+    "australia",
+    "new zealand",
+    "singapore",
+    "philippines",
+    "india",
+    "japan",
+    "korea",
+    "hong kong",
+    "taiwan",
+    "malaysia",
+    "thailand",
+    "vietnam",
+)
+
+_EUROPE_AMERICAS_REGION_KEYWORDS = (
+    "europe",
+    "emea",
+    "uk",
+    "united kingdom",
+    "germany",
+    "france",
+    "spain",
+    "italy",
+    "netherlands",
+    "portugal",
+    "america",
+    "americas",
+    "usa",
+    "us only",
+    "united states",
+    "canada",
+    "latam",
+    "latin america",
+)
+
+_GLOBAL_REGION_KEYWORDS = (
+    "worldwide",
+    "global",
+    "remote",
+    "anywhere",
+    "anywhere in the world",
+)

@@ -61,6 +61,55 @@
             :value="String(source.id)"
           />
         </el-select>
+        <el-select v-model="budgetBandFilter" class="profile-select" :placeholder="t('marketplace.filters.budgetBand')">
+          <el-option :label="t('marketplace.filters.budgetBandOptions.all')" value="all" />
+          <el-option
+            v-for="option in budgetBandOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <el-select
+          v-model="deliveryScopeFilter"
+          class="profile-select"
+          :placeholder="t('marketplace.filters.deliveryScope')"
+        >
+          <el-option :label="t('marketplace.filters.deliveryScopeOptions.all')" value="all" />
+          <el-option
+            v-for="option in deliveryScopeOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <el-select v-model="techStackFilter" class="profile-select" :placeholder="t('marketplace.filters.techStack')">
+          <el-option :label="t('marketplace.filters.techStackOptions.all')" value="all" />
+          <el-option
+            v-for="option in techStackOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <el-select v-model="regionFilter" class="profile-select" :placeholder="t('marketplace.filters.region')">
+          <el-option :label="t('marketplace.filters.regionOptions.all')" value="all" />
+          <el-option
+            v-for="option in regionOptions"
+            :key="option.value"
+            :label="option.label"
+            :value="option.value"
+          />
+        </el-select>
+        <el-select
+          v-model="timezoneFitFilter"
+          class="profile-select"
+          :placeholder="t('marketplace.filters.timezoneFit')"
+        >
+          <el-option :label="t('marketplace.filters.timezoneFitOptions.all')" value="all" />
+          <el-option :label="t('marketplace.filters.timezoneFitOptions.fit')" value="fit" />
+          <el-option :label="t('marketplace.filters.timezoneFitOptions.unfit')" value="unfit" />
+        </el-select>
         <el-select
           v-model="bulkOutcomeDraft"
           class="status-select"
@@ -393,9 +442,41 @@
             </div>
           </template>
         </el-table-column>
+        <el-table-column :label="t('marketplace.table.profile')" min-width="240">
+          <template #default="{ row }">
+            <div class="tag-list">
+              <el-tag v-if="row.budget_band" size="small" effect="plain">
+                {{ budgetBandLabel(row.budget_band) }}
+              </el-tag>
+              <el-tag v-if="row.delivery_scope" size="small" effect="plain" type="success">
+                {{ deliveryScopeLabel(row.delivery_scope) }}
+              </el-tag>
+              <el-tag v-if="row.region" size="small" effect="plain" type="warning">
+                {{ regionLabel(row.region) }}
+              </el-tag>
+              <el-tag
+                v-if="row.timezone_fit !== null"
+                size="small"
+                effect="plain"
+                :type="row.timezone_fit ? 'success' : 'danger'"
+              >
+                {{ timezoneFitLabel(row.timezone_fit) }}
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('marketplace.table.skills')" min-width="220">
           <template #default="{ row }">
             <div class="tag-list">
+              <el-tag
+                v-for="stack in row.tech_stack_normalized.slice(0, 3)"
+                :key="`stack-${stack}`"
+                size="small"
+                effect="plain"
+                type="success"
+              >
+                {{ stack }}
+              </el-tag>
               <el-tag v-for="skill in row.skills.slice(0, 4)" :key="skill" size="small" effect="plain">
                 {{ skill }}
               </el-tag>
@@ -573,8 +654,32 @@
               <span>{{ selectedLead.normalized_budget || selectedLead.budget || '—' }}</span>
             </div>
             <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.budgetBand') }}</span>
+              <span>{{ selectedLead.budget_band ? budgetBandLabel(selectedLead.budget_band) : '—' }}</span>
+            </div>
+            <div class="detail-item">
               <span class="detail-label">{{ t('marketplace.details.timeline') }}</span>
               <span>{{ selectedLead.normalized_timeline || selectedLead.timeline || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.deliveryScope') }}</span>
+              <span>
+                {{ selectedLead.delivery_scope ? deliveryScopeLabel(selectedLead.delivery_scope) : '—' }}
+              </span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.region') }}</span>
+              <span>{{ selectedLead.region ? regionLabel(selectedLead.region) : '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.timezoneFit') }}</span>
+              <span>
+                {{
+                  selectedLead.timezone_fit === null
+                    ? '—'
+                    : timezoneFitLabel(selectedLead.timezone_fit)
+                }}
+              </span>
             </div>
             <div class="detail-item">
               <span class="detail-label">{{ t('marketplace.details.published') }}</span>
@@ -689,6 +794,21 @@
             <div class="tag-list">
               <el-tag v-for="skill in selectedLead.skills" :key="skill" size="small" effect="plain">
                 {{ skill }}
+              </el-tag>
+            </div>
+          </div>
+
+          <div v-if="selectedLead.tech_stack_normalized.length" class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.techStack') }}</div>
+            <div class="tag-list">
+              <el-tag
+                v-for="stack in selectedLead.tech_stack_normalized"
+                :key="stack"
+                size="small"
+                effect="plain"
+                type="success"
+              >
+                {{ stack }}
               </el-tag>
             </div>
           </div>
@@ -826,6 +946,11 @@ const sourceId = ref<'all' | string>('all');
 const statusFilter = ref<'all' | MarketplaceLead['lead_status']>('all');
 const outcomeFilter = ref<'all' | NonNullable<MarketplaceLead['lead_outcome']>>('all');
 const followUpFilter = ref<'all' | 'overdue'>('all');
+const budgetBandFilter = ref<'all' | NonNullable<MarketplaceLead['budget_band']>>('all');
+const deliveryScopeFilter = ref<'all' | NonNullable<MarketplaceLead['delivery_scope']>>('all');
+const techStackFilter = ref<'all' | string>('all');
+const regionFilter = ref<'all' | NonNullable<MarketplaceLead['region']>>('all');
+const timezoneFitFilter = ref<'all' | 'fit' | 'unfit'>('all');
 const queueView = ref<'high_purity' | 'expanded' | 'all'>('high_purity');
 const leadKindView = ref<'reviewable' | 'project' | 'contract_role' | 'full_time_job' | 'all'>('reviewable');
 const detailsVisible = ref(false);
@@ -853,6 +978,70 @@ const leadOutcomeOptions = computed(() => [
   { value: 'no_response' as const, label: t('marketplace.filters.outcomeOptions.no_response') },
   { value: 'not_fit' as const, label: t('marketplace.filters.outcomeOptions.not_fit') }
 ]);
+
+const budgetBandOptions = computed(() => [
+  { value: 'lt_1k' as const, label: t('marketplace.filters.budgetBandOptions.band_lt_1k') },
+  { value: '1k_5k' as const, label: t('marketplace.filters.budgetBandOptions.band_1k_5k') },
+  { value: '5k_20k' as const, label: t('marketplace.filters.budgetBandOptions.band_5k_20k') },
+  { value: 'gt_20k' as const, label: t('marketplace.filters.budgetBandOptions.band_gt_20k') },
+  { value: 'negotiable' as const, label: t('marketplace.filters.budgetBandOptions.band_negotiable') }
+]);
+
+const deliveryScopeOptions = computed(() => [
+  { value: 'website' as const, label: t('marketplace.filters.deliveryScopeOptions.website') },
+  { value: 'app' as const, label: t('marketplace.filters.deliveryScopeOptions.app') },
+  { value: 'backend' as const, label: t('marketplace.filters.deliveryScopeOptions.backend') },
+  { value: 'plugin' as const, label: t('marketplace.filters.deliveryScopeOptions.plugin') },
+  { value: 'automation' as const, label: t('marketplace.filters.deliveryScopeOptions.automation') },
+  { value: 'data_tool' as const, label: t('marketplace.filters.deliveryScopeOptions.data_tool') },
+  { value: 'embedded' as const, label: t('marketplace.filters.deliveryScopeOptions.embedded') }
+]);
+
+const regionOptions = computed(() => [
+  { value: 'china' as const, label: t('marketplace.filters.regionOptions.china') },
+  { value: 'apac' as const, label: t('marketplace.filters.regionOptions.apac') },
+  {
+    value: 'europe_americas' as const,
+    label: t('marketplace.filters.regionOptions.europe_americas')
+  },
+  { value: 'global' as const, label: t('marketplace.filters.regionOptions.global') }
+]);
+
+const techStackOptions = computed(() =>
+  [
+    'react',
+    'nextjs',
+    'vue',
+    'angular',
+    'typescript',
+    'javascript',
+    'nodejs',
+    'python',
+    'django',
+    'fastapi',
+    'flask',
+    'php',
+    'laravel',
+    'wordpress',
+    'java',
+    'spring',
+    'go',
+    'dotnet',
+    'postgres',
+    'mysql',
+    'mongodb',
+    'docker',
+    'kubernetes',
+    'graphql',
+    'android',
+    'ios',
+    'flutter',
+    'react_native',
+    'shopify',
+    'webflow',
+    'llm'
+  ].map((value) => ({ value, label: value }))
+);
 
 const sourcesQuery = useQuery({
   queryKey: ['marketplace-sources'],
@@ -884,6 +1073,12 @@ const queryParams = computed(() => ({
     leadKindView.value === 'full_time_job'
       ? leadKindView.value
       : undefined,
+  budget_band: budgetBandFilter.value === 'all' ? undefined : budgetBandFilter.value,
+  delivery_scope: deliveryScopeFilter.value === 'all' ? undefined : deliveryScopeFilter.value,
+  tech_stack: techStackFilter.value === 'all' ? undefined : techStackFilter.value,
+  region: regionFilter.value === 'all' ? undefined : regionFilter.value,
+  timezone_fit:
+    timezoneFitFilter.value === 'fit' ? true : timezoneFitFilter.value === 'unfit' ? false : undefined,
   reviewable_only: leadKindView.value === 'reviewable' ? true : undefined,
   overdue_only: followUpFilter.value === 'overdue' ? true : undefined,
   lead_status: statusFilter.value === 'all' ? undefined : statusFilter.value,
@@ -1053,9 +1248,25 @@ const topOutcomeReasons = computed(() =>
 const highSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.high ?? 0);
 const mediumSeverityTodoCount = computed(() => leadsQuery.data.value?.todo_breakdown?.medium ?? 0);
 
-watch([search, sourceId, statusFilter, outcomeFilter, followUpFilter, queueView, leadKindView], () => {
-  page.value = 1;
-});
+watch(
+  [
+    search,
+    sourceId,
+    statusFilter,
+    outcomeFilter,
+    followUpFilter,
+    budgetBandFilter,
+    deliveryScopeFilter,
+    techStackFilter,
+    regionFilter,
+    timezoneFitFilter,
+    queueView,
+    leadKindView
+  ],
+  () => {
+    page.value = 1;
+  }
+);
 
 watch(
   () => detailsQuery.data.value,
@@ -1100,6 +1311,18 @@ const leadStatusLabel = (status: MarketplaceLead['lead_status']) =>
 
 const leadOutcomeLabel = (outcome: NonNullable<MarketplaceLead['lead_outcome']>) =>
   t(`marketplace.filters.outcomeOptions.${outcome}`);
+
+const budgetBandLabel = (value: NonNullable<MarketplaceLead['budget_band']>) =>
+  t(`marketplace.filters.budgetBandOptions.band_${value}`);
+
+const deliveryScopeLabel = (value: NonNullable<MarketplaceLead['delivery_scope']>) =>
+  t(`marketplace.filters.deliveryScopeOptions.${value}`);
+
+const regionLabel = (value: NonNullable<MarketplaceLead['region']>) =>
+  t(`marketplace.filters.regionOptions.${value}`);
+
+const timezoneFitLabel = (value: boolean) =>
+  value ? t('marketplace.filters.timezoneFitOptions.fit') : t('marketplace.filters.timezoneFitOptions.unfit');
 
 const leadOutcomeTagType = (outcome: NonNullable<MarketplaceLead['lead_outcome']>) => {
   if (outcome === 'won') return 'success';
@@ -1282,6 +1505,7 @@ const formatPercent = (value: number) =>
 .source-select,
 .status-select,
 .kind-select,
+.profile-select,
 .reason-select {
   width: 220px;
 }
@@ -1613,6 +1837,7 @@ const formatPercent = (value: number) =>
   .source-select,
   .status-select,
   .kind-select,
+.profile-select,
   .reason-select {
     width: 100%;
   }

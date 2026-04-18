@@ -198,7 +198,11 @@
       "author": "Publisher",
       "location": "Location",
       "budget": "Budget",
+      "budgetBand": "Budget band",
       "timeline": "Timeline",
+      "deliveryScope": "Delivery scope",
+      "region": "Region profile",
+      "timezoneFit": "Timezone fit",
       "published": "Published",
       "updated": "Updated",
       "lastActionAt": "Last action",
@@ -209,6 +213,7 @@
       "priority": "Priority",
       "priorityScore": "Current priority score: {score}",
       "skills": "Skill tags",
+      "techStack": "Normalized tech stack",
       "duplicates": "Merged sources",
       "summary": "Summary",
       "description": "Original description",
@@ -242,6 +247,11 @@
       "leadKind": "Lead kind",
       "outcome": "Outcome",
       "followUp": "Follow-up filter",
+      "budgetBand": "Budget band",
+      "deliveryScope": "Delivery scope",
+      "techStack": "Tech stack",
+      "region": "Region profile",
+      "timezoneFit": "Timezone fit",
       "leadKindOptions": {
         "reviewable": "Default reviewable",
         "project": "Project",
@@ -273,6 +283,39 @@
         "all": "All follow-ups",
         "overdue": "Overdue only"
       },
+      "budgetBandOptions": {
+        "all": "All budgets",
+        "band_lt_1k": "Below 1k",
+        "band_1k_5k": "1k-5k",
+        "band_5k_20k": "5k-20k",
+        "band_gt_20k": "20k+",
+        "band_negotiable": "Negotiable"
+      },
+      "deliveryScopeOptions": {
+        "all": "All scopes",
+        "website": "Website",
+        "app": "App / mini app",
+        "backend": "Backend / API",
+        "plugin": "Plugin / extension",
+        "automation": "Automation",
+        "data_tool": "Data tool",
+        "embedded": "Embedded"
+      },
+      "techStackOptions": {
+        "all": "All tech stacks"
+      },
+      "regionOptions": {
+        "all": "All regions",
+        "china": "China",
+        "apac": "APAC",
+        "europe_americas": "Europe / Americas",
+        "global": "Global / Remote"
+      },
+      "timezoneFitOptions": {
+        "all": "All timezones",
+        "fit": "Fits current delivery window",
+        "unfit": "Hard timezone overlap"
+      },
       "sourceOptions": {
         "all": "All marketplace sources"
       }
@@ -282,6 +325,7 @@
       "title": "Project title",
       "budget": "Budget",
       "timeline": "Timeline",
+      "profile": "Profile",
       "skills": "Skills / category",
       "source": "Source",
       "leadKind": "Lead kind",

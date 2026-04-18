@@ -280,10 +280,15 @@ export interface MarketplaceLead {
   category: string | null;
   budget: string | null;
   normalized_budget: string | null;
+  budget_band: 'lt_1k' | '1k_5k' | '5k_20k' | 'gt_20k' | 'negotiable' | null;
   engagement: string | null;
   timeline: string | null;
   normalized_timeline: string | null;
+  delivery_scope: 'website' | 'app' | 'backend' | 'plugin' | 'automation' | 'data_tool' | 'embedded' | null;
+  tech_stack_normalized: string[];
   location: string | null;
+  region: 'china' | 'apac' | 'europe_americas' | 'global' | null;
+  timezone_fit: boolean | null;
   published_at: string | null;
   author: string | null;
   tags: string[];
@@ -379,6 +384,11 @@ export interface MarketplaceLeadQueryParams {
   search?: string;
   tier?: 'high_purity' | 'expanded';
   lead_kind?: 'project' | 'contract_role' | 'full_time_job';
+  budget_band?: 'lt_1k' | '1k_5k' | '5k_20k' | 'gt_20k' | 'negotiable';
+  delivery_scope?: 'website' | 'app' | 'backend' | 'plugin' | 'automation' | 'data_tool' | 'embedded';
+  tech_stack?: string;
+  region?: 'china' | 'apac' | 'europe_americas' | 'global';
+  timezone_fit?: boolean;
   reviewable_only?: boolean;
   overdue_only?: boolean;
   lead_status?: 'new' | 'watching' | 'contacted' | 'ignored';

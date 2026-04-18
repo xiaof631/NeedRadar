@@ -69,9 +69,12 @@ def test_list_marketplace_leads_returns_structured_fields(client: TestClient) ->
     assert item["source_name"] == "Freelancer Web Development Jobs"
     assert item["budget"] == "$500 Avg Bid"
     assert item["normalized_budget"] == "$500 Avg Bid"
+    assert item["budget_band"] == "lt_1k"
     assert item["timeline"] == "6 days left"
     assert item["normalized_timeline"] == "6 days"
+    assert item["delivery_scope"] == "website"
     assert item["skills"] == ["Web Development", "Laravel"]
+    assert item["tech_stack_normalized"] == ["laravel"]
     assert item["lead_kind"] == "project"
     assert item["lead_tier"] == "high_purity"
     assert item["lead_status"] == "new"
@@ -80,6 +83,88 @@ def test_list_marketplace_leads_returns_structured_fields(client: TestClient) ->
     assert payload["status_breakdown"]["new"] == 1
     assert payload["source_breakdown"][0]["source_name"] == "Freelancer Web Development Jobs"
     assert payload["source_breakdown"][0]["high_purity"] == 1
+
+
+def test_marketplace_leads_support_profile_filters_and_priority(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "apac-automation",
+            "title": "Python automation dashboard for APAC fulfillment team",
+            "summary": "Python automation dashboard for APAC fulfillment team | $2K | 5 days",
+            "content": "Build workflow automation, reporting dashboard, and Dockerized services.",
+            "link": "https://example.com/apac-automation",
+            "published_at": datetime(2026, 4, 17, 10, 0, tzinfo=UTC),
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$2K",
+                "timeline": "5 days",
+                "engagement": "fixed-price",
+                "location": "Philippines",
+                "skills": ["Python", "Docker"],
+            },
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "us-backend",
+            "title": "Backend API rebuild for US-only fintech portal",
+            "summary": "Backend API rebuild for US-only fintech portal | $2K | 5 days",
+            "content": "Build backend APIs and database services for a United States client.",
+            "link": "https://example.com/us-backend",
+            "published_at": datetime(2026, 4, 17, 10, 0, tzinfo=UTC),
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "budget": "$2K",
+                "timeline": "5 days",
+                "engagement": "fixed-price",
+                "location": "United States",
+                "skills": ["Python", "Postgres"],
+            },
+        }
+    )
+
+    response = client.get("/api/v1/marketplace-leads/")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["items"][0]["title"] == "Python automation dashboard for APAC fulfillment team"
+    assert payload["items"][0]["budget_band"] == "1k_5k"
+    assert payload["items"][0]["delivery_scope"] == "automation"
+    assert payload["items"][0]["tech_stack_normalized"] == ["python", "docker"]
+    assert payload["items"][0]["region"] == "apac"
+    assert payload["items"][0]["timezone_fit"] is True
+    assert "时区匹配" in payload["items"][0]["priority_reason"]
+    assert payload["items"][1]["region"] == "europe_americas"
+    assert payload["items"][1]["timezone_fit"] is False
+    assert "时区不匹配" in payload["items"][1]["priority_reason"]
+
+    filtered = client.get(
+        "/api/v1/marketplace-leads/",
+        params={
+            "budget_band": "1k_5k",
+            "delivery_scope": "automation",
+            "tech_stack": "python",
+            "region": "apac",
+            "timezone_fit": "true",
+        },
+    )
+    assert filtered.status_code == 200
+    filtered_payload = filtered.json()
+    assert filtered_payload["total"] == 1
+    assert filtered_payload["items"][0]["title"] == "Python automation dashboard for APAC fulfillment team"
 
 
 def test_marketplace_leads_returns_todo_queue(client: TestClient) -> None:
@@ -464,7 +549,9 @@ def test_list_marketplace_leads_diversifies_sources() -> None:
 
     assert total == 3
     source_ids = [item.source_id for item in items]
-    assert source_ids == [sxsoft.id, zbj.id, zbj.id]
+    assert source_ids[0] != source_ids[1]
+    assert source_ids.count(zbj.id) == 2
+    assert source_ids.count(sxsoft.id) == 1
     assert tier_breakdown["high_purity"] == 3
     assert tier_breakdown["expanded"] == 0
     assert kind_breakdown["project"] == 3

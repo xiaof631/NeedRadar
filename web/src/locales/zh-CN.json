@@ -201,7 +201,11 @@
       "author": "发布方",
       "location": "地区",
       "budget": "预算",
+      "budgetBand": "预算分段",
       "timeline": "周期/时效",
+      "deliveryScope": "交付范围",
+      "region": "地区画像",
+      "timezoneFit": "时区匹配",
       "published": "发布时间",
       "updated": "最近更新",
       "lastActionAt": "最近操作",
@@ -212,6 +216,7 @@
       "priority": "优先级",
       "priorityScore": "当前优先级分数：{score}",
       "skills": "技能标签",
+      "techStack": "标准技术栈",
       "duplicates": "归并来源",
       "summary": "摘要",
       "description": "原始正文",
@@ -245,6 +250,11 @@
       "leadKind": "线索类型",
       "outcome": "跟进结果",
       "followUp": "跟进筛选",
+      "budgetBand": "预算分段",
+      "deliveryScope": "交付范围",
+      "techStack": "技术栈",
+      "region": "地区画像",
+      "timezoneFit": "时区匹配",
       "leadKindOptions": {
         "reviewable": "默认可跟进",
         "project": "项目型",
@@ -276,6 +286,39 @@
         "all": "全部跟进",
         "overdue": "仅看已超时"
       },
+      "budgetBandOptions": {
+        "all": "全部预算",
+        "band_lt_1k": "低于 1k",
+        "band_1k_5k": "1k-5k",
+        "band_5k_20k": "5k-20k",
+        "band_gt_20k": "20k+",
+        "band_negotiable": "可议价"
+      },
+      "deliveryScopeOptions": {
+        "all": "全部范围",
+        "website": "网站",
+        "app": "App / 小程序",
+        "backend": "后端 / API",
+        "plugin": "插件 / 扩展",
+        "automation": "自动化",
+        "data_tool": "数据工具",
+        "embedded": "嵌入式"
+      },
+      "techStackOptions": {
+        "all": "全部技术栈"
+      },
+      "regionOptions": {
+        "all": "全部地区",
+        "china": "国内",
+        "apac": "APAC",
+        "europe_americas": "欧美",
+        "global": "全球 / Remote"
+      },
+      "timezoneFitOptions": {
+        "all": "全部时区",
+        "fit": "适合当前承接",
+        "unfit": "时区偏难承接"
+      },
       "sourceOptions": {
         "all": "全部项目源"
       }
@@ -285,6 +328,7 @@
       "title": "项目标题",
       "budget": "预算",
       "timeline": "周期/时效",
+      "profile": "项目画像",
       "skills": "技能/分类",
       "source": "数据源",
       "leadKind": "线索类型",
