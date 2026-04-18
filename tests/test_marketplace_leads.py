@@ -165,12 +165,10 @@ def test_marketplace_leads_returns_todo_queue(client: TestClient) -> None:
     assert payload["todo_breakdown"]["total"] == 3
     assert payload["todo_breakdown"]["high"] >= 1
     assert payload["todo_breakdown"]["new_high_priority"] == 1
-    assert payload["todo_breakdown"]["watching_stale"] == 1
-    assert payload["todo_breakdown"]["contacted_stale"] == 1
+    assert payload["todo_breakdown"]["follow_up_overdue"] == 2
     assert {item["reminder_type"] for item in payload["todo_queue"]} == {
         "new_high_priority",
-        "watching_stale",
-        "contacted_stale",
+        "follow_up_overdue",
     }
 
 
@@ -861,6 +859,74 @@ def test_marketplace_lead_history_tracks_status_and_notes_updates(client: TestCl
         and _event_value(event, "note") == "Review outreach plan before contacting"
         for event in payload["lead_events"]
     )
+
+
+def test_marketplace_lead_follow_up_schedule_and_overdue_filter(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-follow-up",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $1200 | 2 days",
+            "content": "Build a frontend app.",
+            "link": "https://example.com/lead-follow-up",
+            "tags": ["marketplace"],
+            "metadata": {
+                "platform": "PeoplePerHour",
+                "lead_status": "watching",
+                "lead_events": [
+                    {
+                        "event_type": "status_changed",
+                        "created_at": "2026-04-10T09:00:00+00:00",
+                        "status_from": "new",
+                        "status_to": "watching",
+                    }
+                ],
+            },
+        }
+    )
+
+    detail_response = client.get(f"/api/v1/marketplace-leads/{lead.id}")
+    assert detail_response.status_code == 200
+    detail_payload = detail_response.json()
+    assert detail_payload["follow_up_reason"] == "watching_checkin"
+    assert detail_payload["next_follow_up_at"] is not None
+    assert detail_payload["is_follow_up_overdue"] is True
+
+    overdue_response = client.get("/api/v1/marketplace-leads/", params={"overdue_only": "true"})
+    assert overdue_response.status_code == 200
+    assert overdue_response.json()["total"] == 1
+    assert overdue_response.json()["todo_queue"][0]["reminder_type"] == "follow_up_overdue"
+
+    update_response = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/follow-up",
+        json={
+            "next_follow_up_at": "2026-04-20T09:00:00+00:00",
+            "follow_up_reason": "proposal_sent",
+        },
+    )
+    assert update_response.status_code == 200
+    update_payload = update_response.json()
+    assert update_payload["follow_up_reason"] == "proposal_sent"
+    assert update_payload["is_follow_up_overdue"] is False
+    assert any(
+        _event_value(event, "event_type") == "follow_up_scheduled"
+        and "proposal_sent" in (_event_value(event, "note") or "")
+        for event in update_payload["lead_events"]
+    )
+
+    refetched_overdue = client.get("/api/v1/marketplace-leads/", params={"overdue_only": "true"})
+    assert refetched_overdue.status_code == 200
+    assert refetched_overdue.json()["total"] == 0
 
 
 def test_marketplace_lead_list_supports_outcome_filtering(client: TestClient) -> None:

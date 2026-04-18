@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from app.schemas import (
     MarketplaceLeadBulkOutcomeUpdate,
     MarketplaceLeadConversionMetricRead,
     MarketplaceLeadEventRead,
+    MarketplaceLeadFollowUpUpdate,
     MarketplaceLeadList,
     MarketplaceLeadNotesUpdate,
     MarketplaceLeadOutcomeUpdate,
@@ -34,6 +37,7 @@ async def list_marketplace_leads(
         default=None, description="按线索类型过滤"
     ),
     reviewable_only: bool = Query(default=False, description="仅保留项目型与合同型线索"),
+    overdue_only: bool = Query(default=False, description="仅保留下次跟进已超时的线索"),
     lead_status: marketplace_leads.MarketplaceLeadStatus | None = Query(
         default=None, description="按跟进状态过滤"
     ),
@@ -49,6 +53,7 @@ async def list_marketplace_leads(
         tier=tier,
         lead_kind=lead_kind,
         reviewable_only=reviewable_only,
+        overdue_only=overdue_only,
         lead_status=lead_status,
         lead_outcome=lead_outcome,
     )
@@ -161,6 +166,32 @@ async def update_marketplace_lead_notes(
 ) -> MarketplaceLeadRead:
     try:
         item = marketplace_leads.update_lead_notes(lead_id, payload.notes)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
+    return _to_marketplace_lead_read(item)
+
+
+@router.put(
+    "/{lead_id}/follow-up",
+    response_model=MarketplaceLeadRead,
+    summary="更新外包项目线索下次跟进时间",
+)
+async def update_marketplace_lead_follow_up(
+    lead_id: int,
+    payload: MarketplaceLeadFollowUpUpdate,
+) -> MarketplaceLeadRead:
+    next_follow_up_at = None
+    if payload.next_follow_up_at:
+        try:
+            next_follow_up_at = datetime.fromisoformat(payload.next_follow_up_at)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="invalid next follow-up timestamp") from exc
+    try:
+        item = marketplace_leads.update_lead_follow_up(
+            lead_id,
+            next_follow_up_at,
+            payload.follow_up_reason,
+        )
     except Exception as exc:
         raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
     return _to_marketplace_lead_read(item)
