@@ -55,10 +55,15 @@ class MarketplaceLeadRead(BaseModel):
     category: str | None = None
     budget: str | None = None
     normalized_budget: str | None = None
+    budget_band: str | None = None
     engagement: str | None = None
     timeline: str | None = None
     normalized_timeline: str | None = None
+    delivery_scope: str | None = None
+    tech_stack_normalized: list[str] = Field(default_factory=list)
     location: str | None = None
+    region: str | None = None
+    timezone_fit: bool | None = None
     published_at: datetime | None = None
     author: str | None = None
     tags: list[str] = Field(default_factory=list)

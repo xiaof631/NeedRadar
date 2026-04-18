@@ -36,6 +36,17 @@ async def list_marketplace_leads(
     lead_kind: marketplace_leads.MarketplaceLeadKind | None = Query(
         default=None, description="按线索类型过滤"
     ),
+    budget_band: marketplace_leads.MarketplaceBudgetBand | None = Query(
+        default=None, description="按预算分段过滤"
+    ),
+    delivery_scope: marketplace_leads.MarketplaceDeliveryScope | None = Query(
+        default=None, description="按交付范围过滤"
+    ),
+    tech_stack: str | None = Query(default=None, description="按归一化技术栈过滤"),
+    region: marketplace_leads.MarketplaceRegion | None = Query(
+        default=None, description="按地区画像过滤"
+    ),
+    timezone_fit: bool | None = Query(default=None, description="按时区匹配度过滤"),
     reviewable_only: bool = Query(default=False, description="仅保留项目型与合同型线索"),
     overdue_only: bool = Query(default=False, description="仅保留下次跟进已超时的线索"),
     lead_status: marketplace_leads.MarketplaceLeadStatus | None = Query(
@@ -52,6 +63,11 @@ async def list_marketplace_leads(
         search=search,
         tier=tier,
         lead_kind=lead_kind,
+        budget_band=budget_band,
+        delivery_scope=delivery_scope,
+        tech_stack=tech_stack,
+        region=region,
+        timezone_fit=timezone_fit,
         reviewable_only=reviewable_only,
         overdue_only=overdue_only,
         lead_status=lead_status,
