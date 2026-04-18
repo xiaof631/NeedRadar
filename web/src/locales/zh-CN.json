@@ -151,7 +151,8 @@
         "keep": "继续保留",
         "expand_similar": "扩同类来源",
         "lower_frequency": "建议降频",
-        "pause_candidate": "建议暂停"
+        "pause_candidate": "建议暂停",
+        "needs_outcome_data": "需要补结果数据"
       }
     },
     "reasonBreakdown": {

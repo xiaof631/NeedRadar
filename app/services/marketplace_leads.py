@@ -331,7 +331,10 @@ def query_leads(
         leads = [lead for lead in leads if lead.lead_outcome == lead_outcome]
     todo_queue = _build_todo_queue(leads, priority_context.now)
     todo_breakdown = _count_todo_queue(todo_queue)
-    source_recommendations = _build_source_recommendations(source_breakdown)
+    source_recommendations = _build_source_recommendations(
+        source_breakdown,
+        source_conversion_breakdown,
+    )
     total = len(leads)
     leads = leads[skip : skip + limit]
     return MarketplaceLeadQueryResult(
@@ -1446,13 +1449,31 @@ def _build_todo_queue(leads: list[MarketplaceLead], now: datetime) -> list[Marke
 
 def _build_source_recommendations(
     metrics: list[MarketplaceLeadSourceMetric],
+    conversions: list[MarketplaceLeadConversionMetric],
 ) -> list[MarketplaceSourceRecommendation]:
     recommendations: list[MarketplaceSourceRecommendation] = []
+    conversions_by_source_id: dict[int, MarketplaceLeadConversionMetric] = {}
+    for metric in conversions:
+        if not metric.key.startswith("source:"):
+            continue
+        try:
+            source_id = int(metric.key.split(":", 1)[1])
+        except ValueError:
+            continue
+        conversions_by_source_id[source_id] = metric
+
     for item in metrics:
         total = max(item.total, 1)
         high_purity_ratio = item.high_purity / total
         reviewable_ratio = item.reviewable / total
         full_time_ratio = item.full_time_job / total
+        conversion = conversions_by_source_id.get(item.source_id)
+        resolved = conversion.resolved if conversion is not None else 0
+        won = conversion.won if conversion is not None else 0
+        no_response = conversion.no_response if conversion is not None else 0
+        not_fit = conversion.not_fit if conversion is not None else 0
+        contacted = conversion.contacted if conversion is not None else item.contacted
+        win_rate = conversion.win_rate if conversion is not None else 0.0
 
         if item.total >= 2 and full_time_ratio >= 0.5:
             recommendations.append(
@@ -1476,14 +1497,43 @@ def _build_source_recommendations(
                 )
             )
             continue
-        if item.total >= 3 and high_purity_ratio >= 0.6 and reviewable_ratio >= 0.8:
+        if resolved >= 2 and won >= 1 and win_rate >= 0.3 and high_purity_ratio >= 0.5:
             recommendations.append(
                 MarketplaceSourceRecommendation(
                     source_id=item.source_id,
                     source_name=item.source_name,
                     action="expand_similar",
                     severity="high",
-                    reason="高纯度和可跟进占比都高，值得扩同类平台或关键词。",
+                    reason="已有真实成交且赢单率稳定，值得扩同类平台或关键词。",
+                )
+            )
+            continue
+        if resolved >= 2 and won == 0 and (not_fit + no_response) >= resolved:
+            action = "pause_candidate" if full_time_ratio >= 0.3 or not_fit >= no_response else "lower_frequency"
+            severity = "high" if action == "pause_candidate" else "medium"
+            reason = (
+                "已有多条结案结果但主要是不匹配，建议暂停并重做来源过滤。"
+                if action == "pause_candidate"
+                else "已有多条结案结果但多数无回复/失败，建议降频并观察后续样本。"
+            )
+            recommendations.append(
+                MarketplaceSourceRecommendation(
+                    source_id=item.source_id,
+                    source_name=item.source_name,
+                    action=action,
+                    severity=severity,
+                    reason=reason,
+                )
+            )
+            continue
+        if contacted >= 2 and resolved == 0 and high_purity_ratio >= 0.4:
+            recommendations.append(
+                MarketplaceSourceRecommendation(
+                    source_id=item.source_id,
+                    source_name=item.source_name,
+                    action="needs_outcome_data",
+                    severity="medium",
+                    reason="已有跟进动作但还缺少结案样本，建议先补结果数据再判断是否扩源。",
                 )
             )
             continue
@@ -1558,6 +1608,7 @@ def _recommendation_action_rank(value: str) -> int:
     return {
         "expand_similar": 3,
         "pause_candidate": 3,
+        "needs_outcome_data": 2,
         "lower_frequency": 2,
         "keep": 1,
     }.get(value, 0)
@@ -1567,6 +1618,7 @@ def _recommendation_action_label(value: str) -> str:
     return {
         "expand_similar": "扩同类来源",
         "pause_candidate": "建议暂停",
+        "needs_outcome_data": "需要补结果数据",
         "lower_frequency": "建议降频",
         "keep": "继续保留",
     }.get(value, value)

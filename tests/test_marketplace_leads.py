@@ -297,6 +297,7 @@ def test_marketplace_leads_returns_source_recommendations(client: TestClient) ->
                     "platform": "PeoplePerHour",
                     "budget": "$1200",
                     "timeline": "2 days",
+                    "lead_outcome": "won" if index <= 2 else None,
                 },
             }
         )
@@ -319,6 +320,7 @@ def test_marketplace_leads_returns_source_recommendations(client: TestClient) ->
                 "metadata": {
                     "platform": "Remotive",
                     "engagement": "full-time",
+                    "lead_outcome": "not_fit",
                 },
             }
         )
@@ -330,6 +332,55 @@ def test_marketplace_leads_returns_source_recommendations(client: TestClient) ->
     recommendations = {item["source_name"]: item for item in payload["source_recommendations"]}
     assert recommendations["PeoplePerHour Technology Projects"]["action"] == "expand_similar"
     assert recommendations["Remotive Software Contracts"]["action"] == "pause_candidate"
+
+
+def test_marketplace_leads_marks_sources_needing_outcome_data(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/freelance-jobs/technology-programming",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    contacted_ids: list[int] = []
+    for index, title in enumerate(
+        [
+            "Frontend Developer (React / Next.js)",
+            "Backend API build for logistics workflow",
+            "HubSpot CMS integration and dashboard",
+        ],
+        start=1,
+    ):
+        entry = raw_entries.create_entry(
+            {
+                "source_id": source.id,
+                "guid": f"needs-outcome-{index}",
+                "title": title,
+                "summary": f"{title} | $1200 | 2 days",
+                "content": "Build a software product.",
+                "link": f"https://example.com/needs-outcome-{index}",
+                "tags": ["marketplace"],
+                "metadata": {
+                    "platform": "PeoplePerHour",
+                    "budget": "$1200",
+                    "timeline": "2 days",
+                },
+            }
+        )
+        if index <= 2:
+            contacted_ids.append(entry.id)
+
+    for lead_id in contacted_ids:
+        marketplace_leads.update_lead_status(lead_id, marketplace_leads.MarketplaceLeadStatus.CONTACTED)
+
+    response = client.get("/api/v1/marketplace-leads/")
+    assert response.status_code == 200
+    payload = response.json()
+
+    recommendations = {item["source_name"]: item for item in payload["source_recommendations"]}
+    assert recommendations["PeoplePerHour Technology Projects"]["action"] == "needs_outcome_data"
 
 
 def test_marketplace_leads_returns_conversion_breakdowns(client: TestClient) -> None:

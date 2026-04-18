@@ -342,7 +342,7 @@ export interface MarketplaceLeadReminder {
 export interface MarketplaceSourceRecommendation {
   source_id: number;
   source_name: string;
-  action: 'keep' | 'expand_similar' | 'lower_frequency' | 'pause_candidate' | string;
+  action: 'keep' | 'expand_similar' | 'lower_frequency' | 'pause_candidate' | 'needs_outcome_data' | string;
   severity: 'high' | 'medium' | 'low' | string;
   reason: string;
 }

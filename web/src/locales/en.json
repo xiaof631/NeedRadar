@@ -148,7 +148,8 @@
         "keep": "Keep",
         "expand_similar": "Expand similar sources",
         "lower_frequency": "Lower frequency",
-        "pause_candidate": "Pause candidate"
+        "pause_candidate": "Pause candidate",
+        "needs_outcome_data": "Need outcome data"
       }
     },
     "reasonBreakdown": {
