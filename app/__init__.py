@@ -1,0 +1,3 @@
+from runtime_bootstrap import prefer_installed_packages
+
+prefer_installed_packages()

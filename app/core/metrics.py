@@ -137,9 +137,33 @@ def record_task_enqueue(kind: str, *, count: int) -> None:
 
 
 def instrument_fastapi_app(app: Any) -> None:
-    """为简化版 FastAPI 注入请求级指标。"""
+    """为真实 FastAPI 或简化兼容层注入请求级指标。"""
 
     if getattr(app, "_needradar_metrics_instrumented", False):
+        return
+
+    if hasattr(app, "middleware"):
+        @app.middleware("http")
+        async def instrumented_http_requests(request: Any, call_next: Callable[..., Awaitable[Any]]) -> Any:
+            start = perf_counter()
+            status_code = "500"
+            try:
+                response = await call_next(request)
+                status_code = str(getattr(response, "status_code", 200))
+                return response
+            finally:
+                duration = perf_counter() - start
+                _http_requests_total.labels(
+                    method=request.method.upper(),
+                    path=request.url.path,
+                    status_code=status_code,
+                ).inc()
+                _http_request_duration.labels(
+                    method=request.method.upper(),
+                    path=request.url.path,
+                ).observe(duration)
+
+        app._needradar_metrics_instrumented = True  # type: ignore[attr-defined]
         return
 
     original_dispatch: Callable[..., Awaitable[tuple[int, Any]]] = app.dispatch

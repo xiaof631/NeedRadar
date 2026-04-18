@@ -1,9 +1,15 @@
+# ruff: noqa: E402
+
 """APScheduler 驱动的调度入口。"""
 
 from __future__ import annotations
 
 import asyncio
 import signal
+
+from runtime_bootstrap import prefer_installed_packages
+
+prefer_installed_packages()
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger

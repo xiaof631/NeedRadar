@@ -1,3 +1,5 @@
+# ruff: noqa: I001
+
 """NeedRadar 命令行入口。"""
 
 from __future__ import annotations
@@ -9,8 +11,9 @@ from io import StringIO
 from pathlib import Path
 from typing import Annotated, Any
 
-import app.services.export_jobs as export_jobs
 import typer
+
+import app.services.export_jobs as export_jobs
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.models import (

@@ -1,8 +1,14 @@
+# ruff: noqa: E402
+
 """Celery 应用实例定义。"""
 
 from __future__ import annotations
 
 from datetime import timedelta
+
+from runtime_bootstrap import prefer_installed_packages
+
+prefer_installed_packages()
 
 try:  # pragma: no cover - 真实环境会安装 celery
     from celery import Celery
