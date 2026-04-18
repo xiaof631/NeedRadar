@@ -12,8 +12,8 @@ from app.schemas import (
     MarketplaceLeadList,
     MarketplaceLeadNotesUpdate,
     MarketplaceLeadOutcomeUpdate,
-    MarketplaceLeadReminderRead,
     MarketplaceLeadRead,
+    MarketplaceLeadReminderRead,
     MarketplaceLeadSourceMetricRead,
     MarketplaceLeadStatusUpdate,
 )

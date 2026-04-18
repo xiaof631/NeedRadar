@@ -54,6 +54,10 @@ extend-exclude = [
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+ignore = [
+    "E501",
+    "UP042",
+]
 
 [tool.mypy]
 python_version = "3.11"
@@ -96,4 +100,3 @@ pythonpath = ["."]
 markers = [
     "asyncio: async tests",
 ]
-

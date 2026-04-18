@@ -246,7 +246,7 @@ def test_plan_balanced_promotions_respects_source_quotas_and_skips_noise() -> No
     filter_rules.create_rule(
         {
             "name": "Need Signals",
-            "keywords": ["manual", "painful", "stuck", "offline", "error", "which"],
+            "keywords": ["manual", "pain", "painful", "stuck", "offline", "error", "fail", "which"],
             "patterns": [],
             "min_score": 0.15,
             "enabled": True,

@@ -6,7 +6,13 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from app.models import CandidateNeedStatus, CandidateNeedType, ExportJobStatus, SourceType, SyncChannel
+from app.models import (
+    CandidateNeedStatus,
+    CandidateNeedType,
+    ExportJobStatus,
+    SourceType,
+    SyncChannel,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -43,7 +49,7 @@ class CandidateNeedRead(BaseModel):
     candidate_type: CandidateNeedTypeEnum | None = None
     review_readiness: float | None = Field(default=None, ge=0.0, le=1.0)
     review_explanation: str | None = None
-    review_signals: list[str] = Field(default_factory=list)
+    review_signals: list[str] = []
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     rule_score: float | None = Field(default=None, ge=0.0, le=1.0)
     status: CandidateNeedStatusEnum

@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+import app.services.candidate_needs as candidate_needs
 from app.db.storage import db
 from app.models import CandidateNeed, CandidateNeedStatus, RssSource, SourceType
-import app.services.candidate_needs as candidate_needs
 
 _LATIN_TOKEN_RE = re.compile(r"[a-z0-9]{2,}")
 _CJK_TOKEN_RE = re.compile(r"[\u4e00-\u9fff]{2,}")
@@ -135,6 +135,9 @@ def summarize_clusters(
     statuses: tuple[CandidateNeedStatus, ...] | None = None,
     search: str | None = None,
     source_type: SourceType | None = None,
+    candidate_type: candidate_needs.CandidateNeedType | None = None,
+    review_ready_only: bool | None = None,
+    min_review_readiness: float | None = None,
     synced: bool | None = None,
     limit: int = 100,
     min_cluster_size: int = 2,
@@ -146,6 +149,9 @@ def summarize_clusters(
         statuses=statuses,
         search=search,
         source_type=source_type,
+        candidate_type=candidate_type,
+        review_ready_only=review_ready_only,
+        min_review_readiness=min_review_readiness,
         synced=synced,
         limit=limit,
     )
@@ -161,7 +167,7 @@ def summarize_clusters(
             raw_entry = db.get_raw_entry(need.raw_entry_id)
             raw_entry_cache[need.raw_entry_id] = raw_entry
         source_name = "Unknown"
-        source_type = "unknown"
+        source_kind = "unknown"
         supporting_text = ""
         if raw_entry is not None:
             source = source_cache.get(raw_entry.source_id)
@@ -170,13 +176,13 @@ def summarize_clusters(
                 source_cache[raw_entry.source_id] = source
             if source is not None:
                 source_name = source.name
-                source_type = source.source_type.value
+                source_kind = source.source_type.value
             supporting_text = " ".join(part for part in (raw_entry.title, raw_entry.summary) if part)
         contexts.append(
             _NeedContext(
                 need=need,
                 source_name=source_name,
-                source_type=source_type,
+                source_type=source_kind,
                 tokens=_tokenize(
                     " ".join(
                         part
@@ -189,12 +195,12 @@ def summarize_clusters(
                         )
                         if part
                     ),
-                    source_type=source_type,
+                    source_type=source_kind,
                 ),
                 normalized_summary=_normalize_text(need.summary),
                 tags=set(raw_entry.tags if raw_entry is not None and raw_entry.tags else ()),
                 bug_signal=_is_bug_signal(
-                    source_type=source_type,
+                    source_type=source_kind,
                     title=raw_entry.title if raw_entry is not None else need.summary,
                     summary=raw_entry.summary if raw_entry is not None else need.problem_statement,
                 ),

@@ -21,8 +21,8 @@ async def _run_fetch_job() -> None:
 
     try:
         queued = task_queue.enqueue_fetch_sources()
-    except Exception:  # pragma: no cover - 调度器异常记录
-        logger.exception("scheduler.fetch.failed")
+    except Exception as exc:  # pragma: no cover - 调度器异常记录
+        logger.error("scheduler.fetch.failed", error=str(exc))
         return
 
     logger.info(
@@ -43,8 +43,8 @@ def _run_promote_job(
             batch_size=batch_size,
             min_score=min_score,
         )
-    except Exception:  # pragma: no cover - 调度器异常记录
-        logger.exception("scheduler.promote.failed")
+    except Exception as exc:  # pragma: no cover - 调度器异常记录
+        logger.error("scheduler.promote.failed", error=str(exc))
         return
 
     logger.info("scheduler.promote.completed", queued=queued)
@@ -64,8 +64,8 @@ async def _run_sync_job(
             statuses=statuses,
             batch_size=batch_size,
         )
-    except Exception:  # pragma: no cover - 调度器异常记录
-        logger.exception("scheduler.sync.failed")
+    except Exception as exc:  # pragma: no cover - 调度器异常记录
+        logger.error("scheduler.sync.failed", error=str(exc))
         return
 
     logger.info("scheduler.sync.completed", queued=queued)

@@ -812,7 +812,7 @@ def _parse_zbj_hall_scroll(
         bids = _normalize_text(match.group("bids"))
         location, title = _split_location_title(raw_title)
         link = f"https://task.zbj.com/{task_id}/"
-        metadata = {
+        metadata: dict[str, object] = {
             "platform": "猪八戒",
             "category": str(source.config.get("topic") or source.category or "").strip() or None,
             "budget": budget,

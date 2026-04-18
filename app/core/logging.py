@@ -33,7 +33,7 @@ def configure_logging(level: int = logging.INFO) -> None:
     logging.basicConfig(level=level)
 
 
-def get_logger(name: str, **initial_values: Any) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str, **initial_values: Any) -> Any:
     """获取绑定初始上下文的 logger。"""
 
     return structlog.get_logger(name).bind(**initial_values)

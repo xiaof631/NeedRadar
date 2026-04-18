@@ -5,10 +5,16 @@ from pathlib import Path
 
 import pytest
 
-from app.main import app
-from app.models import CandidateNeedStatus, CandidateNeedType, RawEntryStatus, SourceStatus, SourceType, SyncChannel
 import app.services.export_jobs as export_jobs
-
+from app.main import app
+from app.models import (
+    CandidateNeedStatus,
+    CandidateNeedType,
+    RawEntryStatus,
+    SourceStatus,
+    SourceType,
+    SyncChannel,
+)
 from app.services import candidate_clusters, candidate_needs, raw_entries, rss_sources, sync_audit
 from app.services.export_jobs import ExportJobStatus
 from fastapi.testclient import TestClient

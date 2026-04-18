@@ -12,9 +12,9 @@ from app.schemas import (
     RawEntryList,
     RawEntryRead,
     RawEntryRuleMatch,
+    RawEntrySourceTypeEnum,
     RawEntryStatusEnum,
     RawEntryStatusUpdate,
-    RawEntrySourceTypeEnum,
 )
 from app.services import filter_engine, raw_entries
 from fastapi import APIRouter, HTTPException, Query, status

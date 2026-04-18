@@ -8,13 +8,12 @@ from typing import Any
 
 import httpx
 
+import app.services.export_jobs as export_jobs
 from app.core import metrics
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.telemetry import get_tracer
 from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus, SyncChannel
-import app.services.export_jobs as export_jobs
-
 from app.services import (
     candidate_needs,
     downstream,

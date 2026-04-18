@@ -755,7 +755,7 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
     )
 
 
-def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, datetime]:
+def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, int, int, datetime]:
     return (
         lead.priority_score,
         1 if lead.lead_kind in _REVIEWABLE_LEAD_KINDS else 0,

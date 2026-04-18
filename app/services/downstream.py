@@ -42,8 +42,9 @@ async def deliver_need_to_webhook(
     """将候选需求推送至配置的 webhook 并返回执行结果。"""
 
     payload = CandidateNeedRead.model_validate(need)
+    payload_data = payload.model_dump()
     try:
-        response = await client.post(webhook_url, json=payload)
+        response = await client.post(webhook_url, json=payload_data)
     except httpx.HTTPError as exc:
         candidate_needs.mark_need_sync_failed(need.id, str(exc))
         metrics.record_downstream_delivery(SyncChannel.WEBHOOK.value, "network-error")
@@ -114,7 +115,7 @@ def publish_need_to_mq(
         raise RuntimeError("MQ publisher is not configured")
 
     payload = CandidateNeedRead.model_validate(need)
-    result = publisher.publish(payload)
+    result = publisher.publish(payload.model_dump())
     if result.success:
         candidate_needs.mark_need_synced(need.id)
         metrics.record_downstream_delivery(SyncChannel.MQ.value, "success")

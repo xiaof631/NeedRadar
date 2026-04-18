@@ -145,7 +145,7 @@ async def _fetch_item(
     client: httpx.AsyncClient, item_url_template: str, item_id: object
 ) -> dict | None:
     try:
-        item_id_int = int(item_id)
+        item_id_int = int(str(item_id))
     except (TypeError, ValueError):
         return None
 
@@ -219,7 +219,7 @@ def _coerce_item_limit(value: object) -> int:
     try:
         if value is None:
             return 20
-        parsed = int(value)
+        parsed = int(str(value))
     except (TypeError, ValueError):
         return 20
     return max(1, min(parsed, 100))
@@ -227,7 +227,7 @@ def _coerce_item_limit(value: object) -> int:
 
 def _parse_unix_timestamp(value: object) -> datetime | None:
     try:
-        timestamp = int(value)
+        timestamp = int(str(value))
     except (TypeError, ValueError):
         return None
     return datetime.fromtimestamp(timestamp, tz=UTC)
