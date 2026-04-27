@@ -545,7 +545,7 @@ export interface CandidateNeedQueryParams {
 export async function fetchCandidateNeeds(
   params: CandidateNeedQueryParams = {}
 ): Promise<CandidateNeedListResponse> {
-  const response = await apiClient.get('/api/v1/candidate-needs', {
+  const response = await apiClient.get('/api/v1/candidate-needs/', {
     params: buildCandidateNeedParams(params)
   });
   return response.data;
