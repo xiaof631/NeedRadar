@@ -85,6 +85,8 @@ class MarketplaceLeadRead(BaseModel):
     duplicate_sources: list[str] = Field(default_factory=list)
     last_action_at: datetime
     lead_events: list[MarketplaceLeadEventRead] = Field(default_factory=list)
+    first_seen_at: datetime
+    latest_seen_at: datetime
     created_at: datetime
     updated_at: datetime
 

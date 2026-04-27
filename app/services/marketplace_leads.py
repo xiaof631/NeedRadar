@@ -128,6 +128,8 @@ class MarketplaceLead:
     lead_events: list[MarketplaceLeadEvent]
     duplicate_count: int
     duplicate_sources: list[str]
+    first_seen_at: datetime
+    latest_seen_at: datetime
     created_at: datetime
     updated_at: datetime
 
@@ -685,6 +687,8 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         lead_events=lead_events,
         duplicate_count=1,
         duplicate_sources=[source.name],
+        first_seen_at=item.created_at,
+        latest_seen_at=item.created_at,
         created_at=item.created_at,
         updated_at=item.updated_at,
     )
@@ -848,6 +852,8 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         lead_events=_merge_lead_events(left.lead_events, right.lead_events),
         duplicate_count=left.duplicate_count + right.duplicate_count,
         duplicate_sources=duplicate_sources,
+        first_seen_at=min(left.first_seen_at, right.first_seen_at),
+        latest_seen_at=max(left.latest_seen_at, right.latest_seen_at),
         created_at=min(left.created_at, right.created_at),
         updated_at=max(left.updated_at, right.updated_at),
     )
@@ -859,7 +865,7 @@ def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, int, int, datetime]
         1 if lead.lead_kind in _REVIEWABLE_LEAD_KINDS else 0,
         1 if lead.lead_tier == MarketplaceLeadTier.HIGH_PURITY else 0,
         _lead_status_rank(lead.lead_status),
-        lead.published_at or lead.created_at,
+        lead.latest_seen_at,
     )
 
 

@@ -550,8 +550,8 @@
             <span v-else>—</span>
           </template>
         </el-table-column>
-        <el-table-column :label="t('marketplace.table.published')" width="190">
-          <template #default="{ row }">{{ formatDate(row.published_at || row.created_at) }}</template>
+        <el-table-column :label="t('marketplace.table.latestSeenAt')" width="190">
+          <template #default="{ row }">{{ formatDate(row.latest_seen_at) }}</template>
         </el-table-column>
         <el-table-column :label="t('marketplace.table.actions')" min-width="210" fixed="right">
           <template #default="{ row }">
@@ -683,7 +683,15 @@
             </div>
             <div class="detail-item">
               <span class="detail-label">{{ t('marketplace.details.published') }}</span>
-              <span>{{ formatDate(selectedLead.published_at || selectedLead.created_at) }}</span>
+              <span>{{ formatDate(selectedLead.published_at) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.latestSeenAt') }}</span>
+              <span>{{ formatDate(selectedLead.latest_seen_at) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.firstSeenAt') }}</span>
+              <span>{{ formatDate(selectedLead.first_seen_at) }}</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">{{ t('marketplace.details.updated') }}</span>

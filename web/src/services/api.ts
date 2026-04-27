@@ -310,6 +310,8 @@ export interface MarketplaceLead {
   duplicate_sources: string[];
   last_action_at: string;
   lead_events: MarketplaceLeadEvent[];
+  first_seen_at: string;
+  latest_seen_at: string;
   created_at: string;
   updated_at: string;
 }
