@@ -176,6 +176,13 @@
         "winRate": "成交率"
       }
     },
+    "sort": {
+      "label": "排序",
+      "default": "综合排序",
+      "newestFirst": "最新优先",
+      "oldestFirst": "最旧优先",
+      "priority": "优先级最高"
+    },
     "todo": {
       "title": "今日待办",
       "subtitle": "优先处理高优先级新线索和超时未跟进项",

@@ -47,7 +47,7 @@ service_command() {
       printf '%s\n' "celery -A jobs.celery_app worker --loglevel=info"
       ;;
     scheduler)
-      printf '%s\n' "python3 -m jobs.scheduler"
+      printf '%s\n' "python -m jobs.scheduler"
       ;;
     web)
       printf '%s\n' "pnpm --dir web dev --host 0.0.0.0 --port 5206"
@@ -64,7 +64,7 @@ service_pattern() {
       printf '%s\n' "celery -A jobs.celery_app worker --loglevel=info"
       ;;
     scheduler)
-      printf '%s\n' "python3 -m jobs.scheduler"
+      printf '%s\n' "python -m jobs.scheduler"
       ;;
     web)
       printf '%s\n' "vite.*--host 0.0.0.0 --port 5206"

@@ -173,6 +173,13 @@
         "winRate": "Win rate"
       }
     },
+    "sort": {
+      "label": "Sort",
+      "default": "Default",
+      "newestFirst": "Newest first",
+      "oldestFirst": "Oldest first",
+      "priority": "Highest priority"
+    },
     "todo": {
       "title": "Today’s queue",
       "subtitle": "Handle new high-priority leads and stale follow-ups first",

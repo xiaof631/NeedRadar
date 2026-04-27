@@ -209,13 +209,24 @@
             <div class="source-health-title">{{ t('marketplace.todo.title') }}</div>
             <div class="todo-subtitle">{{ t('marketplace.todo.subtitle') }}</div>
           </div>
-          <div class="tag-list">
-            <el-tag type="danger" effect="plain">
-              {{ t('marketplace.todo.highSeverity', { count: highSeverityTodoCount }) }}
-            </el-tag>
-            <el-tag type="warning" effect="plain">
-              {{ t('marketplace.todo.mediumSeverity', { count: mediumSeverityTodoCount }) }}
-            </el-tag>
+          <div class="todo-header-actions">
+            <div class="todo-sort-group">
+              <button
+                v-for="opt in sortOptions"
+                :key="opt.value"
+                class="todo-sort-btn"
+                :class="{ active: todoSort === opt.value }"
+                @click="todoSort = opt.value"
+              >{{ opt.label }}</button>
+            </div>
+            <div class="tag-list">
+              <el-tag type="danger" effect="plain">
+                {{ t('marketplace.todo.highSeverity', { count: highSeverityTodoCount }) }}
+              </el-tag>
+              <el-tag type="warning" effect="plain">
+                {{ t('marketplace.todo.mediumSeverity', { count: mediumSeverityTodoCount }) }}
+              </el-tag>
+            </div>
           </div>
         </div>
       </template>
@@ -961,6 +972,14 @@ const regionFilter = ref<'all' | NonNullable<MarketplaceLead['region']>>('all');
 const timezoneFitFilter = ref<'all' | 'fit' | 'unfit'>('all');
 const queueView = ref<'high_purity' | 'expanded' | 'all'>('high_purity');
 const leadKindView = ref<'reviewable' | 'project' | 'contract_role' | 'full_time_job' | 'all'>('reviewable');
+const todoSort = ref<'default' | 'newest_first' | 'oldest_first' | 'priority'>('default');
+
+const sortOptions = computed<{ value: typeof todoSort['value']; label: string }[]>(() => [
+  { value: 'default', label: t('marketplace.sort.default') },
+  { value: 'newest_first', label: t('marketplace.sort.newestFirst') },
+  { value: 'oldest_first', label: t('marketplace.sort.oldestFirst') },
+  { value: 'priority', label: t('marketplace.sort.priority') },
+]);
 const detailsVisible = ref(false);
 const selectedLeadId = ref<number | null>(null);
 const leadsTableRef = ref<{ clearSelection?: () => void } | null>(null);
@@ -1090,7 +1109,8 @@ const queryParams = computed(() => ({
   reviewable_only: leadKindView.value === 'reviewable' ? true : undefined,
   overdue_only: followUpFilter.value === 'overdue' ? true : undefined,
   lead_status: statusFilter.value === 'all' ? undefined : statusFilter.value,
-  lead_outcome: outcomeFilter.value === 'all' ? undefined : outcomeFilter.value
+  lead_outcome: outcomeFilter.value === 'all' ? undefined : outcomeFilter.value,
+  todo_sort: todoSort.value
 }));
 
 const leadsQuery = useQuery({
@@ -1566,6 +1586,47 @@ const formatPercent = (value: number) =>
   gap: 1rem;
 }
 
+.todo-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.todo-sort-group {
+  display: flex;
+  gap: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.todo-sort-btn {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.825rem;
+  color: #64748b;
+  background: #f8fafc;
+  border: none;
+  border-right: 1px solid #e2e8f0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.todo-sort-btn:last-child {
+  border-right: none;
+}
+
+.todo-sort-btn:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.todo-sort-btn.active {
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+
 .todo-subtitle {
   margin-top: 0.3rem;
   font-size: 0.875rem;
@@ -1859,11 +1920,20 @@ const formatPercent = (value: number) =>
   }
 
   .todo-header,
+  .todo-header-actions,
   .todo-item,
   .todo-title-row,
   .recommendation-title-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .todo-sort-group {
+    width: 100%;
+  }
+
+  .todo-sort-btn {
+    flex: 1;
   }
 
   .todo-side {

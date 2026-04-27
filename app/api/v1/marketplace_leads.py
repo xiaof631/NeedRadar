@@ -55,6 +55,10 @@ async def list_marketplace_leads(
     lead_outcome: marketplace_leads.MarketplaceLeadOutcome | None = Query(
         default=None, description="按跟进结果过滤"
     ),
+    todo_sort: str = Query(
+        default="default",
+        description="待办排序: default | newest_first | oldest_first | priority",
+    ),
 ) -> MarketplaceLeadList:
     result = marketplace_leads.query_leads(
         skip=skip,
@@ -72,6 +76,7 @@ async def list_marketplace_leads(
         overdue_only=overdue_only,
         lead_status=lead_status,
         lead_outcome=lead_outcome,
+        todo_sort=todo_sort,
     )
     return MarketplaceLeadList(
         total=result.total,

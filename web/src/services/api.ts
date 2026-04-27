@@ -395,6 +395,7 @@ export interface MarketplaceLeadQueryParams {
   overdue_only?: boolean;
   lead_status?: 'new' | 'watching' | 'contacted' | 'ignored';
   lead_outcome?: 'won' | 'lost' | 'no_response' | 'not_fit';
+  todo_sort?: 'default' | 'newest_first' | 'oldest_first' | 'priority';
 }
 
 export async function fetchMarketplaceLeads(

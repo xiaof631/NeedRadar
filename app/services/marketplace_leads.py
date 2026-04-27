@@ -285,6 +285,7 @@ def query_leads(
     lead_outcome: MarketplaceLeadOutcome | None = None,
     skip: int = 0,
     limit: int = 20,
+    todo_sort: str = "default",
 ) -> MarketplaceLeadQueryResult:
     _, items = raw_entries.list_entries(
         source_id=source_id,
@@ -331,7 +332,7 @@ def query_leads(
         leads = [lead for lead in leads if lead.lead_status == lead_status]
     if lead_outcome is not None:
         leads = [lead for lead in leads if lead.lead_outcome == lead_outcome]
-    todo_queue = _build_todo_queue(leads, priority_context.now)
+    todo_queue = _build_todo_queue(leads, priority_context.now, todo_sort)
     todo_breakdown = _count_todo_queue(todo_queue)
     source_recommendations = _build_source_recommendations(
         source_breakdown,
@@ -1366,7 +1367,7 @@ def _sort_conversion_metrics(
     return metrics
 
 
-def _build_todo_queue(leads: list[MarketplaceLead], now: datetime) -> list[MarketplaceLeadReminder]:
+def _build_todo_queue(leads: list[MarketplaceLead], now: datetime, todo_sort: str = "default") -> list[MarketplaceLeadReminder]:
     reminders: list[MarketplaceLeadReminder] = []
     for lead in leads:
         if (
@@ -1441,15 +1442,39 @@ def _build_todo_queue(leads: list[MarketplaceLead], now: datetime) -> list[Marke
                     stale_days=stale_days,
                 )
             )
-    reminders.sort(
-        key=lambda item: (
-            _reminder_severity_rank(item.severity),
-            item.priority_score,
-            item.stale_days,
-            item.last_action_at,
-        ),
-        reverse=True,
-    )
+    if todo_sort == "newest_first":
+        reminders.sort(
+            key=lambda item: (0 - _reminder_severity_rank(item.severity), item.last_action_at),
+            reverse=True,
+        )
+    elif todo_sort == "oldest_first":
+        reminders.sort(
+            key=lambda item: (
+                0 - _reminder_severity_rank(item.severity),
+                item.stale_days,
+                item.last_action_at,
+            ),
+            reverse=True,
+        )
+    elif todo_sort == "priority":
+        reminders.sort(
+            key=lambda item: (
+                0 - _reminder_severity_rank(item.severity),
+                item.priority_score,
+                item.last_action_at,
+            ),
+            reverse=True,
+        )
+    else:
+        reminders.sort(
+            key=lambda item: (
+                _reminder_severity_rank(item.severity),
+                item.priority_score,
+                item.stale_days,
+                item.last_action_at,
+            ),
+            reverse=True,
+        )
     return reminders
 
 
