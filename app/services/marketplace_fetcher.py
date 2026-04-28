@@ -1226,9 +1226,9 @@ class _AnchorCollector(HTMLParser):
         self._current_parts = []
 
     def handle_endtag(self, tag: str) -> None:
-        if tag != "a" or not self._current_href:
-            self._current_href = None
-            self._current_parts = []
+        if tag != "a":
+            return
+        if not self._current_href:
             return
         text = _normalize_text(" ".join(self._current_parts))
         if text:
