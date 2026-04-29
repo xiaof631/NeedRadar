@@ -237,3 +237,90 @@ def test_sync_new_candidate_needs_handles_non_2xx() -> None:
     refreshed = candidate_needs.get_need(need.id)
     assert refreshed.synced_at is None
     assert refreshed.sync_error == "HTTP 503"
+
+
+def test_fetch_active_sources_returns_empty_when_no_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+    """当没有活跃数据源时返回空列表。"""
+    import app.services.rss_sources as rss_sources_mod
+
+    monkeypatch.setattr(
+        rss_sources_mod, "list_sources", lambda **_: (0, [])
+    )
+
+    results = asyncio.run(tasks.fetch_active_sources())
+    assert results == []
+
+
+def test_sync_new_candidate_needs_returns_empty_when_no_webhook_url() -> None:
+    results = asyncio.run(
+        tasks.sync_new_candidate_needs(webhook_url=None)
+    )
+    assert results == []
+
+
+def test_sync_new_candidate_needs_returns_empty_when_no_unsynced() -> None:
+    need = _seed_candidate_need()
+    candidate_needs.mark_need_synced(need.id)
+    client = _DummyClient()
+
+    results = asyncio.run(
+        tasks.sync_new_candidate_needs(
+            webhook_url="https://hook.example.com",
+            batch_size=5,
+            client=client,
+        )
+    )
+    assert results == []
+
+
+def test_sync_new_candidate_needs_auto_creates_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    _seed_candidate_need()
+
+    client = _DummyClient()
+    closed_flag: list[bool] = []
+
+    class _RecordingClient:
+        def __init__(self, **kwargs: object) -> None:
+            self._inner = client
+
+        async def post(self, url: str, json: dict) -> _DummyResponse:
+            return await self._inner.post(url, json=json)
+
+        async def aclose(self) -> None:
+            closed_flag.append(True)
+
+    monkeypatch.setattr(tasks.httpx, "AsyncClient", _RecordingClient)
+
+    results = asyncio.run(
+        tasks.sync_new_candidate_needs(
+            webhook_url="https://hook.example.com",
+            batch_size=5,
+        )
+    )
+
+    assert len(results) == 1
+    assert results[0].success is True
+    assert len(closed_flag) == 1
+    assert closed_flag[0] is True
+
+
+def test_fetch_active_sources_auto_creates_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = rss_sources.create_source(
+        {"name": "A", "url": "https://example.com/a", "frequency": 3600}
+    )
+
+    async def _fake_fetch(source_id: int, *, client: object) -> object:  # type: ignore[return]
+        from app.services.rss_fetcher import FetchResult, FetchStatus
+
+        return FetchResult(
+            source_id=source_id,
+            fetched_entries=1,
+            new_entries=0,
+            status=FetchStatus.SUCCESS,
+        )
+
+    monkeypatch.setattr(tasks.rss_fetcher, "fetch_rss_source", _fake_fetch)
+
+    results = asyncio.run(tasks.fetch_active_sources())
+    assert len(results) == 1
+    assert results[0].source_id == source.id

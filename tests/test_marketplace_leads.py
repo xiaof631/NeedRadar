@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -1045,10 +1045,12 @@ def test_marketplace_lead_follow_up_schedule_and_overdue_filter(client: TestClie
     assert overdue_response.json()["total"] == 1
     assert overdue_response.json()["todo_queue"][0]["reminder_type"] == "follow_up_overdue"
 
+    future_date = (datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=30)).isoformat()
+
     update_response = client.put(
         f"/api/v1/marketplace-leads/{lead.id}/follow-up",
         json={
-            "next_follow_up_at": "2026-04-20T09:00:00+00:00",
+            "next_follow_up_at": future_date,
             "follow_up_reason": "proposal_sent",
         },
     )
@@ -1770,3 +1772,130 @@ def test_marketplace_leads_prioritize_reviewable_new_high_purity_items() -> None
     assert items[0].priority_score > items[1].priority_score
     assert "高纯度线索" in items[0].priority_reason
     assert "全职招聘降权" in items[1].priority_reason
+
+
+def test_update_lead_status_invalid_value_returns_400(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Test source",
+            "url": "https://example.com/test",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "generic_html"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-error-test",
+            "title": "Test",
+            "content": "Test",
+            "tags": ["marketplace"],
+        }
+    )
+
+    response = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/status",
+        json={"status": "invalid_status_value"},
+    )
+    assert response.status_code == 400
+    assert "unsupported" in response.json()["detail"]
+
+
+def test_update_lead_status_not_found_returns_404(client: TestClient) -> None:
+    response = client.put(
+        "/api/v1/marketplace-leads/99999/status",
+        json={"status": "contacted"},
+    )
+    assert response.status_code == 404
+
+
+def test_update_lead_outcome_invalid_value_returns_400(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Test source 2",
+            "url": "https://example.com/test2",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "generic_html"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-outcome-test",
+            "title": "Test",
+            "content": "Test",
+            "tags": ["marketplace"],
+        }
+    )
+
+    response = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/outcome",
+        json={"outcome": "invalid_outcome"},
+    )
+    assert response.status_code == 400
+    assert "unsupported" in response.json()["detail"]
+
+
+def test_update_lead_outcome_not_found_returns_404(client: TestClient) -> None:
+    response = client.put(
+        "/api/v1/marketplace-leads/99999/outcome",
+        json={"outcome": "won"},
+    )
+    assert response.status_code == 404
+
+
+def test_update_lead_follow_up_invalid_datetime_returns_400(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Test source 3",
+            "url": "https://example.com/test3",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "generic_html"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "lead-followup-test",
+            "title": "Test",
+            "content": "Test",
+            "tags": ["marketplace"],
+        }
+    )
+
+    response = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/follow-up",
+        json={
+            "next_follow_up_at": "not-a-datetime",
+            "follow_up_reason": "proposal_sent",
+        },
+    )
+    assert response.status_code == 400
+    assert "invalid" in response.json()["detail"]
+
+
+def test_update_lead_follow_up_not_found_returns_404(client: TestClient) -> None:
+    response = client.put(
+        "/api/v1/marketplace-leads/99999/follow-up",
+        json={
+            "next_follow_up_at": "2026-05-20T09:00:00+00:00",
+            "follow_up_reason": "proposal_sent",
+        },
+    )
+    assert response.status_code == 404
+
+
+def test_update_lead_notes_not_found_returns_404(client: TestClient) -> None:
+    response = client.put(
+        "/api/v1/marketplace-leads/99999/notes",
+        json={"notes": "some notes"},
+    )
+    assert response.status_code == 404
+
+
+def test_get_lead_not_found_returns_404(client: TestClient) -> None:
+    response = client.get("/api/v1/marketplace-leads/99999")
+    assert response.status_code == 404

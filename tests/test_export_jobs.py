@@ -56,3 +56,57 @@ def test_run_candidate_export_job_generates_file(
     payload = json.loads(Path(completed.file_path).read_text(encoding="utf-8"))
     assert isinstance(payload, list)
     assert payload and payload[0]["summary"] == "Demo need"
+
+
+def test_run_candidate_export_job_csv_format(_override_export_dir: Path) -> None:
+    _seed_need()
+
+    job = export_jobs.create_candidate_export_job(format="csv")
+    completed = export_jobs.run_candidate_export_job(job.id)
+
+    assert completed.status == ExportJobStatus.COMPLETED
+    assert completed.file_path is not None
+    content = Path(completed.file_path).read_text(encoding="utf-8")
+    lines = [line for line in content.splitlines() if line]
+    assert len(lines) >= 2
+    assert "summary" in lines[0]
+
+
+def test_run_candidate_export_job_handles_missing_job() -> None:
+    with pytest.raises(export_jobs.ExportJobNotFoundError):
+        export_jobs.run_candidate_export_job(999)
+
+
+def test_get_export_job_not_found() -> None:
+    with pytest.raises(export_jobs.ExportJobNotFoundError):
+        export_jobs.get_export_job(999)
+
+
+def test_list_candidate_export_jobs_with_status_filter(_override_export_dir: Path) -> None:
+    _seed_need()
+
+    job = export_jobs.create_candidate_export_job(format="json")
+    export_jobs.run_candidate_export_job(job.id)
+
+    all_jobs = export_jobs.list_candidate_export_jobs(limit=50)
+    assert len(all_jobs) == 1
+
+    pending_only = export_jobs.list_candidate_export_jobs(status=ExportJobStatus.PENDING, limit=50)
+    assert len(pending_only) == 0
+
+    completed_only = export_jobs.list_candidate_export_jobs(status=ExportJobStatus.COMPLETED, limit=50)
+    assert len(completed_only) == 1
+
+
+def test_create_candidate_export_job_with_filters() -> None:
+    _seed_need()
+
+    job = export_jobs.create_candidate_export_job(
+        format="json",
+        statuses=[CandidateNeedStatus.APPROVED],
+        search="Metrics",
+        limit=5,
+    )
+    assert job.format == "json"
+    assert job.status == ExportJobStatus.PENDING
+    assert job.record_count is None

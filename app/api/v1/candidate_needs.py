@@ -198,111 +198,6 @@ async def create_candidate_need(payload: CandidateNeedCreate) -> CandidateNeedRe
     return _build_candidate_need_reads([need])[0]
 
 
-@router.get(
-    "/{need_id}",
-    response_model=CandidateNeedRead,
-    summary="候选需求详情",
-)
-async def get_candidate_need(need_id: int) -> CandidateNeedRead:
-    try:
-        need = candidate_needs.get_need(need_id)
-    except CandidateNeedNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
-    return _build_candidate_need_reads([need])[0]
-
-
-@router.put(
-    "/{need_id}",
-    response_model=CandidateNeedRead,
-    summary="更新候选需求",
-)
-async def update_candidate_need(need_id: int, payload: CandidateNeedUpdate) -> CandidateNeedRead:
-    data = payload.model_dump(exclude_unset=True)
-    if "status" in data:
-        status_value = data["status"]
-        if status_value is None:
-            data.pop("status")
-        else:
-            data["status"] = _convert_status(status_value)
-    try:
-        need = candidate_needs.update_need(need_id, data)
-    except CandidateNeedNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
-    except RawEntryNotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="关联的原始条目不存在",
-        ) from exc
-    except InvalidStatusTransitionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    return _build_candidate_need_reads([need])[0]
-
-
-@router.put(
-    "/{need_id}/status",
-    response_model=CandidateNeedRead,
-    summary="更新候选需求状态",
-)
-async def update_candidate_need_status(
-    need_id: int, payload: CandidateNeedStatusUpdate
-) -> CandidateNeedRead:
-    try:
-        need = candidate_needs.update_need_status(need_id, _convert_status(payload.status))
-    except CandidateNeedNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
-    except InvalidStatusTransitionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        ) from exc
-    return _build_candidate_need_reads([need])[0]
-
-
-@router.delete(
-    "/{need_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="删除候选需求",
-)
-async def delete_candidate_need(need_id: int) -> None:
-    try:
-        candidate_needs.delete_need(need_id)
-    except CandidateNeedNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
-
-
-@router.get(
-    "/{need_id}/status-logs",
-    response_model=list[CandidateNeedStatusLogRead],
-    summary="候选需求状态流转日志",
-)
-async def list_candidate_need_status_logs(need_id: int) -> list[CandidateNeedStatusLogRead]:
-    try:
-        logs = candidate_needs.list_need_status_logs(need_id)
-    except CandidateNeedNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
-    return [CandidateNeedStatusLogRead.model_validate(item) for item in logs]
-
-
-@router.get(
-    "/{need_id}/sync-logs",
-    response_model=list[CandidateNeedSyncLogRead],
-    summary="候选需求下游同步日志",
-)
-async def list_candidate_need_sync_logs(
-    need_id: int,
-    limit: int = Query(default=50, ge=1, le=200, description="返回的日志数量"),
-) -> list[CandidateNeedSyncLogRead]:
-    try:
-        candidate_needs.get_need(need_id)
-    except CandidateNeedNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
-    logs = sync_audit.list_logs(need_id=need_id, limit=limit)
-    return [CandidateNeedSyncLogRead.model_validate(item) for item in logs]
-
-
 @router.get("/export", summary="导出候选需求")
 async def export_candidate_needs(
     format: str = Query(default="json", pattern="^(json|csv)$", description="导出格式"),
@@ -436,6 +331,111 @@ async def get_candidate_need_export_task(job_id: int) -> CandidateNeedExportJobR
     except ExportJobNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="导出任务不存在") from exc
     return CandidateNeedExportJobRead.model_validate(job)
+
+
+@router.get(
+    "/{need_id}",
+    response_model=CandidateNeedRead,
+    summary="候选需求详情",
+)
+async def get_candidate_need(need_id: int) -> CandidateNeedRead:
+    try:
+        need = candidate_needs.get_need(need_id)
+    except CandidateNeedNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+    return _build_candidate_need_reads([need])[0]
+
+
+@router.put(
+    "/{need_id}",
+    response_model=CandidateNeedRead,
+    summary="更新候选需求",
+)
+async def update_candidate_need(need_id: int, payload: CandidateNeedUpdate) -> CandidateNeedRead:
+    data = payload.model_dump(exclude_unset=True)
+    if "status" in data:
+        status_value = data["status"]
+        if status_value is None:
+            data.pop("status")
+        else:
+            data["status"] = _convert_status(status_value)
+    try:
+        need = candidate_needs.update_need(need_id, data)
+    except CandidateNeedNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+    except RawEntryNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="关联的原始条目不存在",
+        ) from exc
+    except InvalidStatusTransitionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return _build_candidate_need_reads([need])[0]
+
+
+@router.put(
+    "/{need_id}/status",
+    response_model=CandidateNeedRead,
+    summary="更新候选需求状态",
+)
+async def update_candidate_need_status(
+    need_id: int, payload: CandidateNeedStatusUpdate
+) -> CandidateNeedRead:
+    try:
+        need = candidate_needs.update_need_status(need_id, _convert_status(payload.status))
+    except CandidateNeedNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+    except InvalidStatusTransitionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return _build_candidate_need_reads([need])[0]
+
+
+@router.delete(
+    "/{need_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="删除候选需求",
+)
+async def delete_candidate_need(need_id: int) -> None:
+    try:
+        candidate_needs.delete_need(need_id)
+    except CandidateNeedNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+
+
+@router.get(
+    "/{need_id}/status-logs",
+    response_model=list[CandidateNeedStatusLogRead],
+    summary="候选需求状态流转日志",
+)
+async def list_candidate_need_status_logs(need_id: int) -> list[CandidateNeedStatusLogRead]:
+    try:
+        logs = candidate_needs.list_need_status_logs(need_id)
+    except CandidateNeedNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+    return [CandidateNeedStatusLogRead.model_validate(item) for item in logs]
+
+
+@router.get(
+    "/{need_id}/sync-logs",
+    response_model=list[CandidateNeedSyncLogRead],
+    summary="候选需求下游同步日志",
+)
+async def list_candidate_need_sync_logs(
+    need_id: int,
+    limit: int = Query(default=50, ge=1, le=200, description="返回的日志数量"),
+) -> list[CandidateNeedSyncLogRead]:
+    try:
+        candidate_needs.get_need(need_id)
+    except CandidateNeedNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="候选需求不存在") from exc
+    logs = sync_audit.list_logs(need_id=need_id, limit=limit)
+    return [CandidateNeedSyncLogRead.model_validate(item) for item in logs]
 
 
 def _convert_status(

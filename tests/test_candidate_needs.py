@@ -884,3 +884,214 @@ def test_candidate_clusters_can_filter_by_source_type(client: TestClient) -> Non
     body = response.json()
 
     assert body["total"] == 0
+
+
+# ── 直接服务层测试 ──────────────────────────────────────────────
+
+
+def test_delete_candidate_need_service() -> None:
+    _, need_ids = _seed_candidate_needs()
+    target = need_ids[0]
+
+    candidate_needs.delete_need(target)
+
+    with pytest.raises(candidate_needs.CandidateNeedNotFoundError):
+        candidate_needs.get_need(target)
+
+
+def test_delete_candidate_need_not_found() -> None:
+    with pytest.raises(candidate_needs.CandidateNeedNotFoundError):
+        candidate_needs.delete_need(999)
+
+
+def test_get_need_not_found() -> None:
+    with pytest.raises(candidate_needs.CandidateNeedNotFoundError):
+        candidate_needs.get_need(999)
+
+
+def test_get_need_by_raw_entry_service() -> None:
+    entry_id, need_ids = _seed_candidate_needs()
+
+    found = candidate_needs.get_need_by_raw_entry(entry_id)
+    assert found is not None
+    assert found.id == need_ids[0]
+
+    missing = candidate_needs.get_need_by_raw_entry(999)
+    assert missing is None
+
+
+def test_is_review_ready_service() -> None:
+    _, need_ids = _seed_candidate_needs()
+    need = candidate_needs.get_need(need_ids[0])
+    result = candidate_needs.is_review_ready(need)
+    assert isinstance(result, bool)
+
+
+def test_refresh_review_metadata_service() -> None:
+    _, need_ids = _seed_candidate_needs()
+    refreshed = candidate_needs.refresh_review_metadata(need_ids[0])
+    assert refreshed.id == need_ids[0]
+    assert refreshed.candidate_type is not None
+    assert refreshed.review_readiness is not None
+
+
+def test_refresh_all_review_metadata_service() -> None:
+    _seed_candidate_needs()
+    count = candidate_needs.refresh_all_review_metadata()
+    assert count == 2
+
+
+def test_list_unsynced_needs_service() -> None:
+    _, need_ids = _seed_candidate_needs()
+    candidate_needs.mark_need_synced(need_ids[0])
+
+    unsynced = candidate_needs.list_unsynced_needs(limit=10)
+    assert len(unsynced) == 1
+    assert unsynced[0].id == need_ids[1]
+
+
+def test_mark_need_sync_failed_service() -> None:
+    _, need_ids = _seed_candidate_needs()
+    updated = candidate_needs.mark_need_sync_failed(need_ids[0], error="test-error")
+    assert updated.sync_error == "test-error"
+    assert updated.synced_at is None
+
+
+def test_mark_need_sync_failed_not_found() -> None:
+    with pytest.raises(candidate_needs.CandidateNeedNotFoundError):
+        candidate_needs.mark_need_sync_failed(999)
+
+
+def test_export_needs_service() -> None:
+    _seed_candidate_needs()
+    needs = candidate_needs.export_needs(limit=5)
+    assert len(needs) == 2
+
+
+def test_invalid_status_transition_error_message() -> None:
+    err = candidate_needs.InvalidStatusTransitionError(
+        CandidateNeedStatus.COMPLETED,
+        CandidateNeedStatus.APPROVED,
+    )
+    assert "completed" in str(err)
+    assert "approved" in str(err)
+    assert err.current_status == CandidateNeedStatus.COMPLETED
+    assert err.target_status == CandidateNeedStatus.APPROVED
+
+
+def test_delete_candidate_need_api(client: TestClient) -> None:
+    _, need_ids = _seed_candidate_needs()
+    resp = client.delete(f"/api/v1/candidate-needs/{need_ids[0]}")
+    assert resp.status_code == 204
+
+    missing = client.delete("/api/v1/candidate-needs/999")
+    assert missing.status_code == 404
+
+
+def test_get_candidate_need_not_found_api(client: TestClient) -> None:
+    resp = client.get("/api/v1/candidate-needs/999")
+    assert resp.status_code == 404
+
+
+def test_update_candidate_need_not_found_api(client: TestClient) -> None:
+    resp = client.put("/api/v1/candidate-needs/999", json={"summary": "Ghost"})
+    assert resp.status_code == 404
+
+
+def test_create_candidate_need_invalid_raw_entry_api(client: TestClient) -> None:
+    resp = client.post(
+        "/api/v1/candidate-needs",
+        json={"raw_entry_id": 99999, "summary": "No parent"},
+    )
+    assert resp.status_code == 400
+
+
+def test_candidate_type_classification_tool_seeking() -> None:
+    source = rss_sources.create_source({
+        "name": "ToolSource", "url": "https://example.com/tools.xml", "frequency": 3600,
+    })
+    entry = raw_entries.create_entry({
+        "source_id": source.id, "guid": "tool-1",
+        "title": "Looking for a better alternative to Jira",
+        "summary": "I need a replacement for our current project management tool",
+        "status": RawEntryStatus.PROMOTED,
+    })
+    need = candidate_needs.create_need({
+        "raw_entry_id": entry.id,
+        "summary": "Looking for a better alternative to Jira",
+        "status": CandidateNeedStatus.PENDING_REVIEW,
+    })
+    assert need.candidate_type == CandidateNeedType.TOOL_SEEKING
+
+
+def test_candidate_type_classification_workflow_pain() -> None:
+    source = rss_sources.create_source({
+        "name": "WorkflowSource", "url": "https://example.com/wf.xml", "frequency": 3600,
+    })
+    entry = raw_entries.create_entry({
+        "source_id": source.id, "guid": "wf-1",
+        "title": "Manual spreadsheet tracking is painful",
+        "summary": "Our manual workflow for tracking ops is tedious and slow",
+        "status": RawEntryStatus.PROMOTED,
+    })
+    need = candidate_needs.create_need({
+        "raw_entry_id": entry.id,
+        "summary": "Manual spreadsheet tracking is painful",
+        "status": CandidateNeedStatus.PENDING_REVIEW,
+    })
+    assert need.candidate_type == CandidateNeedType.WORKFLOW_PAIN
+
+
+def test_candidate_type_classification_feature_gap() -> None:
+    source = rss_sources.create_source({
+        "name": "FeatureSource", "url": "https://example.com/feat.xml", "frequency": 3600,
+    })
+    entry = raw_entries.create_entry({
+        "source_id": source.id, "guid": "feat-1",
+        "title": "The platform lacks support for SSO",
+        "summary": "Missing capability for enterprise authentication",
+        "status": RawEntryStatus.PROMOTED,
+    })
+    need = candidate_needs.create_need({
+        "raw_entry_id": entry.id,
+        "summary": "The platform lacks support for SSO",
+        "status": CandidateNeedStatus.PENDING_REVIEW,
+    })
+    assert need.candidate_type == CandidateNeedType.FEATURE_GAP
+
+
+def test_candidate_type_classification_github_bug() -> None:
+    source = rss_sources.create_source({
+        "name": "GitBug", "url": "https://api.github.com/repos/x/issues",
+        "frequency": 3600, "source_type": SourceType.GITHUB_ISSUES,
+    })
+    entry = raw_entries.create_entry({
+        "source_id": source.id, "guid": "gh-bug-1",
+        "title": "App crashes when clicking the save button",
+        "summary": "The application crashes with a typeerror after clicking save",
+        "status": RawEntryStatus.PROMOTED,
+    })
+    need = candidate_needs.create_need({
+        "raw_entry_id": entry.id,
+        "summary": "App crashes when clicking the save button",
+        "status": CandidateNeedStatus.PENDING_REVIEW,
+    })
+    assert need.candidate_type == CandidateNeedType.BUG_REPORT
+
+
+def test_candidate_type_classification_market_signal() -> None:
+    source = rss_sources.create_source({
+        "name": "MarketSource", "url": "https://example.com/market.xml", "frequency": 3600,
+    })
+    entry = raw_entries.create_entry({
+        "source_id": source.id, "guid": "market-1",
+        "title": "Interesting trends in cloud computing",
+        "summary": "Some observations about the industry direction",
+        "status": RawEntryStatus.PROMOTED,
+    })
+    need = candidate_needs.create_need({
+        "raw_entry_id": entry.id,
+        "summary": "Interesting trends in cloud computing",
+        "status": CandidateNeedStatus.PENDING_REVIEW,
+    })
+    assert need.candidate_type == CandidateNeedType.MARKET_SIGNAL

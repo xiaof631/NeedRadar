@@ -229,3 +229,105 @@ def test_enqueue_sync_tasks_respects_channel_filter(monkeypatch: pytest.MonkeyPa
     assert webhook_calls == []
     assert mq_calls == [need_id]
     assert file_calls == []
+
+
+# ── 规范化辅助函数测试 ──────────────────────────────────────────
+
+
+def test_normalize_statuses_returns_settings_default_when_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        task_queue.settings,
+        "downstream_sync_statuses",
+        (CandidateNeedStatus.APPROVED, CandidateNeedStatus.PENDING_REVIEW),
+    )
+    result = task_queue._normalize_statuses(None)
+    assert result is not None
+    assert CandidateNeedStatus.APPROVED in result
+    assert CandidateNeedStatus.PENDING_REVIEW in result
+
+
+def test_normalize_statuses_converts_strings() -> None:
+    result = task_queue._normalize_statuses(["approved", "pending_review"])
+    assert result == (CandidateNeedStatus.APPROVED, CandidateNeedStatus.PENDING_REVIEW)
+
+
+def test_normalize_statuses_leaves_enum_values_unchanged() -> None:
+    result = task_queue._normalize_statuses((CandidateNeedStatus.APPROVED,))
+    assert result == (CandidateNeedStatus.APPROVED,)
+
+
+def test_normalize_channels_returns_none_when_none() -> None:
+    assert task_queue._normalize_channels(None) is None
+
+
+def test_normalize_channels_converts_strings() -> None:
+    result = task_queue._normalize_channels(["webhook", "mq"])
+    assert result == (SyncChannel.WEBHOOK, SyncChannel.MQ)
+
+
+def test_normalize_channels_leaves_enum_values_unchanged() -> None:
+    result = task_queue._normalize_channels((SyncChannel.WEBHOOK,))
+    assert result == (SyncChannel.WEBHOOK,)
+
+
+def test_channel_enabled_when_selected_is_none() -> None:
+    assert task_queue._channel_enabled(SyncChannel.WEBHOOK, None) is True
+
+
+def test_channel_enabled_when_in_selection() -> None:
+    assert task_queue._channel_enabled(SyncChannel.MQ, (SyncChannel.MQ, SyncChannel.WEBHOOK)) is True
+
+
+def test_channel_enabled_when_not_in_selection() -> None:
+    assert task_queue._channel_enabled(SyncChannel.FILE_DROP, (SyncChannel.MQ, SyncChannel.WEBHOOK)) is False
+
+
+def test_enqueue_sync_tasks_all_channels_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    _seed_need(CandidateNeedStatus.APPROVED)
+    monkeypatch.setattr(task_queue.settings, "downstream_webhook_url", None)
+    monkeypatch.setattr(task_queue.settings, "downstream_mq_enabled", False)
+    monkeypatch.setattr(task_queue.settings, "downstream_filesystem_enabled", False)
+
+    result = task_queue.enqueue_sync_tasks(
+        webhook_url=None,
+        statuses=(CandidateNeedStatus.APPROVED,),
+    )
+    assert result == 0
+
+
+def test_enqueue_sync_tasks_no_unsynced_needs() -> None:
+    result = task_queue.enqueue_sync_tasks(
+        webhook_url="https://hook.example.com",
+        statuses=(CandidateNeedStatus.APPROVED,),
+    )
+    assert result == 0
+
+
+def test_enqueue_export_job_eager_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(task_queue.settings, "celery_task_always_eager", True)
+
+    called: list[int] = []
+
+    def _fake_run(job_id: int) -> None:
+        called.append(job_id)
+
+    monkeypatch.setattr(task_queue.export_jobs, "run_candidate_export_job", _fake_run)
+
+    task_queue.enqueue_export_job(42)
+    assert called == [42]
+
+
+def test_enqueue_export_job_dispatches_task(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(task_queue.settings, "celery_task_always_eager", False)
+
+    called: list[int] = []
+
+    def _fake_delay(job_id: int) -> None:
+        called.append(job_id)
+
+    monkeypatch.setattr(task_queue.export_candidate_needs_task, "delay", _fake_delay)
+
+    task_queue.enqueue_export_job(99)
+    assert called == [99]

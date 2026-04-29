@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.core.config import _normalize_api_tokens as _parse_api_tokens
 from app.core.config import get_settings
 from fastapi import Header, HTTPException, Query, status
 
@@ -13,7 +14,7 @@ async def verify_api_token(
     """在配置了 Token 时验证请求身份。"""
 
     settings = get_settings()
-    tokens = settings.api_tokens
+    tokens = _parse_api_tokens(settings.api_tokens)
     if not tokens:
         return
 

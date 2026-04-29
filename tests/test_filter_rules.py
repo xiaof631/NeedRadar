@@ -95,3 +95,74 @@ def test_filter_rule_filtering(client: TestClient) -> None:
     result = search.json()
     assert result["total"] == 1
     assert result["items"][0]["name"] == second["name"]
+
+
+# ── 直接服务层测试 ──────────────────────────────────────────────
+
+
+def test_create_rule_normalizes_empty_collections() -> None:
+    rule = filter_rules.create_rule({
+        "name": "Empty collections",
+        "keywords": None,
+        "patterns": [],
+        "min_score": 0.5,
+    })
+    assert rule.name == "Empty collections"
+    assert rule.keywords == ()
+    assert rule.patterns == ()
+
+
+def test_update_rule_not_found() -> None:
+    with pytest.raises(filter_rules.FilterRuleNotFoundError):
+        filter_rules.update_rule(999, {"name": "Ghost"})
+
+
+def test_delete_rule_not_found() -> None:
+    with pytest.raises(filter_rules.FilterRuleNotFoundError):
+        filter_rules.delete_rule(999)
+
+
+def test_get_rule_not_found() -> None:
+    with pytest.raises(filter_rules.FilterRuleNotFoundError):
+        filter_rules.get_rule(999)
+
+
+def test_update_rule_normalizes_collections() -> None:
+    created = filter_rules.create_rule({
+        "name": "Original",
+        "keywords": ["ai"],
+        "patterns": ["test"],
+        "min_score": 0.3,
+    })
+    updated = filter_rules.update_rule(created.id, {
+        "keywords": None,
+        "patterns": [],
+    })
+    assert updated.keywords == ()
+    assert updated.patterns == ()
+
+
+def test_list_rules_with_search_and_enabled() -> None:
+    filter_rules.create_rule({
+        "name": "AI filter",
+        "keywords": ["ai", "ml"],
+        "min_score": 0.5,
+        "enabled": True,
+    })
+    filter_rules.create_rule({
+        "name": "Security filter",
+        "keywords": ["security"],
+        "min_score": 0.7,
+        "enabled": False,
+    })
+
+    total, items = filter_rules.list_rules(enabled=True)
+    assert total == 1
+    assert items[0].name == "AI filter"
+
+    total2, items2 = filter_rules.list_rules(search="security")
+    assert total2 == 1
+    assert items2[0].name == "Security filter"
+
+    total3, items3 = filter_rules.list_rules(enabled=False, search="AI")
+    assert total3 == 0

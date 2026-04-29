@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -184,6 +184,28 @@ def test_export_raw_entries(client: TestClient) -> None:
     assert lines[0].startswith("id,source_id")
 
 
+def test_evaluate_raw_entry_not_found(client: TestClient) -> None:
+    response = client.post("/api/v1/raw-entries/999/evaluate")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "原始条目不存在"
+
+
+def test_evaluate_raw_entry_no_rule_match(client: TestClient) -> None:
+    source_id, _ = _seed_entries()
+    entry_id = raw_entries.create_entry(
+        {
+            "source_id": source_id,
+            "guid": "eval-test",
+            "title": "Evaluate me",
+            "summary": "Some content",
+        }
+    ).id
+
+    response = client.post(f"/api/v1/raw-entries/{entry_id}/evaluate")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "未命中任何筛选规则"
+
+
 def test_raw_entry_content_hash_and_duplicate_detection(client: TestClient) -> None:
     source = rss_sources.create_source(
         {
@@ -233,3 +255,75 @@ def test_raw_entry_content_hash_and_duplicate_detection(client: TestClient) -> N
     assert response.status_code == 200
     body = response.json()
     assert body["items"][0]["content_hash"] == entry.content_hash
+
+
+# ── 工具函数与边界情况测试 ──────────────────────────────────────
+
+
+def test_calculate_content_hash_with_empty_components() -> None:
+    result = raw_entries.calculate_content_hash({})
+    assert result is None
+
+
+def test_calculate_content_hash_with_only_whitespace_fields() -> None:
+    result = raw_entries.calculate_content_hash({
+        "title": "   ",
+        "summary": "\n",
+    })
+    assert result is None
+
+
+def test_calculate_content_hash_falls_back_to_guid() -> None:
+    result = raw_entries.calculate_content_hash({
+        "link": "",
+        "title": "  ",
+        "summary": None,
+        "content": None,
+        "guid": "unique-guid-123",
+    })
+    assert result is not None
+    assert len(result) == 64  # SHA-256 hex digest
+
+
+def test_normalize_datetime_naive_to_utc() -> None:
+    from datetime import datetime as dt
+    naive = dt(2025, 1, 15, 12, 0, 0)
+    result = raw_entries._normalize_datetime(naive)
+    assert result is not None
+    assert result.tzinfo is not None
+
+
+def test_normalize_datetime_aware_to_utc() -> None:
+    aware = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone(timedelta(hours=8)))
+    result = raw_entries._normalize_datetime(aware)
+    assert result is not None
+    assert result.tzinfo == UTC
+
+
+def test_normalize_datetime_none() -> None:
+    assert raw_entries._normalize_datetime(None) is None
+
+
+def test_normalize_text_handles_whitespace_only() -> None:
+    assert raw_entries._normalize_text("   \n   ") is None
+    assert raw_entries._normalize_text(None) is None
+    assert raw_entries._normalize_text(123) == "123"
+
+
+def test_get_entry_by_guid_and_hash() -> None:
+    source_id, entry_ids = _seed_entries()
+    found = raw_entries.get_entry_by_guid(source_id, "entry-1")
+    assert found is not None
+    assert found.id == entry_ids[0]
+    assert raw_entries.get_entry_by_guid(999, "no-exist") is None
+
+
+def test_get_entry_not_found_error() -> None:
+    with pytest.raises(raw_entries.RawEntryNotFoundError):
+        raw_entries.get_entry(999)
+
+
+def test_raw_entry_already_exists_error() -> None:
+    err = raw_entries.RawEntryAlreadyExistsError(42)
+    assert err.existing_id == 42
+    assert "42" in str(err)

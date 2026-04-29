@@ -146,9 +146,9 @@ class Settings(BaseSettings):
         gt=0,
     )
 
-    api_tokens: tuple[str, ...] = Field(
-        default=(),
-        description="可访问 API 的 Token 列表，默认关闭认证",
+    api_tokens: str = Field(
+        default="",
+        description="可访问 API 的 Token 列表（逗号分隔），默认关闭认证",
     )
     reddit_access_token: str | None = Field(
         default=None,
@@ -213,14 +213,11 @@ class Settings(BaseSettings):
 def get_settings(**overrides: Any) -> Settings:
     """获取应用配置，支持覆写默认值。"""
 
-    instance = Settings(**overrides)
-    instance.api_tokens = _normalize_api_tokens(instance.api_tokens)
-    return instance
+    return Settings(**overrides)
 
 
 def _normalize_api_tokens(value: Any) -> tuple[str, ...]:
-    """将配置值转换为标准的 Token 元组。"""
-
+    """将逗号分隔字符串或列表转换为标准的 Token 元组。"""
     if value is None:
         return ()
     if isinstance(value, str):

@@ -47,7 +47,7 @@ async def list_rss_sources(
 )
 async def create_rss_source(payload: RssSourceCreate) -> RssSourceRead:
     try:
-        source = rss_sources.create_source(payload.model_dump())
+        source = rss_sources.create_source(payload.model_dump(mode="json"))
     except rss_sources.RssSourceAlreadyExistsError as exc:  # pragma: no cover - 防御性
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="RSS 源已存在") from exc
     return RssSourceRead.model_validate(source)
@@ -64,7 +64,7 @@ async def get_rss_source(source_id: int) -> RssSourceRead:
 
 @router.put("/{source_id}", response_model=RssSourceRead, summary="更新 RSS 源")
 async def update_rss_source(source_id: int, payload: RssSourceUpdate) -> RssSourceRead:
-    data = payload.model_dump(exclude_unset=True)
+    data = payload.model_dump(exclude_unset=True, mode="json")
     try:
         source = rss_sources.update_source(source_id, data)
     except rss_sources.RssSourceNotFoundError as exc:
