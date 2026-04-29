@@ -166,3 +166,43 @@ def test_list_rules_with_search_and_enabled() -> None:
 
     total3, items3 = filter_rules.list_rules(enabled=False, search="AI")
     assert total3 == 0
+
+
+# ── API 错误路径测试 ────────────────────────────────────────────
+
+
+def test_get_filter_rule_not_found_api(client: TestClient) -> None:
+    resp = client.get("/api/v1/filter-rules/999")
+    assert resp.status_code == 404
+
+
+def test_update_filter_rule_not_found_api(client: TestClient) -> None:
+    resp = client.put("/api/v1/filter-rules/999", json={"enabled": False})
+    assert resp.status_code == 404
+
+
+def test_delete_filter_rule_not_found_api(client: TestClient) -> None:
+    resp = client.delete("/api/v1/filter-rules/999")
+    assert resp.status_code == 404
+
+
+def test_list_filter_rules_with_combined_params_api(client: TestClient) -> None:
+    resp0 = client.post(
+        "/api/v1/filter-rules",
+        json={"name": "Rule A", "keywords": ["ai"], "min_score": 0.5, "enabled": True},
+    )
+    assert resp0.status_code == 201
+    resp1 = client.post(
+        "/api/v1/filter-rules",
+        json={"name": "Rule B", "keywords": ["security"], "min_score": 0.7, "enabled": False},
+    )
+    assert resp1.status_code == 201
+
+    combined = client.get(
+        "/api/v1/filter-rules",
+        params={"enabled": True, "search": "Rule"},
+    )
+    assert combined.status_code == 200
+    body = combined.json()
+    assert body["total"] == 1
+    assert body["items"][0]["name"] == "Rule A"

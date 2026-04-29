@@ -1899,3 +1899,88 @@ def test_update_lead_notes_not_found_returns_404(client: TestClient) -> None:
 def test_get_lead_not_found_returns_404(client: TestClient) -> None:
     response = client.get("/api/v1/marketplace-leads/99999")
     assert response.status_code == 404
+
+
+def test_todo_queue_sort_modes() -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/tech",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    newest = raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "sort-newest",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $1200 | 2 days",
+            "content": "Build a responsive frontend for a SaaS dashboard.",
+            "link": "https://example.com/sort-newest",
+            "tags": ["marketplace"],
+            "metadata": {"platform": "PeoplePerHour", "budget": "$1200", "timeline": "2 days", "lead_status": "watching", "lead_events": [
+                {"event_type": "status_changed", "created_at": "2026-04-10T09:00:00+00:00", "status_from": "new", "status_to": "watching"}
+            ]},
+        }
+    )
+    oldest = raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "sort-oldest",
+            "title": "CRM 后台开发",
+            "summary": "CRM 后台开发 | 5千~1万 | 15天",
+            "content": "Need a backend CRM system with database integration.",
+            "link": "https://example.com/sort-oldest",
+            "tags": ["marketplace"],
+            "metadata": {"platform": "PeoplePerHour", "budget": "5千~1万", "timeline": "15天", "lead_status": "watching", "lead_events": [
+                {"event_type": "status_changed", "created_at": "2026-03-15T09:00:00+00:00", "status_from": "new", "status_to": "watching"}
+            ]},
+        }
+    )
+
+    result = marketplace_leads.query_leads(todo_sort="default")
+    assert len(result.todo_queue) >= 2
+
+    newest_result = marketplace_leads.query_leads(todo_sort="newest_first")
+    newest_ids = [r.lead_id for r in newest_result.todo_queue if r.lead_id in {newest.id, oldest.id}]
+    assert newest_ids[0] == newest.id
+
+    oldest_result = marketplace_leads.query_leads(todo_sort="oldest_first")
+    oldest_ids = [r.lead_id for r in oldest_result.todo_queue if r.lead_id in {newest.id, oldest.id}]
+    assert oldest_ids[0] == oldest.id
+
+    priority_result = marketplace_leads.query_leads(todo_sort="priority")
+    assert len(priority_result.todo_queue) >= 2
+
+
+def test_todo_sort_api(client: TestClient) -> None:
+    pph = rss_sources.create_source(
+        {
+            "name": "PeoplePerHour Technology Projects",
+            "url": "https://www.peopleperhour.com/tech",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "peopleperhour_technology"},
+        }
+    )
+    raw_entries.create_entry(
+        {
+            "source_id": pph.id,
+            "guid": "api-sort-1",
+            "title": "Frontend Developer (React / Next.js)",
+            "summary": "Frontend Developer (React / Next.js) | $1200 | 2 days",
+            "content": "Build a frontend app for a booking platform.",
+            "link": "https://example.com/api-sort-1",
+            "tags": ["marketplace"],
+            "metadata": {"platform": "PeoplePerHour", "budget": "$1200", "timeline": "2 days", "lead_status": "watching", "lead_events": [
+                {"event_type": "status_changed", "created_at": "2026-04-10T09:00:00+00:00", "status_from": "new", "status_to": "watching"}
+            ]},
+        }
+    )
+
+    for sort_mode in ("default", "newest_first", "oldest_first", "priority"):
+        resp = client.get("/api/v1/marketplace-leads/", params={"todo_sort": sort_mode})
+        assert resp.status_code == 200
+        assert resp.json()["todo_queue"]

@@ -1095,3 +1095,58 @@ def test_candidate_type_classification_market_signal() -> None:
         "status": CandidateNeedStatus.PENDING_REVIEW,
     })
     assert need.candidate_type == CandidateNeedType.MARKET_SIGNAL
+
+
+def test_list_candidate_needs_with_candidate_type_filter(client: TestClient) -> None:
+    _seed_candidate_needs()
+
+    resp = client.get(
+        "/api/v1/candidate-needs",
+        params={"candidate_type": CandidateNeedType.TOOL_SEEKING.value},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] >= 0
+
+
+def test_list_candidate_needs_with_min_review_readiness(client: TestClient) -> None:
+    _seed_candidate_needs()
+
+    resp = client.get(
+        "/api/v1/candidate-needs",
+        params={"min_review_readiness": 0.5},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] >= 0
+
+
+def test_list_candidate_needs_with_raw_entry_id_filter(client: TestClient) -> None:
+    entry_id, _ = _seed_candidate_needs()
+
+    resp = client.get(
+        "/api/v1/candidate-needs",
+        params={"raw_entry_id": entry_id},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+
+
+def test_get_candidate_need_sync_logs_with_need_id_filter(client: TestClient) -> None:
+    _, need_ids = _seed_candidate_needs()
+    sync_audit.log_sync_attempt(
+        need_ids[0],
+        channel=SyncChannel.WEBHOOK,
+        status="success",
+        attempt=1,
+    )
+
+    resp = client.get(
+        "/api/v1/candidate-needs/sync-logs",
+        params={"need_id": need_ids[0], "limit": 5},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] >= 1
+    assert all(item["need_id"] == need_ids[0] for item in body["items"])

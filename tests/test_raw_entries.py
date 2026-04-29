@@ -327,3 +327,32 @@ def test_raw_entry_already_exists_error() -> None:
     err = raw_entries.RawEntryAlreadyExistsError(42)
     assert err.existing_id == 42
     assert "42" in str(err)
+
+
+# ── API 错误路径测试 ────────────────────────────────────────────
+
+
+def test_get_raw_entry_not_found_api(client: TestClient) -> None:
+    resp = client.get("/api/v1/raw-entries/999")
+    assert resp.status_code == 404
+
+
+def test_list_raw_entries_with_source_type_filter(client: TestClient) -> None:
+    _seed_entries()
+
+    resp = client.get("/api/v1/raw-entries", params={"source_type": "rss", "limit": 10})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 3
+
+
+def test_list_raw_entries_with_source_type_and_status(client: TestClient) -> None:
+    _seed_entries()
+
+    resp = client.get(
+        "/api/v1/raw-entries",
+        params={"source_type": "rss", "status": "pending", "limit": 10},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1

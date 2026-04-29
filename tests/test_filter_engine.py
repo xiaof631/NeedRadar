@@ -86,3 +86,62 @@ def test_evaluate_entry_api(client: TestClient) -> None:
     assert body["rule_name"] == "自动化热点"
     assert body["matched_keywords"]
 
+
+def test_evaluate_entry_with_invalid_regex_pattern() -> None:
+    entry_id = _create_sample_entry()
+    filter_rules.create_rule(
+        {
+            "name": "Bad Regex",
+            "keywords": [],
+            "patterns": ["invalid[", r"AI"],
+            "min_score": 0.1,
+            "enabled": True,
+        }
+    )
+    entry = raw_entries.get_entry(entry_id)
+    result = filter_engine.evaluate_entry(entry)
+    assert result is not None
+
+
+def test_evaluate_entry_no_keywords_no_patterns() -> None:
+    entry_id = _create_sample_entry()
+    filter_rules.create_rule(
+        {
+            "name": "Empty Rule",
+            "keywords": [],
+            "patterns": [],
+            "min_score": 0.1,
+            "enabled": True,
+        }
+    )
+    entry = raw_entries.get_entry(entry_id)
+    result = filter_engine.evaluate_entry(entry)
+    assert result is None
+
+
+def test_evaluate_entry_min_score_above_match() -> None:
+    entry_id = _create_sample_entry()
+    filter_rules.create_rule(
+        {
+            "name": "Partial Match",
+            "keywords": ["AI"],
+            "patterns": [],
+            "min_score": 0.1,
+            "enabled": True,
+        }
+    )
+    entry = raw_entries.get_entry(entry_id)
+    result = filter_engine.evaluate_entry(entry)
+    assert result is not None
+    assert result.rule.name == "Partial Match"
+    # Higher function-param min_score should reject the match
+    result2 = filter_engine.evaluate_entry(entry, min_score=2.0)
+    assert result2 is None
+
+
+def test_evaluate_entry_with_explicit_empty_rules() -> None:
+    entry_id = _create_sample_entry()
+    entry = raw_entries.get_entry(entry_id)
+    result = filter_engine.evaluate_entry(entry, rules=[])
+    assert result is None
+

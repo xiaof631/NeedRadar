@@ -130,3 +130,11 @@ def test_filter_fetch_logs_by_status_and_time_range(client: TestClient) -> None:
     assert time_body["total"] == 2
     returned_ids = {item["id"] for item in time_body["items"]}
     assert returned_ids == {failure_log.id, latest_log.id}
+
+
+def test_list_fetch_logs_empty(client: TestClient) -> None:
+    response = client.get("/api/v1/fetch-logs")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 0
+    assert body["items"] == []
