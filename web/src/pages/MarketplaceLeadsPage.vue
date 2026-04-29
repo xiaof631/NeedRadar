@@ -1563,16 +1563,31 @@ const formatPercent = (value: number) =>
   gap: 1rem;
 }
 
+.summary-grid :deep(.el-card) {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-grid :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .metric-label {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: #64748b;
+  line-height: 1.35;
+  min-height: 2.2em;
 }
 
 .metric-value {
-  margin-top: 0.5rem;
-  font-size: 1.75rem;
+  margin-top: 0.35rem;
+  font-size: 1.65rem;
   font-weight: 700;
   color: #0f172a;
+  line-height: 1.2;
 }
 
 .title-cell {
