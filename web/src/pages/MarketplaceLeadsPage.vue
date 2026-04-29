@@ -1,10 +1,10 @@
 <template>
   <section class="page">
+    <div class="page-banner">
+      <h1 class="page-title">{{ t('marketplace.title') }}</h1>
+      <p class="page-description">{{ t('marketplace.subtitle') }}</p>
+    </div>
     <header class="page-header">
-      <div>
-        <h1>{{ t('marketplace.title') }}</h1>
-        <p>{{ t('marketplace.subtitle') }}</p>
-      </div>
       <div class="actions">
         <el-radio-group v-model="queueView" size="small">
           <el-radio-button value="high_purity">
@@ -1510,6 +1510,25 @@ const formatPercent = (value: number) =>
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.page-banner {
+  padding-bottom: 0.25rem;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.page-description {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: #64748b;
+  line-height: 1.5;
 }
 
 .page-header {
