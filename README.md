@@ -1,6 +1,40 @@
 # NeedRadar
 
-NeedRadar 是一个用于从公开 RSS 数据源挖掘潜在“小工具”需求的系统。此仓库当前包含后端 API 的基础工程骨架。更多背景可参考 `docs/` 目录。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![CI](https://github.com/xiaof631/NeedRadar/actions/workflows/ci.yml/badge.svg)](https://github.com/xiaof631/NeedRadar/actions/workflows/ci.yml)
+
+**从公开渠道聚合软件外包线索，用规则 + LLM 挖掘真实项目需求。**
+
+NeedRadar 持续抓取自由职业平台、RSS 和公开 API 中的项目机会，自动解析项目画像（预算、技术栈、交付范围、地区），通过规则引擎和可选 LLM 识别高质量线索，并提供待办队列、跟进时间线和转化率复盘。
+
+适用场景：独立开发者接外包、小型外包团队拓客、远程工作机会搜索。
+
+## 架构概览
+
+```
+┌─────────────┐    ┌──────────────┐    ┌───────────────┐
+│  Vue 3 Web   │───▶│  FastAPI      │───▶│  PostgreSQL    │
+│  (Vite:5206) │    │  (uvicorn)    │    │  (:5406)       │
+└─────────────┘    └──────┬───────┘    └───────────────┘
+                          │
+        ┌─────────────────┼─────────────────┐
+        ▼                 ▼                  ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  Celery       │  │  APScheduler │  │  Redis        │
+│  Worker       │  │  (cron jobs) │  │  (:6406)      │
+└──────┬───────┘  └──────┬───────┘  └──────────────┘
+       │                 │
+       ▼                 ▼
+┌──────────────────────────────────────────────┐
+│  抓取层 (marketplace_fetcher / rss_fetcher)    │
+│  软件项目交易网 · Freelancer · Jobicy ·        │
+│  Remotive · WeWorkRemotely · PeoplePerHour ·  │
+│  Contra · 猪八戒 · Reddit · HN · GitHub · RSS  │
+└──────────────────────────────────────────────┘
+```
+
+> **数据抓取声明**：所有数据源均为公开可访问的网页或 API。NeedRadar 以合理的频率抓取公开信息，仅用于个人线索聚合。使用前请确认目标网站的 ToS 和使用条款。建议在 `rss_sources` 中将不需要的源设为 `paused`。
 
 ## 快速开始
 
