@@ -1582,7 +1582,7 @@ const formatPercent = (value: number) =>
 .todo-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 1rem;
 }
 
@@ -1595,36 +1595,33 @@ const formatPercent = (value: number) =>
 .todo-sort-group {
   display: flex;
   gap: 0;
-  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
   border-radius: 0.5rem;
-  overflow: hidden;
+  padding: 3px;
 }
 
 .todo-sort-btn {
   padding: 0.35rem 0.85rem;
   font-size: 0.825rem;
   color: #64748b;
-  background: #f8fafc;
+  background: transparent;
   border: none;
-  border-right: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
-}
-
-.todo-sort-btn:last-child {
-  border-right: none;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 }
 
 .todo-sort-btn:hover {
-  background: #f1f5f9;
   color: #334155;
+  background: #e2e8f0;
 }
 
 .todo-sort-btn.active {
-  background: #eff6ff;
-  color: #2563eb;
+  background: #fff;
+  color: #1d4ed8;
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .todo-subtitle {
@@ -1643,10 +1640,16 @@ const formatPercent = (value: number) =>
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.9rem 1rem;
+  padding: 0.85rem 1rem;
   border: 1px solid #e2e8f0;
-  border-radius: 0.85rem;
-  background: #f8fafc;
+  border-radius: 0.75rem;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.todo-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .todo-main {
@@ -1836,8 +1839,23 @@ const formatPercent = (value: number) =>
 }
 
 .priority-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.8125rem;
   font-weight: 700;
-  color: #0f172a;
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  border-radius: 999px;
+  line-height: 1.5;
+}
+
+.todo-side .priority-score {
+  font-size: 0.85rem;
+  min-width: 2.25rem;
+  padding: 0.15rem 0.6rem;
 }
 
 .details-actions {
