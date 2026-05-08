@@ -43,6 +43,7 @@ const navItems = [
   { index: '/', labelKey: 'nav.dashboard' },
   { index: '/sources', labelKey: 'nav.sources' },
   { index: '/marketplace', labelKey: 'nav.marketplace' },
+  { index: '/customer-radar', labelKey: 'nav.customerRadar' },
   { index: '/entries', labelKey: 'nav.entries' },
   { index: '/filter', labelKey: 'nav.filter' },
   { index: '/candidates', labelKey: 'nav.candidates' },

@@ -3,6 +3,7 @@
     "dashboard": "仪表盘",
     "sources": "RSS 源管理",
     "marketplace": "外包项目线索",
+    "customerRadar": "客户雷达",
     "entries": "原始内容",
     "filter": "筛选监控",
     "candidates": "候选需求",
@@ -463,6 +464,65 @@
       "filter": "筛选",
       "focus": "聚焦",
       "viewAll": "全部"
+    }
+  },
+  "customerRadar": {
+    "title": "客户雷达",
+    "subtitle": "自动从已入库需求中筛出 DocReview/PDF 文档处理方向的潜在客户",
+    "metrics": {
+      "total": "匹配线索",
+      "contactNow": "建议联系",
+      "reviewFirst": "人工复核",
+      "averageScore": "平均匹配分",
+      "averageCredibility": "平均可信度"
+    },
+    "filters": {
+      "searchPlaceholder": "搜索客户、痛点或来源",
+      "all": "全部",
+      "action": "推荐动作",
+      "segment": "客户场景",
+      "sourceType": "来源类型",
+      "minScore": "最低分"
+    },
+    "action": {
+      "contact_now": "立即联系",
+      "review_first": "先复核",
+      "watch": "观察"
+    },
+    "credibility": {
+      "high": "高可信",
+      "medium": "中可信",
+      "low": "低可信"
+    },
+    "segment": {
+      "government_docs": "政府/公共资料",
+      "real_estate_docs": "房产/物业文档",
+      "compliance_kyc": "KYC/合规审核",
+      "legal_contracts": "法律/合同",
+      "training_lms": "培训/LMS",
+      "document_ops": "通用文档运营",
+      "outreach_research": "社区/市场研究"
+    },
+    "table": {
+      "opportunity": "客户机会",
+      "score": "匹配分",
+      "credibility": "可信度",
+      "action": "动作",
+      "segment": "场景",
+      "source": "来源",
+      "budget": "预算",
+      "actions": "操作",
+      "empty": "暂无符合条件的客户机会"
+    },
+    "details": {
+      "title": "客户机会详情",
+      "recommendation": "推荐切入点",
+      "credibility": "可信度判断",
+      "evidence": "匹配证据",
+      "outreachDraft": "联系草稿",
+      "copyDraft": "复制草稿",
+      "openSource": "打开来源",
+      "copied": "联系草稿已复制"
     }
   },
   "candidates": {

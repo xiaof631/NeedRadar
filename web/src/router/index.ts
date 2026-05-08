@@ -6,6 +6,7 @@ const router = createRouter({
     { path: '/', component: () => import('../pages/DashboardPage.vue') },
     { path: '/sources', component: () => import('../pages/RssSourcesPage.vue') },
     { path: '/marketplace', component: () => import('../pages/MarketplaceLeadsPage.vue') },
+    { path: '/customer-radar', component: () => import('../pages/CustomerRadarPage.vue') },
     { path: '/entries', component: () => import('../pages/RawEntriesPage.vue') },
     { path: '/filter', component: () => import('../pages/FilterMonitorPage.vue') },
     { path: '/candidates', component: () => import('../pages/CandidateNeedsPage.vue') },

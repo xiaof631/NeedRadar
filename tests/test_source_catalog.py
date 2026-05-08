@@ -113,3 +113,27 @@ def test_seed_marketplace_catalog_pauses_freelancer_source_by_default() -> None:
     assert "recruiter" in by_name["Remotive Software Contracts"].config["exclude_keywords"]
     assert by_name["Jobicy Contract Developer Roles"].config["adapter"] == "jobicy_api"
     assert "talent acquisition" in by_name["Jobicy Contract Developer Roles"].config["exclude_keywords"]
+
+
+def test_seed_docreview_customer_discovery_catalog_creates_targeted_sources() -> None:
+    created, skipped = source_catalog.seed_catalog("docreview-customer-discovery")
+
+    assert skipped == []
+    assert len(created) == 7
+
+    by_name = {source.name: source for source in created}
+    pph_pdf = by_name["PeoplePerHour PDF Extraction Projects"]
+    assert pph_pdf.status == SourceStatus.ACTIVE
+    assert pph_pdf.source_type == SourceType.FREELANCE_MARKETPLACE
+    assert pph_pdf.category == "docreview-customer-discovery"
+    assert pph_pdf.config["adapter"] == "peopleperhour_technology"
+    assert "pdf" in pph_pdf.config["include_keyword_groups"]
+    assert "extract" in pph_pdf.config["include_keyword_groups"]
+
+    freelancer_pdf = by_name["Freelancer PDF Data Extraction Jobs"]
+    assert freelancer_pdf.config["adapter"] == "freelancer_jobs"
+    assert "graphic design" in freelancer_pdf.config["exclude_keywords"]
+
+    cn_source = by_name["猪八戒文档识别与系统对接任务"]
+    assert "文档" in cn_source.config["include_keyword_groups"]
+    assert "美工" in cn_source.config["exclude_keywords"]

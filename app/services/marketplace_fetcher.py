@@ -953,14 +953,19 @@ def _filter_marketplace_items(
     items: list[ParsedMarketplaceLead],
 ) -> list[ParsedMarketplaceLead]:
     include_keywords = _normalize_keywords(source.config.get("include_keywords"))
+    include_keyword_groups = _normalize_keyword_groups(source.config.get("include_keyword_groups"))
     exclude_keywords = _normalize_keywords(source.config.get("exclude_keywords"))
-    if not include_keywords and not exclude_keywords:
+    if not include_keywords and not include_keyword_groups and not exclude_keywords:
         return items
 
     filtered: list[ParsedMarketplaceLead] = []
     for item in items:
         haystack = _build_keyword_haystack(item)
         if include_keywords and not any(keyword in haystack for keyword in include_keywords):
+            continue
+        if include_keyword_groups and not all(
+            any(keyword in haystack for keyword in group) for group in include_keyword_groups
+        ):
             continue
         if exclude_keywords and any(keyword in haystack for keyword in exclude_keywords):
             continue
@@ -979,6 +984,17 @@ def _normalize_keywords(value: object) -> list[str]:
         if text:
             normalized.append(text.lower())
     return normalized
+
+
+def _normalize_keyword_groups(value: object) -> list[list[str]]:
+    if not isinstance(value, str):
+        return []
+    groups: list[list[str]] = []
+    for group in value.split(";"):
+        keywords = _normalize_keywords(group)
+        if keywords:
+            groups.append(keywords)
+    return groups
 
 
 def _strip_html_tags(value: str) -> str | None:
@@ -1019,9 +1035,7 @@ def _build_keyword_haystack(item: ParsedMarketplaceLead) -> str:
         item.title,
         item.summary,
         item.description,
-        item.metadata.get("category"),
         item.metadata.get("location"),
-        " ".join(item.tags),
         " ".join(str(skill) for skill in item.metadata.get("skills", []) if skill),
     ]
     return " ".join(_normalize_text(field) or "" for field in fields if field).lower()

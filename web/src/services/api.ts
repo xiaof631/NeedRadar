@@ -469,6 +469,80 @@ export async function updateMarketplaceLeadFollowUp(
   return response.data;
 }
 
+export type CustomerSegment =
+  | 'government_docs'
+  | 'real_estate_docs'
+  | 'compliance_kyc'
+  | 'legal_contracts'
+  | 'training_lms'
+  | 'document_ops'
+  | 'outreach_research';
+
+export type CustomerRadarAction = 'contact_now' | 'review_first' | 'watch';
+export type CustomerCredibilityLevel = 'high' | 'medium' | 'low';
+
+export interface CustomerOpportunity {
+  id: string;
+  candidate_need_id: number;
+  raw_entry_id: number;
+  title: string;
+  source_name: string;
+  source_type: SourceType;
+  platform: string | null;
+  link: string | null;
+  published_at: string | null;
+  customer_segment: CustomerSegment;
+  fit_score: number;
+  credibility_score: number;
+  credibility_level: CustomerCredibilityLevel;
+  credibility_reasons: string[];
+  risk_flags: string[];
+  recommended_action: CustomerRadarAction;
+  pain_summary: string;
+  product_angle: string;
+  evidence: string[];
+  matched_signals: string[];
+  budget_signal: string | null;
+  outreach_draft: string;
+  created_at: string;
+}
+
+export interface CustomerRadarSummary {
+  total_candidates: number;
+  contact_now: number;
+  review_first: number;
+  watch: number;
+  average_fit_score: number;
+  average_credibility_score: number;
+  segment_breakdown: Record<string, number>;
+  source_breakdown: Record<string, number>;
+}
+
+export interface CustomerRadarListResponse {
+  total: number;
+  summary: CustomerRadarSummary;
+  items: CustomerOpportunity[];
+}
+
+export interface CustomerRadarQueryParams {
+  skip?: number;
+  limit?: number;
+  search?: string;
+  source_type?: SourceType;
+  segment?: CustomerSegment;
+  action?: CustomerRadarAction;
+  min_score?: number;
+}
+
+export async function fetchCustomerOpportunities(
+  params: CustomerRadarQueryParams = {}
+): Promise<CustomerRadarListResponse> {
+  const response = await apiClient.get('/api/v1/customer-radar/', {
+    params
+  });
+  return response.data;
+}
+
 export type CandidateNeedType =
   | 'workflow_pain'
   | 'feature_gap'

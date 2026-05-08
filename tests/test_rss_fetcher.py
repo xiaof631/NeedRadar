@@ -890,6 +890,55 @@ def test_normalize_keywords_lowercases_values() -> None:
     assert keywords == ["web", "app", "嵌入式"]
 
 
+def test_filter_marketplace_items_requires_each_keyword_group() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "DocReview test source",
+            "url": "https://example.com/jobs",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {
+                "include_keyword_groups": "pdf,document,invoice;extract,parse,review",
+                "exclude_keywords": "logo",
+            },
+        }
+    )
+    matching = marketplace_fetcher.ParsedMarketplaceLead(
+        guid="match",
+        title="PDF invoice extraction workflow",
+        summary="Extract fields from invoices and review them before export.",
+        description=None,
+        link=None,
+        published_at=None,
+        author=None,
+    )
+    missing_action = marketplace_fetcher.ParsedMarketplaceLead(
+        guid="missing-action",
+        title="PDF invoice archive",
+        summary="Store scanned invoices in a folder.",
+        description=None,
+        link=None,
+        published_at=None,
+        author=None,
+    )
+    excluded = marketplace_fetcher.ParsedMarketplaceLead(
+        guid="excluded",
+        title="PDF logo extraction",
+        summary="Extract a logo from a PDF.",
+        description=None,
+        link=None,
+        published_at=None,
+        author=None,
+    )
+
+    items = marketplace_fetcher._filter_marketplace_items(
+        source,
+        [matching, missing_action, excluded],
+    )
+
+    assert [item.guid for item in items] == ["match"]
+
+
 def test_fetch_reddit_source_success() -> None:
     async def _run() -> None:
         source = rss_sources.create_source(

@@ -27,6 +27,12 @@ from app.schemas.dashboard import (
     SourcesSummaryRead,
     StatusBreakdownRead,
 )
+from app.schemas.customer_radar import (
+    CredibilityLevelEnum,
+    CustomerOpportunityRead,
+    CustomerRadarList,
+    CustomerRadarSummaryRead,
+)
 from app.schemas.filter_metrics import (
     FilterPerformanceRead,
     SourceFilterMetricRead,
@@ -88,6 +94,10 @@ __all__ = [
     "CandidateNeedStatusUpdate",
     "CandidateNeedUpdate",
     "SyncChannelEnum",
+    "CustomerOpportunityRead",
+    "CustomerRadarList",
+    "CustomerRadarSummaryRead",
+    "CredibilityLevelEnum",
     "AlertRead",
     "AlertSeverityEnum",
     "DashboardMetricsRead",

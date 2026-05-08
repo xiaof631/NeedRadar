@@ -244,14 +244,117 @@ _MARKETPLACE_PUBLIC_BASELINE: tuple[CatalogEntry, ...] = (
     },
 )
 
+_DOCREVIEW_CUSTOMER_DISCOVERY: tuple[CatalogEntry, ...] = (
+    {
+        "name": "PeoplePerHour PDF Extraction Projects",
+        "url": "https://www.peopleperhour.com/freelance-jobs?keywords=pdf%20extraction",
+        "category": "docreview-customer-discovery",
+        "frequency": 3600,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "peopleperhour_technology",
+            "item_limit": 12,
+            "topic": "docreview-pdf-extraction",
+            "include_keyword_groups": "pdf,pdfs,document,documents,docx,scan,scanned,ocr,invoice,invoices,contract,contracts,form,forms;extract,extraction,parse,scrape,scraping,crawl,metadata,field,fields,review,validation,validate,sync,export,google sheets,spreadsheet",
+            "exclude_keywords": "logo,branding,illustration,copywriting,video,marketing,social media,seo,penetration testing,resume,cv,ebook,book cover,graphic design",
+        },
+    },
+    {
+        "name": "PeoplePerHour OCR Automation Projects",
+        "url": "https://www.peopleperhour.com/freelance-jobs?keywords=ocr%20automation",
+        "category": "docreview-customer-discovery",
+        "frequency": 3600,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "peopleperhour_technology",
+            "item_limit": 12,
+            "topic": "docreview-ocr-automation",
+            "include_keyword_groups": "ocr,pdf,pdfs,document,documents,invoice,invoices,receipt,receipts,form,forms;automation,automate,extract,extraction,parse,metadata,field,fields,review,validation,google sheets,excel,csv,database",
+            "exclude_keywords": "logo,branding,illustration,copywriting,video,marketing,social media,seo,penetration testing,resume,cv",
+        },
+    },
+    {
+        "name": "PeoplePerHour Document Workflow Projects",
+        "url": "https://www.peopleperhour.com/freelance-jobs?keywords=document%20automation",
+        "category": "docreview-customer-discovery",
+        "frequency": 3600,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "peopleperhour_technology",
+            "item_limit": 12,
+            "topic": "docreview-document-workflow",
+            "include_keyword_groups": "document,documents,pdf,pdfs,form,forms,contract,contracts,invoice,invoices,google drive,sharepoint;automation,workflow,extract,extraction,parse,review,approval,validation,sync,export,integration,api",
+            "exclude_keywords": "logo,branding,illustration,copywriting,video,marketing,social media,seo,design only,penetration testing",
+        },
+    },
+    {
+        "name": "Freelancer PDF Data Extraction Jobs",
+        "url": "https://www.freelancer.com/jobs/pdf/",
+        "category": "docreview-customer-discovery",
+        "frequency": 5400,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "freelancer_jobs",
+            "item_limit": 12,
+            "topic": "docreview-pdf-data-extraction",
+            "include_keyword_groups": "pdf,pdfs,document,documents,invoice,invoices,contract,contracts,form,forms;extract,extraction,parse,scrape,scraping,ocr,metadata,field,fields,data entry,review,validation,excel,csv,spreadsheet",
+            "exclude_keywords": "logo,branding,illustration,copywriting,video,marketing,social media,seo,ebook,book cover,graphic design",
+        },
+    },
+    {
+        "name": "Freelancer Data Extraction Automation Jobs",
+        "url": "https://www.freelancer.com/jobs/data-extraction/",
+        "category": "docreview-customer-discovery",
+        "frequency": 5400,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "freelancer_jobs",
+            "item_limit": 12,
+            "topic": "docreview-data-extraction",
+            "include_keyword_groups": "pdf,pdfs,document,documents,website,web pages,invoice,invoices,contract,contracts,form,forms;extract,extraction,scrape,scraping,crawl,parse,ocr,metadata,field,fields,excel,csv,google sheets,database",
+            "exclude_keywords": "logo,branding,illustration,copywriting,video,marketing,social media,seo,lead generation,email scraping,linkedin scraping,instagram scraping",
+        },
+    },
+    {
+        "name": "猪八戒文档识别与系统对接任务",
+        "url": "https://task.zbj.com/index/?needradar=docreview",
+        "category": "docreview-customer-discovery",
+        "frequency": 7200,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "zbj_hall_scroll",
+            "item_limit": 15,
+            "topic": "docreview-cn-document-workflow",
+            "include_keyword_groups": "pdf,文档,资料,表单,合同,发票,票据,扫描件,图片,ocr,识别;提取,抽取,解析,采集,爬取,录入,审核,校验,同步,导出,对接,自动化",
+            "exclude_keywords": "logo,海报,文案,命名,广告,创意设计,包装设计,活动,征集,大赛,推广,运营,设计,ui,美工,短视频,剪辑",
+        },
+    },
+    {
+        "name": "软件项目交易网文档自动化项目",
+        "url": "https://www.sxsoft.com/?needradar=docreview",
+        "category": "docreview-customer-discovery",
+        "frequency": 7200,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "sxsoft_latest",
+            "item_limit": 12,
+            "topic": "docreview-cn-document-automation",
+            "include_keyword_groups": "pdf,文档,资料,表单,合同,发票,票据,扫描件,图片,ocr,识别;提取,抽取,解析,采集,爬取,录入,审核,校验,同步,导出,对接,自动化",
+            "exclude_keywords": "logo,海报,文案,命名,广告,创意设计,包装设计,活动,征集,大赛,推广,运营,设计,ui,美工,短视频,剪辑,脚本,代付",
+        },
+    },
+)
+
 _CATALOGS: dict[str, tuple[CatalogEntry, ...]] = {
     "github-public-expanded": _GITHUB_PUBLIC_EXPANDED,
     "marketplace-public-baseline": _MARKETPLACE_PUBLIC_BASELINE,
+    "docreview-customer-discovery": _DOCREVIEW_CUSTOMER_DISCOVERY,
 }
 
 _CATALOG_DESCRIPTIONS: dict[str, str] = {
     "github-public-expanded": "长期扩源用的 GitHub public repo issue 源目录，覆盖 AI、开发工具、自动化与排期场景。",
     "marketplace-public-baseline": "公开外包/自由职业项目线索目录，优先接入可公开浏览的真实项目列表。",
+    "docreview-customer-discovery": "DocReview/PDF 抽取与人工复核方向的高意图客户线索来源，使用关键词分组降低泛技术噪声。",
 }
 
 

@@ -3,6 +3,7 @@
     "dashboard": "Dashboard",
     "sources": "Sources",
     "marketplace": "Marketplace Leads",
+    "customerRadar": "Customer Radar",
     "entries": "Raw Entries",
     "filter": "Filter Monitor",
     "candidates": "Candidate Needs",
@@ -460,6 +461,65 @@
       "filter": "Filter",
       "focus": "Focus",
       "viewAll": "All"
+    }
+  },
+  "customerRadar": {
+    "title": "Customer Radar",
+    "subtitle": "Find DocReview/PDF processing customer opportunities from captured demand signals",
+    "metrics": {
+      "total": "Matched leads",
+      "contactNow": "Contact now",
+      "reviewFirst": "Review first",
+      "averageScore": "Avg. fit score",
+      "averageCredibility": "Avg. credibility"
+    },
+    "filters": {
+      "searchPlaceholder": "Search customer, pain or source",
+      "all": "All",
+      "action": "Recommended action",
+      "segment": "Customer segment",
+      "sourceType": "Source type",
+      "minScore": "Min score"
+    },
+    "action": {
+      "contact_now": "Contact now",
+      "review_first": "Review first",
+      "watch": "Watch"
+    },
+    "credibility": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "segment": {
+      "government_docs": "Government docs",
+      "real_estate_docs": "Real estate docs",
+      "compliance_kyc": "KYC/compliance",
+      "legal_contracts": "Legal/contracts",
+      "training_lms": "Training/LMS",
+      "document_ops": "Document ops",
+      "outreach_research": "Community research"
+    },
+    "table": {
+      "opportunity": "Opportunity",
+      "score": "Fit score",
+      "credibility": "Credibility",
+      "action": "Action",
+      "segment": "Segment",
+      "source": "Source",
+      "budget": "Budget",
+      "actions": "Actions",
+      "empty": "No customer opportunities match these filters"
+    },
+    "details": {
+      "title": "Customer opportunity",
+      "recommendation": "Recommended angle",
+      "credibility": "Credibility check",
+      "evidence": "Evidence",
+      "outreachDraft": "Outreach draft",
+      "copyDraft": "Copy draft",
+      "openSource": "Open source",
+      "copied": "Outreach draft copied"
     }
   },
   "feedback": {
