@@ -178,6 +178,29 @@ def test_can_create_and_filter_reddit_source(client: TestClient) -> None:
     assert result["items"][0]["name"] == payload["name"]
 
 
+# ── API 错误路径测试 ────────────────────────────────────────────
+
+
+def test_get_rss_source_not_found(client: TestClient) -> None:
+    resp = client.get("/api/v1/rss-sources/999")
+    assert resp.status_code == 404
+
+
+def test_update_rss_source_not_found(client: TestClient) -> None:
+    resp = client.put("/api/v1/rss-sources/999", json={"frequency": 3600})
+    assert resp.status_code == 404
+
+
+def test_delete_rss_source_not_found(client: TestClient) -> None:
+    resp = client.delete("/api/v1/rss-sources/999")
+    assert resp.status_code == 404
+
+
+def test_fetch_rss_source_not_found(client: TestClient) -> None:
+    resp = client.post("/api/v1/rss-sources/999/fetch")
+    assert resp.status_code == 404
+
+
 def test_can_create_reddit_comments_source(client: TestClient) -> None:
     payload = {
         "name": "r/startups comments",
