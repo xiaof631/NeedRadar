@@ -1,9 +1,13 @@
 __pycache__/
 *.pyc
+*,cover
 .env
 .env.*
 pytest_cache/
+.pytest_cache/
 data/
+tmp/
+*.egg-info/
 .idea/
 .vscode/
 node_modules/
