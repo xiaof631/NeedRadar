@@ -543,6 +543,120 @@ export async function fetchCustomerOpportunities(
   return response.data;
 }
 
+export type EmailFollowUpSource = 'all' | 'marketplace' | 'customer_radar';
+export type EmailFollowUpTaskSource = Exclude<EmailFollowUpSource, 'all'>;
+export type EmailFollowUpStatus =
+  | 'draft_ready'
+  | 'drafted'
+  | 'sent'
+  | 'replied'
+  | 'no_response'
+  | 'closed'
+  | 'skipped';
+export type EmailFollowUpAction =
+  | 'create_draft'
+  | 'send_after_review'
+  | 'check_reply'
+  | 'close_or_retry'
+  | 'closed';
+
+export interface EmailDraft {
+  recipient: string | null;
+  subject: string;
+  body: string;
+  source_url: string | null;
+  gmail_query_hint: string | null;
+  codex_handoff: string;
+}
+
+export interface EmailFollowUpEvent {
+  event_type: string;
+  created_at: string;
+  status_from: EmailFollowUpStatus | null;
+  status_to: EmailFollowUpStatus | null;
+  note: string | null;
+}
+
+export interface EmailFollowUpTask {
+  id: string;
+  raw_entry_id: number;
+  lead_id: number | null;
+  candidate_need_id: number | null;
+  opportunity_id: string | null;
+  source: EmailFollowUpTaskSource;
+  title: string;
+  source_name: string;
+  platform: string | null;
+  source_url: string | null;
+  priority_score: number;
+  reason: string;
+  recommended_action: EmailFollowUpAction;
+  status: EmailFollowUpStatus;
+  recipient: string | null;
+  next_follow_up_at: string | null;
+  last_action_at: string;
+  risk_flags: string[];
+  evidence: string[];
+  draft: EmailDraft;
+  events: EmailFollowUpEvent[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailFollowUpSummary {
+  total: number;
+  draft_ready: number;
+  drafted: number;
+  sent: number;
+  waiting_reply: number;
+  no_response: number;
+  replied: number;
+  closed: number;
+  skipped: number;
+  needs_recipient: number;
+  overdue: number;
+}
+
+export interface EmailFollowUpListResponse {
+  total: number;
+  summary: EmailFollowUpSummary;
+  items: EmailFollowUpTask[];
+}
+
+export interface EmailFollowUpQueryParams {
+  skip?: number;
+  limit?: number;
+  source?: EmailFollowUpSource;
+  status?: EmailFollowUpStatus;
+  min_score?: number;
+  include_review_first?: boolean;
+}
+
+export interface EmailFollowUpStatusPayload {
+  status: EmailFollowUpStatus;
+  note?: string | null;
+  recipient?: string | null;
+  gmail_thread_id?: string | null;
+  next_follow_up_at?: string | null;
+}
+
+export async function fetchEmailFollowUps(
+  params: EmailFollowUpQueryParams = {}
+): Promise<EmailFollowUpListResponse> {
+  const response = await apiClient.get('/api/v1/email-followups/', {
+    params
+  });
+  return response.data;
+}
+
+export async function updateEmailFollowUpStatus(
+  rawEntryId: number,
+  payload: EmailFollowUpStatusPayload
+): Promise<EmailFollowUpTask> {
+  const response = await apiClient.put(`/api/v1/email-followups/${rawEntryId}/status`, payload);
+  return response.data;
+}
+
 export type CandidateNeedType =
   | 'workflow_pain'
   | 'feature_gap'

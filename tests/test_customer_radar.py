@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models import CandidateNeedType, SourceType
 from app.services import candidate_needs, customer_radar, raw_entries, rss_sources
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)

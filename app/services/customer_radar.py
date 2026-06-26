@@ -672,7 +672,7 @@ def _extract_budget(value: str | None) -> str | None:
 def _extract_budget_amount(value: str | None) -> float | None:
     if not value:
         return None
-    match = re.search(r"[\$£€]\s?(\d[\d,.]*)(k)?", value, re.I)
+    match = re.search(r"[\$£€]\s?(\d[\d,]*(?:\.\d+)?)(k)?", value, re.I)
     if not match:
         return None
     amount = float(match.group(1).replace(",", ""))

@@ -4,6 +4,7 @@
     "sources": "Sources",
     "marketplace": "Marketplace Leads",
     "customerRadar": "Customer Radar",
+    "emailFollowups": "Email Follow-ups",
     "entries": "Raw Entries",
     "filter": "Filter Monitor",
     "candidates": "Candidate Needs",
@@ -524,6 +525,85 @@
   },
   "feedback": {
     "genericError": "Something went wrong, please try again"
+  },
+  "emailFollowups": {
+    "title": "Email Follow-ups",
+    "subtitle": "Manage drafts, send confirmations and reply checks for marketplace and customer radar leads",
+    "metrics": {
+      "total": "Queue total",
+      "draftReady": "Drafts needed",
+      "needsRecipient": "Missing recipient",
+      "waitingReply": "Waiting for reply",
+      "overdue": "Overdue"
+    },
+    "filters": {
+      "source": "Lead source",
+      "status": "Email status",
+      "all": "All",
+      "minScore": "Min score",
+      "includeReviewFirst": "Include review-first"
+    },
+    "source": {
+      "marketplace": "Marketplace",
+      "customer_radar": "Customer radar"
+    },
+    "status": {
+      "draft_ready": "Draft ready",
+      "drafted": "Drafted",
+      "sent": "Sent",
+      "replied": "Replied",
+      "no_response": "No response",
+      "closed": "Closed",
+      "skipped": "Skipped"
+    },
+    "action": {
+      "create_draft": "Create draft",
+      "send_after_review": "Send after review",
+      "check_reply": "Check reply",
+      "close_or_retry": "Close or retry",
+      "closed": "Closed"
+    },
+    "table": {
+      "lead": "Lead",
+      "source": "Source",
+      "score": "Score",
+      "status": "Status",
+      "action": "Action",
+      "recipient": "Recipient",
+      "nextFollowUp": "Next follow-up",
+      "lastAction": "Last action",
+      "operations": "Operations",
+      "empty": "No email follow-up tasks"
+    },
+    "details": {
+      "title": "Email follow-up details",
+      "recipient": "Recipient",
+      "recipientPlaceholder": "Confirm and enter the email address",
+      "subject": "Subject",
+      "body": "Body",
+      "handoff": "Codex Gmail handoff",
+      "reason": "Queue reason",
+      "evidence": "Lead evidence",
+      "risks": "Risks",
+      "note": "Note",
+      "notePlaceholder": "Record send, reply or close reason",
+      "copySubject": "Copy subject",
+      "copyBody": "Copy body",
+      "copyHandoff": "Copy handoff",
+      "openSource": "Open source",
+      "markDrafted": "Mark drafted",
+      "markSent": "Mark sent",
+      "markReplied": "Mark replied",
+      "markNoResponse": "Mark no response",
+      "close": "Close",
+      "skip": "Skip",
+      "events": "Activity",
+      "emptyEvents": "No activity yet"
+    },
+    "feedback": {
+      "copied": "Copied",
+      "statusUpdated": "Follow-up status updated"
+    }
   },
   "candidates": {
     "title": "Candidate Needs",

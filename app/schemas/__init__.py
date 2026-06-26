@@ -19,6 +19,12 @@ from app.schemas.candidate_needs import (
     CandidateNeedUpdate,
     SyncChannelEnum,
 )
+from app.schemas.customer_radar import (
+    CredibilityLevelEnum,
+    CustomerOpportunityRead,
+    CustomerRadarList,
+    CustomerRadarSummaryRead,
+)
 from app.schemas.dashboard import (
     AlertRead,
     AlertSeverityEnum,
@@ -27,11 +33,13 @@ from app.schemas.dashboard import (
     SourcesSummaryRead,
     StatusBreakdownRead,
 )
-from app.schemas.customer_radar import (
-    CredibilityLevelEnum,
-    CustomerOpportunityRead,
-    CustomerRadarList,
-    CustomerRadarSummaryRead,
+from app.schemas.email_followups import (
+    EmailDraftRead,
+    EmailFollowUpEventRead,
+    EmailFollowUpList,
+    EmailFollowUpStatusUpdate,
+    EmailFollowUpSummaryRead,
+    EmailFollowUpTaskRead,
 )
 from app.schemas.filter_metrics import (
     FilterPerformanceRead,
@@ -98,6 +106,12 @@ __all__ = [
     "CustomerRadarList",
     "CustomerRadarSummaryRead",
     "CredibilityLevelEnum",
+    "EmailDraftRead",
+    "EmailFollowUpEventRead",
+    "EmailFollowUpList",
+    "EmailFollowUpStatusUpdate",
+    "EmailFollowUpSummaryRead",
+    "EmailFollowUpTaskRead",
     "AlertRead",
     "AlertSeverityEnum",
     "DashboardMetricsRead",

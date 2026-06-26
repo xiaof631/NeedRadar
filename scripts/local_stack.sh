@@ -44,7 +44,7 @@ service_command() {
       printf '%s\n' "uvicorn app.main:app --host 0.0.0.0 --port 3106"
       ;;
     worker)
-      printf '%s\n' "celery -A jobs.celery_app worker --loglevel=info"
+      printf '%s\n' "celery -A jobs.celery_app worker --loglevel=info --pool=\${NEEDRADAR_CELERY_WORKER_POOL:-threads} --concurrency=\${NEEDRADAR_CELERY_WORKER_CONCURRENCY:-4}"
       ;;
     scheduler)
       printf '%s\n' "python -m jobs.scheduler"
@@ -64,7 +64,7 @@ service_pattern() {
       printf '%s\n' "celery -A jobs.celery_app worker --loglevel=info"
       ;;
     scheduler)
-      printf '%s\n' "python -m jobs.scheduler"
+      printf '%s\n' "python3? -m jobs\\.scheduler"
       ;;
     web)
       printf '%s\n' "vite.*--host 0.0.0.0 --port 5206"
@@ -99,9 +99,9 @@ find_existing_pid() {
 
   pattern="$(service_pattern "$1")"
   ps -ax -o pid=,command= | awk -v pattern="$pattern" '
-    $0 ~ pattern && $0 !~ /awk -v pattern/ {
+    !found && $0 ~ pattern && $0 !~ /awk -v pattern/ {
       print $1
-      exit
+      found = 1
     }
   '
 }
@@ -194,7 +194,7 @@ status_service() {
       return 0
     fi
     echo "$service: stale pid file ($pid)"
-    return 0
+    rm -f "$pidfile"
   fi
 
   pid="$(find_existing_pid "$service")"

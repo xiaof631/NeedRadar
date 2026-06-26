@@ -4,6 +4,7 @@ from app.api.v1 import (
     candidate_needs,
     customer_radar,
     dashboard,
+    email_followups,
     fetch_logs,
     filter_metrics,
     filter_rules,
@@ -21,6 +22,7 @@ router.include_router(filter_rules.router)
 router.include_router(filter_metrics.router)
 router.include_router(candidate_needs.router)
 router.include_router(customer_radar.router)
+router.include_router(email_followups.router)
 router.include_router(fetch_logs.router)
 router.include_router(dashboard.router)
 
