@@ -1,0 +1,20 @@
+[
+  {
+    "case_id": "case_001",
+    "source": "synthetic",
+    "generated_at": "2026-06-26",
+    "notes": "Fictional groundworks schedule with unit price, quantity, missing reference, and missing invoice exceptions."
+  },
+  {
+    "case_id": "case_002",
+    "source": "synthetic",
+    "generated_at": "2026-06-26",
+    "notes": "Fictional civils schedule with amount mismatch and fuzzy line description matching."
+  },
+  {
+    "case_id": "case_003",
+    "source": "synthetic",
+    "generated_at": "2026-06-26",
+    "notes": "Fictional fit-out schedule with fuzzy matching, unit price mismatch, and extra invoice item."
+  }
+]

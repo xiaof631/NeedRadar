@@ -1,0 +1,4 @@
+line_id,description,quantity,unit,unit_price,amount
+B200,Excavation,80,m3,22,1760
+B210,Drainage pipe,60,m,35,2100
+B220,Asphalt patching,30,m2,45,1350

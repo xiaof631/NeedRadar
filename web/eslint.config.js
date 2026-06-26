@@ -11,7 +11,8 @@ export default [
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
-      parser: tsParser
+      parser: tsParser,
+      parserOptions: { sourceType: 'module' }
     },
     rules: {
       'no-undef': 'off',
@@ -23,7 +24,8 @@ export default [
     languageOptions: {
       parserOptions: {
         parser: tsParser,
-        extraFileExtensions: ['.vue']
+        extraFileExtensions: ['.vue'],
+        sourceType: 'module'
       }
     },
     rules: {

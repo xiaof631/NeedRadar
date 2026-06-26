@@ -4,6 +4,7 @@
     "sources": "RSS 源管理",
     "marketplace": "外包项目线索",
     "customerRadar": "客户雷达",
+    "documentOps": "文档核对",
     "emailFollowups": "邮件跟进",
     "entries": "原始内容",
     "filter": "筛选监控",
@@ -524,6 +525,75 @@
       "copyDraft": "复制草稿",
       "openSource": "打开来源",
       "copied": "联系草稿已复制"
+    }
+  },
+  "documentOps": {
+    "title": "文档核对工作台",
+    "subtitle": "施工发票 / 进度款与合同费率表核对队列",
+    "actions": {
+      "run": "运行核对",
+      "exportCsv": "导出 CSV"
+    },
+    "metrics": {
+      "reference": "基准项",
+      "invoice": "发票项",
+      "matched": "已匹配",
+      "exceptions": "异常",
+      "needsReview": "待复核",
+      "referenceTotal": "基准",
+      "invoiceTotal": "发票",
+      "totalDifference": "差额"
+    },
+    "tabs": {
+      "exceptions": "异常",
+      "matches": "匹配",
+      "inputs": "输入",
+      "conclusion": "结论"
+    },
+    "table": {
+      "empty": "暂无数据",
+      "type": "类型",
+      "lines": "行号",
+      "message": "说明",
+      "confidence": "置信度",
+      "status": "复核状态",
+      "note": "备注",
+      "notePlaceholder": "添加备注",
+      "reference": "基准",
+      "invoice": "发票",
+      "matchType": "匹配方式",
+      "lineId": "行号",
+      "description": "描述",
+      "quantity": "数量",
+      "unitPrice": "单价",
+      "amount": "金额"
+    },
+    "exceptionTypes": {
+      "missing_reference_item": "缺少基准项",
+      "missing_invoice_item": "缺少发票项",
+      "unit_price_mismatch": "单价不一致",
+      "quantity_mismatch": "数量不一致",
+      "amount_mismatch": "金额不一致",
+      "total_amount_mismatch": "合计不一致",
+      "missing_required_field": "字段缺失",
+      "low_confidence_match": "低置信匹配"
+    },
+    "reviewStatus": {
+      "pending": "待处理",
+      "accepted": "确认异常",
+      "dismissed": "忽略",
+      "resolved": "已解决"
+    },
+    "matchTypes": {
+      "exact_line_id": "行号",
+      "exact_description": "描述",
+      "fuzzy_description": "模糊"
+    },
+    "conclusion": {
+      "feasible": "可行",
+      "needsMore": "证据不足",
+      "validated": "已验证",
+      "risks": "风险"
     }
   },
   "emailFollowups": {

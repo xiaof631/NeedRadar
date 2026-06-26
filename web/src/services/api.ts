@@ -657,6 +657,129 @@ export async function updateEmailFollowUpStatus(
   return response.data;
 }
 
+export type DocumentOpsScenario = 'contractor_invoice_reconciliation';
+export type DocumentOpsExceptionType =
+  | 'missing_reference_item'
+  | 'missing_invoice_item'
+  | 'unit_price_mismatch'
+  | 'quantity_mismatch'
+  | 'amount_mismatch'
+  | 'total_amount_mismatch'
+  | 'missing_required_field'
+  | 'low_confidence_match';
+export type DocumentOpsSeverity = 'high' | 'medium' | 'low';
+export type DocumentOpsReviewStatus = 'pending' | 'accepted' | 'dismissed' | 'resolved';
+export type DocumentOpsMatchType = 'exact_line_id' | 'exact_description' | 'fuzzy_description';
+
+export interface DocumentOpsLineItemInput {
+  line_id?: string | null;
+  description?: string | null;
+  quantity?: number | null;
+  unit?: string | null;
+  unit_price?: number | null;
+  amount?: number | null;
+  raw?: Record<string, unknown>;
+}
+
+export interface DocumentOpsLineItem extends Required<DocumentOpsLineItemInput> {
+  line_id: string;
+  description: string;
+  source: string;
+  source_row: number;
+  normalized_description: string;
+  parse_warnings: string[];
+}
+
+export interface DocumentOpsException {
+  id: string;
+  type: DocumentOpsExceptionType;
+  severity: DocumentOpsSeverity;
+  message: string;
+  reference_line_id: string | null;
+  invoice_line_id: string | null;
+  expected: string | null;
+  actual: string | null;
+  difference: number | null;
+  confidence: number;
+  needs_review: boolean;
+  review_status: DocumentOpsReviewStatus;
+  reviewer_note: string | null;
+}
+
+export interface DocumentOpsMatch {
+  id: string;
+  reference_item: DocumentOpsLineItem;
+  invoice_item: DocumentOpsLineItem;
+  match_type: DocumentOpsMatchType;
+  confidence: number;
+  needs_review: boolean;
+  review_status: DocumentOpsReviewStatus;
+  reviewer_note: string | null;
+  exception_ids: string[];
+}
+
+export interface DocumentOpsReviewItem {
+  id: string;
+  item_type: string;
+  reason: string;
+  confidence: number;
+}
+
+export interface DocumentOpsSummary {
+  reference_count: number;
+  invoice_count: number;
+  matched_count: number;
+  exception_count: number;
+  needs_review_count: number;
+  reference_total: number;
+  invoice_total: number;
+  total_difference: number;
+}
+
+export interface DocumentOpsSpikeConclusion {
+  feasible: boolean;
+  recommendation: string;
+  validated: string[];
+  remaining_risks: string[];
+}
+
+export interface DocumentOpsReconcileRequest {
+  scenario?: DocumentOpsScenario;
+  reference_items: DocumentOpsLineItemInput[];
+  invoice_items: DocumentOpsLineItemInput[];
+}
+
+export interface DocumentOpsReconcileResponse {
+  scenario: DocumentOpsScenario;
+  normalized_invoice_items: DocumentOpsLineItem[];
+  normalized_reference_items: DocumentOpsLineItem[];
+  matched_items: DocumentOpsMatch[];
+  exceptions: DocumentOpsException[];
+  confidence_by_match: Record<string, number>;
+  needs_review_items: DocumentOpsReviewItem[];
+  summary: DocumentOpsSummary;
+  spike_conclusion: DocumentOpsSpikeConclusion;
+  exported_exception_report_csv: string;
+}
+
+export async function reconcileDocumentOps(
+  payload: DocumentOpsReconcileRequest
+): Promise<DocumentOpsReconcileResponse> {
+  const response = await apiClient.post('/api/v1/document-ops/reconcile', payload);
+  return response.data;
+}
+
+export async function exportDocumentOpsExceptions(
+  exceptions: DocumentOpsException[]
+): Promise<string> {
+  const response = await apiClient.post(
+    '/api/v1/document-ops/exceptions/export.csv',
+    { exceptions },
+    { responseType: 'text' }
+  );
+  return response.data;
+}
+
 export type CandidateNeedType =
   | 'workflow_pain'
   | 'feature_gap'

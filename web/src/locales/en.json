@@ -4,6 +4,7 @@
     "sources": "Sources",
     "marketplace": "Marketplace Leads",
     "customerRadar": "Customer Radar",
+    "documentOps": "Document Ops",
     "emailFollowups": "Email Follow-ups",
     "entries": "Raw Entries",
     "filter": "Filter Monitor",
@@ -521,6 +522,75 @@
       "copyDraft": "Copy draft",
       "openSource": "Open source",
       "copied": "Outreach draft copied"
+    }
+  },
+  "documentOps": {
+    "title": "Document Ops Reconciliation",
+    "subtitle": "Contractor invoice vs rate schedule review queue",
+    "actions": {
+      "run": "Run reconciliation",
+      "exportCsv": "Export CSV"
+    },
+    "metrics": {
+      "reference": "Reference items",
+      "invoice": "Invoice items",
+      "matched": "Matched",
+      "exceptions": "Exceptions",
+      "needsReview": "Needs review",
+      "referenceTotal": "Reference",
+      "invoiceTotal": "Invoice",
+      "totalDifference": "Difference"
+    },
+    "tabs": {
+      "exceptions": "Exceptions",
+      "matches": "Matches",
+      "inputs": "Inputs",
+      "conclusion": "Conclusion"
+    },
+    "table": {
+      "empty": "No rows",
+      "type": "Type",
+      "lines": "Lines",
+      "message": "Message",
+      "confidence": "Confidence",
+      "status": "Review status",
+      "note": "Reviewer note",
+      "notePlaceholder": "Add note",
+      "reference": "Reference",
+      "invoice": "Invoice",
+      "matchType": "Match type",
+      "lineId": "Line",
+      "description": "Description",
+      "quantity": "Qty",
+      "unitPrice": "Rate",
+      "amount": "Amount"
+    },
+    "exceptionTypes": {
+      "missing_reference_item": "Missing reference",
+      "missing_invoice_item": "Missing invoice",
+      "unit_price_mismatch": "Rate mismatch",
+      "quantity_mismatch": "Quantity mismatch",
+      "amount_mismatch": "Amount mismatch",
+      "total_amount_mismatch": "Total mismatch",
+      "missing_required_field": "Missing field",
+      "low_confidence_match": "Low confidence"
+    },
+    "reviewStatus": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "dismissed": "Dismissed",
+      "resolved": "Resolved"
+    },
+    "matchTypes": {
+      "exact_line_id": "Line ID",
+      "exact_description": "Description",
+      "fuzzy_description": "Fuzzy"
+    },
+    "conclusion": {
+      "feasible": "Feasible",
+      "needsMore": "Needs more evidence",
+      "validated": "Validated",
+      "risks": "Risks"
     }
   },
   "feedback": {
