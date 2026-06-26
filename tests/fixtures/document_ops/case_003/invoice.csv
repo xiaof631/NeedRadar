@@ -1,0 +1,5 @@
+line_id,description,quantity,unit,unit_price,amount
+C301,Interior wall painting,300,m2,6,1800
+C310,Door hardware,24,set,20,480
+C321,Final cleaning,1,item,250,250
+C340,Additional signage,2,item,85,170

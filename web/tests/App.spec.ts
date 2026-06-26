@@ -10,7 +10,10 @@ describe('App', () => {
   it('renders navigation menu', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/', component: { template: '<div>dashboard</div>' } }]
+      routes: [
+        { path: '/', component: { template: '<div>dashboard</div>' } },
+        { path: '/document-ops', component: { template: '<div>document ops</div>' } }
+      ]
     });
 
     await router.push('/');
@@ -30,6 +33,7 @@ describe('App', () => {
                   dashboard: '仪表盘',
                   sources: '数据源',
                   marketplace: '外包项目线索',
+                  documentOps: '文档核对',
                   entries: '原始内容',
                   filter: '筛选监控',
                   candidates: '候选需求',

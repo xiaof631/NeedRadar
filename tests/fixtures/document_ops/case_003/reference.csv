@@ -1,0 +1,4 @@
+line_id,description,quantity,unit,unit_price,amount
+C300,Interior painting,300,m2,6,1800
+C310,Door hardware,24,set,18,432
+C320,Final clean,1,item,250,250

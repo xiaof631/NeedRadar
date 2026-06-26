@@ -16,6 +16,7 @@ import { ElProgress } from 'element-plus/es/components/progress/index';
 import { ElRadioButton, ElRadioGroup } from 'element-plus/es/components/radio/index';
 import { ElRow } from 'element-plus/es/components/row/index';
 import { ElSkeleton } from 'element-plus/es/components/skeleton/index';
+import { ElTabPane, ElTabs } from 'element-plus/es/components/tabs/index';
 import { ElTable, ElTableColumn } from 'element-plus/es/components/table/index';
 import { ElTag } from 'element-plus/es/components/tag/index';
 import { ElTimeline, ElTimelineItem } from 'element-plus/es/components/timeline/index';
@@ -43,6 +44,8 @@ import 'element-plus/es/components/radio-group/style/css';
 import 'element-plus/es/components/row/style/css';
 import 'element-plus/es/components/select/style/css';
 import 'element-plus/es/components/skeleton/style/css';
+import 'element-plus/es/components/tab-pane/style/css';
+import 'element-plus/es/components/tabs/style/css';
 import 'element-plus/es/components/table/style/css';
 import 'element-plus/es/components/table-column/style/css';
 import 'element-plus/es/components/tag/style/css';
@@ -71,6 +74,8 @@ const components = [
   ElRow,
   ElSelect,
   ElSkeleton,
+  ElTabPane,
+  ElTabs,
   ElTable,
   ElTableColumn,
   ElTag,

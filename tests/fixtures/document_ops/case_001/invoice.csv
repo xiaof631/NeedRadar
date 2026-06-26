@@ -1,0 +1,5 @@
+line_id,description,quantity,unit,unit_price,amount
+A100,Site setup,1,item,1250,1250
+A110,Concrete slab preparation,120,m2,19,2280
+A120,Rebar installation,500,kg,2.5,1250
+A140,Temporary fencing,1,item,420,420

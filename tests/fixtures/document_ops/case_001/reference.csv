@@ -1,0 +1,5 @@
+line_id,description,quantity,unit,unit_price,amount
+A100,Site setup,1,item,1250,1250
+A110,Concrete slab preparation,120,m2,18,2160
+A120,Rebar installation,450,kg,2.5,1125
+A130,Waste disposal,1,item,300,300

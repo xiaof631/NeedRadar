@@ -19,6 +19,12 @@ from app.schemas.candidate_needs import (
     CandidateNeedUpdate,
     SyncChannelEnum,
 )
+from app.schemas.customer_radar import (
+    CredibilityLevelEnum,
+    CustomerOpportunityRead,
+    CustomerRadarList,
+    CustomerRadarSummaryRead,
+)
 from app.schemas.dashboard import (
     AlertRead,
     AlertSeverityEnum,
@@ -27,11 +33,22 @@ from app.schemas.dashboard import (
     SourcesSummaryRead,
     StatusBreakdownRead,
 )
-from app.schemas.customer_radar import (
-    CredibilityLevelEnum,
-    CustomerOpportunityRead,
-    CustomerRadarList,
-    CustomerRadarSummaryRead,
+from app.schemas.document_ops import (
+    DocumentOpsExceptionExportRequest,
+    DocumentOpsExceptionRead,
+    DocumentOpsExceptionTypeEnum,
+    DocumentOpsLineItemInput,
+    DocumentOpsLineItemRead,
+    DocumentOpsMatchRead,
+    DocumentOpsMatchTypeEnum,
+    DocumentOpsReconcileRequest,
+    DocumentOpsReconcileResponse,
+    DocumentOpsReviewItemRead,
+    DocumentOpsReviewStatusEnum,
+    DocumentOpsScenarioEnum,
+    DocumentOpsSeverityEnum,
+    DocumentOpsSpikeConclusionRead,
+    DocumentOpsSummaryRead,
 )
 from app.schemas.filter_metrics import (
     FilterPerformanceRead,
@@ -105,6 +122,21 @@ __all__ = [
     "FetchLogRead",
     "FetchResultRead",
     "FetchLogSummaryRead",
+    "DocumentOpsExceptionExportRequest",
+    "DocumentOpsExceptionRead",
+    "DocumentOpsExceptionTypeEnum",
+    "DocumentOpsLineItemInput",
+    "DocumentOpsLineItemRead",
+    "DocumentOpsMatchRead",
+    "DocumentOpsMatchTypeEnum",
+    "DocumentOpsReconcileRequest",
+    "DocumentOpsReconcileResponse",
+    "DocumentOpsReviewItemRead",
+    "DocumentOpsReviewStatusEnum",
+    "DocumentOpsScenarioEnum",
+    "DocumentOpsSeverityEnum",
+    "DocumentOpsSpikeConclusionRead",
+    "DocumentOpsSummaryRead",
     "FilterPerformanceRead",
     "FilterRuleCreate",
     "FilterRuleList",
