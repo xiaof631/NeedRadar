@@ -12,6 +12,8 @@ from app.models import (
     CandidateNeedStatus,
     CandidateNeedStatusLog,
     CandidateNeedType,
+    RawEntry,
+    RawEntryStatus,
     SourceType,
 )
 from app.services.raw_entries import RawEntryNotFoundError
@@ -41,6 +43,7 @@ _ALLOWED_STATUS_TRANSITIONS: dict[CandidateNeedStatus, tuple[CandidateNeedStatus
     CandidateNeedStatus.PENDING_REVIEW: (
         CandidateNeedStatus.APPROVED,
         CandidateNeedStatus.REJECTED,
+        CandidateNeedStatus.ARCHIVED,
     ),
     CandidateNeedStatus.APPROVED: (
         CandidateNeedStatus.IN_DISCOVERY,
@@ -55,6 +58,9 @@ _ALLOWED_STATUS_TRANSITIONS: dict[CandidateNeedStatus, tuple[CandidateNeedStatus
     ),
     CandidateNeedStatus.COMPLETED: (
         CandidateNeedStatus.IN_DISCOVERY,
+    ),
+    CandidateNeedStatus.ARCHIVED: (
+        CandidateNeedStatus.PENDING_REVIEW,
     ),
 }
 
@@ -180,6 +186,11 @@ def update_need(need_id: int, data: dict[str, Any]) -> CandidateNeed:
     updated = db.update_candidate_need(need_id, _apply)
     if "status" in payload and updated.status != previous_status:
         _record_status_transition(updated.id, previous_status, updated.status)
+        _sync_raw_entry_archive_status(
+            updated.raw_entry_id,
+            previous_status=previous_status,
+            target_status=updated.status,
+        )
     return updated
 
 
@@ -198,6 +209,11 @@ def update_need_status(need_id: int, status: CandidateNeedStatus) -> CandidateNe
     updated = db.update_candidate_need(need_id, _apply)
     if previous_status != status:
         _record_status_transition(need_id, previous_status, status)
+        _sync_raw_entry_archive_status(
+            updated.raw_entry_id,
+            previous_status=previous_status,
+            target_status=status,
+        )
     return updated
 
 
@@ -397,6 +413,25 @@ def _record_status_transition(
         to_status=to_status,
         note=note,
     )
+
+
+def _sync_raw_entry_archive_status(
+    raw_entry_id: int,
+    *,
+    previous_status: CandidateNeedStatus,
+    target_status: CandidateNeedStatus,
+) -> None:
+    if target_status == CandidateNeedStatus.ARCHIVED:
+        raw_status = RawEntryStatus.ARCHIVED
+    elif previous_status == CandidateNeedStatus.ARCHIVED:
+        raw_status = RawEntryStatus.PROMOTED
+    else:
+        return
+
+    def _apply(model: RawEntry) -> None:
+        model.status = raw_status
+
+    db.update_raw_entry(raw_entry_id, _apply)
 
 
 def _should_refresh_review_metadata(data: dict[str, Any]) -> bool:

@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.db.entities import (
@@ -324,6 +324,8 @@ class SQLDatabase:
                 )
             if status is not None:
                 stmt = stmt.where(RawEntryEntity.status == status.value)
+            else:
+                stmt = stmt.where(RawEntryEntity.status != RawEntryStatus.ARCHIVED.value)
             if search:
                 keyword = f"%{search.lower()}%"
                 stmt = stmt.where(
@@ -373,6 +375,8 @@ class SQLDatabase:
                 )
             if status is not None:
                 stmt = stmt.where(RawEntryEntity.status == status.value)
+            else:
+                stmt = stmt.where(RawEntryEntity.status != RawEntryStatus.ARCHIVED.value)
             if search:
                 keyword = f"%{search.lower()}%"
                 stmt = stmt.where(
@@ -474,6 +478,10 @@ class SQLDatabase:
                 stmt = stmt.where(
                     CandidateNeedEntity.status.in_([status.value for status in statuses])
                 )
+            else:
+                stmt = stmt.where(
+                    CandidateNeedEntity.status != CandidateNeedStatus.ARCHIVED.value
+                )
             if candidate_type is not None:
                 stmt = stmt.where(CandidateNeedEntity.candidate_type == candidate_type.value)
             if min_review_readiness is not None:
@@ -532,6 +540,10 @@ class SQLDatabase:
                 stmt = stmt.where(
                     CandidateNeedEntity.status.in_([status.value for status in statuses])
                 )
+            else:
+                stmt = stmt.where(
+                    CandidateNeedEntity.status != CandidateNeedStatus.ARCHIVED.value
+                )
             if candidate_type is not None:
                 stmt = stmt.where(CandidateNeedEntity.candidate_type == candidate_type.value)
             if min_review_readiness is not None:
@@ -560,6 +572,98 @@ class SQLDatabase:
                     )
                 )
             return session.execute(stmt).scalar_one()
+
+    def archive_stale_leads(
+        self,
+        *,
+        cutoff: datetime,
+        archived_at: datetime,
+        reason: str,
+    ) -> tuple[int, int]:
+        """批量归档超过截止时间且仍未处理的原始条目和候选需求。"""
+
+        signal_at = func.coalesce(RawEntryEntity.published_at, RawEntryEntity.created_at)
+        marketplace_source = (
+            RssSourceEntity.source_type == SourceType.FREELANCE_MARKETPLACE.value
+        )
+        lead_status = RawEntryEntity.details["lead_status"].as_string()
+        lead_outcome = RawEntryEntity.details["lead_outcome"].as_string()
+        unresolved_marketplace = and_(
+            marketplace_source,
+            or_(lead_status.is_(None), lead_status == "new"),
+            lead_outcome.is_(None),
+        )
+        eligible_source = or_(
+            RssSourceEntity.source_type != SourceType.FREELANCE_MARKETPLACE.value,
+            unresolved_marketplace,
+        )
+
+        with self._session() as session:
+            stale_candidates = session.execute(
+                select(CandidateNeedEntity.id, CandidateNeedEntity.raw_entry_id)
+                .join(
+                    RawEntryEntity,
+                    CandidateNeedEntity.raw_entry_id == RawEntryEntity.id,
+                )
+                .join(
+                    RssSourceEntity,
+                    RawEntryEntity.source_id == RssSourceEntity.id,
+                )
+                .where(
+                    CandidateNeedEntity.status
+                    == CandidateNeedStatus.PENDING_REVIEW.value,
+                    signal_at < cutoff,
+                    eligible_source,
+                )
+            ).all()
+            candidate_ids = [row.id for row in stale_candidates]
+            candidate_raw_entry_ids = [row.raw_entry_id for row in stale_candidates]
+
+            if candidate_ids:
+                session.add_all(
+                    [
+                        CandidateNeedStatusLogEntity(
+                            need_id=need_id,
+                            from_status=CandidateNeedStatus.PENDING_REVIEW.value,
+                            to_status=CandidateNeedStatus.ARCHIVED.value,
+                            note=reason,
+                            changed_at=archived_at,
+                        )
+                        for need_id in candidate_ids
+                    ]
+                )
+                session.execute(
+                    update(CandidateNeedEntity)
+                    .where(CandidateNeedEntity.id.in_(candidate_ids))
+                    .values(
+                        status=CandidateNeedStatus.ARCHIVED.value,
+                        updated_at=archived_at,
+                    )
+                )
+
+            stale_pending_ids = select(RawEntryEntity.id).join(
+                RssSourceEntity,
+                RawEntryEntity.source_id == RssSourceEntity.id,
+            ).where(
+                RawEntryEntity.status == RawEntryStatus.PENDING.value,
+                signal_at < cutoff,
+                eligible_source,
+            )
+            raw_entry_filter: ColumnElement[bool] = RawEntryEntity.id.in_(stale_pending_ids)
+            if candidate_raw_entry_ids:
+                raw_entry_filter = or_(
+                    raw_entry_filter,
+                    RawEntryEntity.id.in_(candidate_raw_entry_ids),
+                )
+            raw_result = session.execute(
+                update(RawEntryEntity)
+                .where(raw_entry_filter)
+                .values(
+                    status=RawEntryStatus.ARCHIVED.value,
+                    updated_at=archived_at,
+                )
+            )
+            return int(raw_result.rowcount or 0), len(candidate_ids)
 
     def list_candidate_need_logs(self, need_id: int) -> list[CandidateNeedStatusLog]:
         with self._session() as session:

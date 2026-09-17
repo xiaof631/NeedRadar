@@ -67,7 +67,8 @@ const statusOptions = computed(() => [
   { label: t('entries.status.pending'), value: 'pending' },
   { label: t('entries.status.filtered'), value: 'filtered' },
   { label: t('entries.status.promoted'), value: 'promoted' },
-  { label: t('entries.status.ignored'), value: 'ignored' }
+  { label: t('entries.status.ignored'), value: 'ignored' },
+  { label: t('entries.status.archived'), value: 'archived' }
 ]);
 
 const queryParams = computed<RawEntryQueryParams>(() => ({
@@ -111,6 +112,8 @@ const statusLabel = (value: RawEntryStatus) => {
       return t('entries.status.promoted');
     case 'ignored':
       return t('entries.status.ignored');
+    case 'archived':
+      return t('entries.status.archived');
     default:
       return t('entries.status.pending');
   }
@@ -123,6 +126,7 @@ const statusTag = (value: RawEntryStatus) => {
     case 'filtered':
       return 'warning';
     case 'ignored':
+    case 'archived':
       return 'info';
     default:
       return 'primary';

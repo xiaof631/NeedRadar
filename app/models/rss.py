@@ -42,6 +42,7 @@ class RawEntryStatus(str, Enum):
     FILTERED = "filtered"
     PROMOTED = "promoted"
     IGNORED = "ignored"
+    ARCHIVED = "archived"
 
 
 @dataclass(slots=True)

@@ -6,23 +6,29 @@
     </div>
     <header class="page-header">
       <div class="actions">
-        <el-radio-group v-model="queueView" size="small">
-          <el-radio-button value="high_purity">
-            {{ t('marketplace.filters.queueOptions.high_purity') }}
+        <el-radio-group v-model="opportunityView" size="small">
+          <el-radio-button value="preferred">
+            {{ t('marketplace.filters.opportunityOptions.preferred') }}
           </el-radio-button>
-          <el-radio-button value="expanded">
-            {{ t('marketplace.filters.queueOptions.expanded') }}
+          <el-radio-button value="remote_part_time">
+            {{ t('marketplace.filters.opportunityOptions.remote_part_time') }}
+          </el-radio-button>
+          <el-radio-button value="project_outsourcing">
+            {{ t('marketplace.filters.opportunityOptions.project_outsourcing') }}
           </el-radio-button>
           <el-radio-button value="all">
-            {{ t('marketplace.filters.queueOptions.all') }}
+            {{ t('marketplace.filters.opportunityOptions.all') }}
           </el-radio-button>
         </el-radio-group>
-        <el-select v-model="leadKindView" class="kind-select" :placeholder="t('marketplace.filters.leadKind')">
-          <el-option :label="t('marketplace.filters.leadKindOptions.reviewable')" value="reviewable" />
-          <el-option :label="t('marketplace.filters.leadKindOptions.project')" value="project" />
-          <el-option :label="t('marketplace.filters.leadKindOptions.contract_role')" value="contract_role" />
-          <el-option :label="t('marketplace.filters.leadKindOptions.full_time_job')" value="full_time_job" />
-          <el-option :label="t('marketplace.filters.leadKindOptions.all')" value="all" />
+        <el-select
+          v-model="communicationFilter"
+          class="profile-select"
+          :placeholder="t('marketplace.filters.communication')"
+        >
+          <el-option :label="t('marketplace.filters.communicationOptions.all')" value="all" />
+          <el-option :label="t('marketplace.filters.communicationOptions.low')" value="low" />
+          <el-option :label="t('marketplace.filters.communicationOptions.medium')" value="medium" />
+          <el-option :label="t('marketplace.filters.communicationOptions.high')" value="high" />
         </el-select>
         <el-input
           v-model="search"
@@ -30,116 +36,146 @@
           :placeholder="t('marketplace.filters.searchPlaceholder')"
           clearable
         />
-        <el-select v-model="statusFilter" class="status-select" :placeholder="t('marketplace.filters.status')">
-          <el-option :label="t('marketplace.filters.statusOptions.all')" value="all" />
-          <el-option
-            v-for="option in leadStatusOptions"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-        <el-select v-model="outcomeFilter" class="status-select" :placeholder="t('marketplace.filters.outcome')">
-          <el-option :label="t('marketplace.filters.outcomeOptions.all')" value="all" />
-          <el-option
-            v-for="option in leadOutcomeOptions"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-        <el-select v-model="followUpFilter" class="status-select" :placeholder="t('marketplace.filters.followUp')">
-          <el-option :label="t('marketplace.filters.followUpOptions.all')" value="all" />
-          <el-option :label="t('marketplace.filters.followUpOptions.overdue')" value="overdue" />
-        </el-select>
-        <el-select v-model="sourceId" class="source-select" :placeholder="t('marketplace.filters.source')">
-          <el-option :label="t('marketplace.filters.sourceOptions.all')" value="all" />
-          <el-option
-            v-for="source in marketplaceSources"
-            :key="source.id"
-            :label="source.name"
-            :value="String(source.id)"
-          />
-        </el-select>
-        <el-select v-model="budgetBandFilter" class="profile-select" :placeholder="t('marketplace.filters.budgetBand')">
-          <el-option :label="t('marketplace.filters.budgetBandOptions.all')" value="all" />
-          <el-option
-            v-for="option in budgetBandOptions"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-        <el-select
-          v-model="deliveryScopeFilter"
-          class="profile-select"
-          :placeholder="t('marketplace.filters.deliveryScope')"
-        >
-          <el-option :label="t('marketplace.filters.deliveryScopeOptions.all')" value="all" />
-          <el-option
-            v-for="option in deliveryScopeOptions"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-        <el-select v-model="techStackFilter" class="profile-select" :placeholder="t('marketplace.filters.techStack')">
-          <el-option :label="t('marketplace.filters.techStackOptions.all')" value="all" />
-          <el-option
-            v-for="option in techStackOptions"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-        <el-select v-model="regionFilter" class="profile-select" :placeholder="t('marketplace.filters.region')">
-          <el-option :label="t('marketplace.filters.regionOptions.all')" value="all" />
-          <el-option
-            v-for="option in regionOptions"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-        <el-select
-          v-model="timezoneFitFilter"
-          class="profile-select"
-          :placeholder="t('marketplace.filters.timezoneFit')"
-        >
-          <el-option :label="t('marketplace.filters.timezoneFitOptions.all')" value="all" />
-          <el-option :label="t('marketplace.filters.timezoneFitOptions.fit')" value="fit" />
-          <el-option :label="t('marketplace.filters.timezoneFitOptions.unfit')" value="unfit" />
-        </el-select>
-        <el-select
-          v-model="bulkOutcomeDraft"
-          class="status-select"
-          :placeholder="t('marketplace.bulk.outcomePlaceholder')"
-        >
-          <el-option
-            v-for="option in leadOutcomeOptions"
-            :key="option.value"
-            :label="option.label"
-            :value="option.value"
-          />
-        </el-select>
-        <el-select
-          v-model="bulkReasonTagsDraft"
-          class="reason-select"
-          multiple
-          filterable
-          allow-create
-          default-first-option
-          collapse-tags
-          collapse-tags-tooltip
-          :placeholder="t('marketplace.bulk.reasonPlaceholder')"
-        />
+        <details class="advanced-panel filter-panel">
+          <summary>{{ t('marketplace.filters.advancedToggle') }}</summary>
+          <div class="advanced-actions">
+            <el-radio-group v-model="queueView" size="small">
+              <el-radio-button value="high_purity">
+                {{ t('marketplace.filters.queueOptions.high_purity') }}
+              </el-radio-button>
+              <el-radio-button value="expanded">
+                {{ t('marketplace.filters.queueOptions.expanded') }}
+              </el-radio-button>
+              <el-radio-button value="all">
+                {{ t('marketplace.filters.queueOptions.all') }}
+              </el-radio-button>
+            </el-radio-group>
+            <el-select v-model="leadKindView" class="kind-select" :placeholder="t('marketplace.filters.leadKind')">
+              <el-option :label="t('marketplace.filters.leadKindOptions.reviewable')" value="reviewable" />
+              <el-option :label="t('marketplace.filters.leadKindOptions.project')" value="project" />
+              <el-option :label="t('marketplace.filters.leadKindOptions.contract_role')" value="contract_role" />
+              <el-option :label="t('marketplace.filters.leadKindOptions.full_time_job')" value="full_time_job" />
+              <el-option :label="t('marketplace.filters.leadKindOptions.all')" value="all" />
+            </el-select>
+            <el-select v-model="statusFilter" class="status-select" :placeholder="t('marketplace.filters.status')">
+              <el-option :label="t('marketplace.filters.statusOptions.all')" value="all" />
+              <el-option
+                v-for="option in leadStatusOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <el-select v-model="outcomeFilter" class="status-select" :placeholder="t('marketplace.filters.outcome')">
+              <el-option :label="t('marketplace.filters.outcomeOptions.all')" value="all" />
+              <el-option
+                v-for="option in leadOutcomeOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <el-select v-model="followUpFilter" class="status-select" :placeholder="t('marketplace.filters.followUp')">
+              <el-option :label="t('marketplace.filters.followUpOptions.all')" value="all" />
+              <el-option :label="t('marketplace.filters.followUpOptions.overdue')" value="overdue" />
+            </el-select>
+            <el-select v-model="sourceId" class="source-select" :placeholder="t('marketplace.filters.source')">
+              <el-option :label="t('marketplace.filters.sourceOptions.all')" value="all" />
+              <el-option
+                v-for="source in marketplaceSources"
+                :key="source.id"
+                :label="source.name"
+                :value="String(source.id)"
+              />
+            </el-select>
+            <el-select v-model="budgetBandFilter" class="profile-select" :placeholder="t('marketplace.filters.budgetBand')">
+              <el-option :label="t('marketplace.filters.budgetBandOptions.all')" value="all" />
+              <el-option
+                v-for="option in budgetBandOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <el-select
+              v-model="deliveryScopeFilter"
+              class="profile-select"
+              :placeholder="t('marketplace.filters.deliveryScope')"
+            >
+              <el-option :label="t('marketplace.filters.deliveryScopeOptions.all')" value="all" />
+              <el-option
+                v-for="option in deliveryScopeOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <el-select v-model="techStackFilter" class="profile-select" :placeholder="t('marketplace.filters.techStack')">
+              <el-option :label="t('marketplace.filters.techStackOptions.all')" value="all" />
+              <el-option
+                v-for="option in techStackOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <el-select v-model="regionFilter" class="profile-select" :placeholder="t('marketplace.filters.region')">
+              <el-option :label="t('marketplace.filters.regionOptions.all')" value="all" />
+              <el-option
+                v-for="option in regionOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <el-select
+              v-model="timezoneFitFilter"
+              class="profile-select"
+              :placeholder="t('marketplace.filters.timezoneFit')"
+            >
+              <el-option :label="t('marketplace.filters.timezoneFitOptions.all')" value="all" />
+              <el-option :label="t('marketplace.filters.timezoneFitOptions.fit')" value="fit" />
+              <el-option :label="t('marketplace.filters.timezoneFitOptions.unfit')" value="unfit" />
+            </el-select>
+            <el-select
+              v-model="bulkOutcomeDraft"
+              class="status-select"
+              :placeholder="t('marketplace.bulk.outcomePlaceholder')"
+            >
+              <el-option
+                v-for="option in leadOutcomeOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+            <el-select
+              v-model="bulkReasonTagsDraft"
+              class="reason-select"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              collapse-tags
+              collapse-tags-tooltip
+              :placeholder="t('marketplace.bulk.reasonPlaceholder')"
+            />
+            <el-button
+              type="success"
+              :disabled="!selectedLeadIds.length || !bulkOutcomeDraft"
+              :loading="bulkOutcomeMutation.isPending.value"
+              @click="applyBulkOutcome"
+            >
+              {{ t('marketplace.bulk.apply', { count: selectedLeadIds.length }) }}
+            </el-button>
+          </div>
+        </details>
         <el-button
-          type="success"
-          :disabled="!selectedLeadIds.length || !bulkOutcomeDraft"
-          :loading="bulkOutcomeMutation.isPending.value"
-          @click="applyBulkOutcome"
+          type="warning"
+          :loading="batchProposalMutation.isPending.value"
+          @click="prepareTopProposalDrafts"
         >
-          {{ t('marketplace.bulk.apply', { count: selectedLeadIds.length }) }}
+          {{ t('marketplace.proposal.prepareTop') }}
         </el-button>
         <el-button type="primary" @click="refetch" :loading="leadsQuery.isFetching.value">
           {{ t('actions.refresh') }}
@@ -152,6 +188,62 @@
         <div class="metric-label">{{ t('marketplace.metrics.total') }}</div>
         <div class="metric-value">{{ total }}</div>
       </el-card>
+      <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.remotePartTime') }}</div>
+        <div class="metric-value">{{ remotePartTimeCount }}</div>
+      </el-card>
+      <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.projectOutsourcing') }}</div>
+        <div class="metric-value">{{ projectOutsourcingCount }}</div>
+      </el-card>
+      <el-card shadow="never">
+        <div class="metric-label">{{ t('marketplace.metrics.highCommunication') }}</div>
+        <div class="metric-value">{{ highCommunicationCount }}</div>
+      </el-card>
+    </div>
+
+    <section class="priority-preview">
+      <div class="priority-preview-header">
+        <div>
+          <div class="source-health-title">{{ t('marketplace.priorityPreview.title') }}</div>
+          <div class="todo-subtitle">{{ t('marketplace.priorityPreview.subtitle') }}</div>
+        </div>
+        <el-tag type="success" effect="plain">{{ total }}</el-tag>
+      </div>
+      <div v-if="leads.length" class="priority-preview-list">
+        <button
+          v-for="lead in leads"
+          :key="lead.id"
+          class="priority-preview-item"
+          type="button"
+          @click="openLeadDetails(lead.id)"
+        >
+          <div class="priority-preview-main">
+            <div class="priority-preview-title">{{ lead.title }}</div>
+            <div class="tag-list">
+              <el-tag size="small" effect="plain">{{ opportunityLaneLabel(lead.opportunity_lane) }}</el-tag>
+              <el-tag size="small" :type="communicationBurdenTagType(lead.communication_burden)" effect="plain">
+                {{ communicationBurdenLabel(lead.communication_burden) }}
+              </el-tag>
+              <el-tag v-if="lead.quick_delivery_fit" size="small" type="success" effect="plain">
+                {{ t('marketplace.profile.quickFit') }}
+              </el-tag>
+            </div>
+            <div class="summary-text">{{ lead.decision_summary_zh }}</div>
+          </div>
+          <span class="priority-preview-action">{{ t('marketplace.priorityPreview.view') }} →</span>
+        </button>
+      </div>
+      <div v-else class="todo-empty">{{ t('marketplace.priorityPreview.empty') }}</div>
+    </section>
+
+    <details class="advanced-panel stats-panel">
+      <summary>{{ t('marketplace.metrics.fullStats') }}</summary>
+      <div class="summary-grid compact-summary-grid">
+        <el-card shadow="never">
+          <div class="metric-label">{{ t('marketplace.metrics.lowCommunication') }}</div>
+          <div class="metric-value">{{ lowCommunicationCount }}</div>
+        </el-card>
       <el-card shadow="never">
         <div class="metric-label">{{ t('marketplace.metrics.highPurity') }}</div>
         <div class="metric-value">{{ highPurityCount }}</div>
@@ -200,7 +292,8 @@
         <div class="metric-label">{{ t('marketplace.metrics.pausedSources') }}</div>
         <div class="metric-value">{{ pausedSourceCount }}</div>
       </el-card>
-    </div>
+      </div>
+    </details>
 
     <el-card shadow="never">
       <template #header>
@@ -426,8 +519,26 @@
                 >
                   {{ t('marketplace.table.hasLink') }}
                 </el-tag>
+                <el-tag
+                  size="small"
+                  effect="plain"
+                  :type="opportunityLaneTagType(row.opportunity_lane)"
+                >
+                  {{ opportunityLaneLabel(row.opportunity_lane) }}
+                </el-tag>
+                <el-tag
+                  size="small"
+                  effect="plain"
+                  :type="communicationBurdenTagType(row.communication_burden)"
+                >
+                  {{ communicationBurdenLabel(row.communication_burden) }}
+                </el-tag>
+                <el-tag v-if="row.quick_delivery_fit" size="small" type="success" effect="plain">
+                  {{ t('marketplace.profile.quickFit') }}
+                </el-tag>
               </div>
               <div v-if="row.summary" class="summary-text">{{ row.summary }}</div>
+              <div class="summary-text decision-summary">{{ row.decision_summary_zh }}</div>
               <div v-if="row.duplicate_count > 1" class="summary-text">
                 {{ row.duplicate_sources.join(' / ') }}
               </div>
@@ -521,6 +632,17 @@
               <span class="priority-score">{{ row.priority_score }}</span>
               <div class="summary-text">{{ row.priority_reason }}</div>
             </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('marketplace.proposal.tableTitle')" width="160">
+          <template #default="{ row }">
+            <el-tag v-if="row.proposal_status" :type="proposalStatusTagType(row.proposal_status)" effect="plain">
+              {{ proposalStatusLabel(row.proposal_status) }}
+            </el-tag>
+            <div v-if="row.capability_fit_score !== null" class="summary-text">
+              {{ t('marketplace.proposal.fitScore', { score: row.capability_fit_score }) }}
+            </div>
+            <span v-if="!row.proposal_status">—</span>
           </template>
         </el-table-column>
         <el-table-column :label="t('marketplace.table.status')" width="190">
@@ -631,6 +753,12 @@
                 <el-tag :type="leadStatusTagType(selectedLead.lead_status)" effect="plain">
                   {{ leadStatusLabel(selectedLead.lead_status) }}
                 </el-tag>
+                <el-tag :type="opportunityLaneTagType(selectedLead.opportunity_lane)" effect="plain">
+                  {{ opportunityLaneLabel(selectedLead.opportunity_lane) }}
+                </el-tag>
+                <el-tag :type="communicationBurdenTagType(selectedLead.communication_burden)" effect="plain">
+                  {{ communicationBurdenLabel(selectedLead.communication_burden) }}
+                </el-tag>
               </div>
             </div>
             <el-button
@@ -659,6 +787,26 @@
             <div class="detail-item">
               <span class="detail-label">{{ t('marketplace.details.location') }}</span>
               <span>{{ selectedLead.location || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.opportunityLane') }}</span>
+              <span>{{ opportunityLaneLabel(selectedLead.opportunity_lane) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.communication') }}</span>
+              <span>{{ communicationBurdenLabel(selectedLead.communication_burden) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.weeklyHours') }}</span>
+              <span>{{ selectedLead.weekly_hours || '—' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.liveInterview') }}</span>
+              <span>{{ selectedLead.requires_live_interview ? t('marketplace.profile.yes') : t('marketplace.profile.no') }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">{{ t('marketplace.details.quickFit') }}</span>
+              <span>{{ selectedLead.quick_delivery_fit ? t('marketplace.profile.yes') : t('marketplace.profile.no') }}</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">{{ t('marketplace.details.budget') }}</span>
@@ -735,6 +883,22 @@
           </div>
 
           <div class="details-section">
+            <div class="detail-label">{{ t('marketplace.details.decisionSummary') }}</div>
+            <p class="detail-paragraph">{{ selectedLead.decision_summary_zh }}</p>
+            <div class="tag-list">
+              <el-tag
+                v-for="reason in selectedLead.communication_reasons"
+                :key="reason"
+                size="small"
+                effect="plain"
+                :type="communicationBurdenTagType(selectedLead.communication_burden)"
+              >
+                {{ reason }}
+              </el-tag>
+            </div>
+          </div>
+
+          <div class="details-section">
             <div class="detail-label">{{ t('marketplace.details.reason') }}</div>
             <p class="detail-paragraph">{{ selectedLead.tier_reason }}</p>
           </div>
@@ -745,6 +909,188 @@
               {{ t('marketplace.details.priorityScore', { score: selectedLead.priority_score }) }}
             </p>
             <p class="detail-paragraph">{{ selectedLead.priority_reason }}</p>
+          </div>
+
+          <div class="details-section proposal-section">
+            <div class="proposal-title-row">
+              <div>
+                <div class="detail-label">{{ t('marketplace.proposal.title') }}</div>
+                <p class="detail-paragraph">{{ t('marketplace.proposal.safetyNote') }}</p>
+              </div>
+              <el-tag
+                v-if="selectedProposal"
+                :type="proposalStatusTagType(selectedProposal.status)"
+                effect="plain"
+              >
+                {{ proposalStatusLabel(selectedProposal.status) }}
+              </el-tag>
+            </div>
+
+            <div v-loading="proposalQuery.isFetching.value">
+              <template v-if="selectedProposal">
+                <el-alert
+                  v-if="selectedProposal.chinese_brief"
+                  :title="selectedProposal.chinese_brief"
+                  type="info"
+                  :closable="false"
+                  show-icon
+                />
+                <div class="proposal-metrics">
+                  <div class="detail-item">
+                    <span class="detail-label">{{ t('marketplace.proposal.offer') }}</span>
+                    <span>{{ selectedProposal.offer_name }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="detail-label">{{ t('marketplace.proposal.fit') }}</span>
+                    <span>{{ selectedProposal.fit_score }}/100</span>
+                  </div>
+                </div>
+                <div class="tag-list proposal-tags">
+                  <el-tag
+                    v-for="capability in selectedProposal.matched_capabilities"
+                    :key="capability"
+                    size="small"
+                    type="success"
+                    effect="plain"
+                  >
+                    {{ capability }}
+                  </el-tag>
+                  <el-tag
+                    v-for="risk in selectedProposal.risk_flags"
+                    :key="risk"
+                    size="small"
+                    type="danger"
+                    effect="plain"
+                  >
+                    {{ proposalRiskLabel(risk) }}
+                  </el-tag>
+                </div>
+                <div class="proposal-inputs">
+                  <el-input
+                    v-model="proposalPriceDraft"
+                    :disabled="!proposalEditable"
+                    :placeholder="t('marketplace.proposal.price')"
+                  />
+                  <el-input
+                    v-model="proposalDaysDraft"
+                    :disabled="!proposalEditable"
+                    :placeholder="t('marketplace.proposal.deliveryDays')"
+                  />
+                </div>
+                <el-input
+                  v-model="proposalTextDraft"
+                  type="textarea"
+                  :rows="14"
+                  :disabled="!proposalEditable"
+                  :placeholder="t('marketplace.proposal.textPlaceholder')"
+                />
+                <div v-if="selectedProposal.questions.length" class="proposal-questions">
+                  <div class="detail-label">{{ t('marketplace.proposal.questions') }}</div>
+                  <ol>
+                    <li v-for="question in selectedProposal.questions" :key="question">{{ question }}</li>
+                  </ol>
+                </div>
+                <el-alert
+                  v-if="proposalDirty"
+                  :title="t('marketplace.proposal.unsaved')"
+                  type="warning"
+                  :closable="false"
+                  show-icon
+                />
+                <div class="details-actions proposal-actions">
+                  <el-button size="small" @click="copyProposalText">
+                    {{ t('marketplace.proposal.copy') }}
+                  </el-button>
+                  <el-button
+                    v-if="proposalEditable"
+                    size="small"
+                    :loading="proposalContentMutation.isPending.value"
+                    @click="saveProposalDraft"
+                  >
+                    {{ t('marketplace.proposal.save') }}
+                  </el-button>
+                  <el-button
+                    v-if="proposalEditable"
+                    size="small"
+                    :loading="proposalGenerateMutation.isPending.value"
+                    @click="generateProposal(true)"
+                  >
+                    {{ t('marketplace.proposal.regenerate') }}
+                  </el-button>
+                  <el-button
+                    v-if="selectedProposal.status === 'draft_ready'"
+                    size="small"
+                    type="success"
+                    :disabled="proposalDirty"
+                    :loading="proposalStatusMutation.isPending.value"
+                    @click="setProposalStatus('approved')"
+                  >
+                    {{ t('marketplace.proposal.approve') }}
+                  </el-button>
+                  <el-button
+                    v-if="selectedProposal.status === 'approved'"
+                    size="small"
+                    type="primary"
+                    :disabled="proposalDirty"
+                    :loading="proposalStatusMutation.isPending.value"
+                    @click="setProposalStatus('submitted')"
+                  >
+                    {{ t('marketplace.proposal.markSubmitted') }}
+                  </el-button>
+                  <el-button
+                    v-if="selectedProposal.source_url"
+                    size="small"
+                    type="primary"
+                    plain
+                    @click="openExternal(selectedProposal.source_url)"
+                  >
+                    {{ t('marketplace.proposal.openPlatform') }}
+                  </el-button>
+                  <el-button
+                    v-if="selectedProposal.status === 'submitted'"
+                    size="small"
+                    @click="setProposalStatus('replied')"
+                  >
+                    {{ t('marketplace.proposal.markReplied') }}
+                  </el-button>
+                  <el-button
+                    v-if="['submitted', 'replied'].includes(selectedProposal.status)"
+                    size="small"
+                    @click="setProposalStatus('interview')"
+                  >
+                    {{ t('marketplace.proposal.markInterview') }}
+                  </el-button>
+                  <el-button
+                    v-if="['submitted', 'replied', 'interview'].includes(selectedProposal.status)"
+                    size="small"
+                    type="success"
+                    @click="setProposalStatus('won')"
+                  >
+                    {{ t('marketplace.proposal.markWon') }}
+                  </el-button>
+                  <el-button
+                    v-if="['submitted', 'replied', 'interview'].includes(selectedProposal.status)"
+                    size="small"
+                    type="danger"
+                    plain
+                    @click="setProposalStatus('lost')"
+                  >
+                    {{ t('marketplace.proposal.markLost') }}
+                  </el-button>
+                </div>
+              </template>
+              <div v-else class="proposal-empty">
+                <p class="detail-paragraph">{{ t('marketplace.proposal.empty') }}</p>
+                <el-button
+                  type="primary"
+                  size="small"
+                  :loading="proposalGenerateMutation.isPending.value"
+                  @click="generateProposal(false)"
+                >
+                  {{ t('marketplace.proposal.generate') }}
+                </el-button>
+              </div>
+            </div>
           </div>
 
           <div class="details-section">
@@ -946,14 +1292,20 @@ import {
   bulkUpdateMarketplaceLeadOutcome,
   fetchMarketplaceLead,
   fetchMarketplaceLeads,
+  fetchMarketplaceProposal,
   fetchRssSources,
+  generateMarketplaceProposal,
+  prepareMarketplaceProposalDrafts,
   updateMarketplaceLeadFollowUp,
   updateMarketplaceLeadNotes,
   updateMarketplaceLeadOutcome,
   updateMarketplaceLeadStatus,
+  updateMarketplaceProposalContent,
+  updateMarketplaceProposalStatus,
   type MarketplaceLead,
   type MarketplaceLeadEvent,
   type MarketplaceLeadReminder,
+  type MarketplaceProposalStatus,
   type MarketplaceSourceRecommendation
 } from '../services/api';
 
@@ -970,7 +1322,9 @@ const deliveryScopeFilter = ref<'all' | NonNullable<MarketplaceLead['delivery_sc
 const techStackFilter = ref<'all' | string>('all');
 const regionFilter = ref<'all' | NonNullable<MarketplaceLead['region']>>('all');
 const timezoneFitFilter = ref<'all' | 'fit' | 'unfit'>('all');
-const queueView = ref<'high_purity' | 'expanded' | 'all'>('high_purity');
+const opportunityView = ref<'preferred' | MarketplaceLead['opportunity_lane'] | 'all'>('preferred');
+const communicationFilter = ref<'all' | MarketplaceLead['communication_burden']>('all');
+const queueView = ref<'high_purity' | 'expanded' | 'all'>('all');
 const leadKindView = ref<'reviewable' | 'project' | 'contract_role' | 'full_time_job' | 'all'>('reviewable');
 const todoSort = ref<'default' | 'newest_first' | 'oldest_first' | 'priority'>('default');
 
@@ -991,12 +1345,16 @@ const followUpDraft = ref('');
 const followUpReasonDraft = ref('');
 const bulkOutcomeDraft = ref<NonNullable<MarketplaceLead['lead_outcome']> | null>(null);
 const bulkReasonTagsDraft = ref<string[]>([]);
+const proposalTextDraft = ref('');
+const proposalPriceDraft = ref('');
+const proposalDaysDraft = ref('');
 
 const leadStatusOptions = computed(() => [
   { value: 'new' as const, label: t('marketplace.filters.statusOptions.new') },
   { value: 'watching' as const, label: t('marketplace.filters.statusOptions.watching') },
   { value: 'contacted' as const, label: t('marketplace.filters.statusOptions.contacted') },
-  { value: 'ignored' as const, label: t('marketplace.filters.statusOptions.ignored') }
+  { value: 'ignored' as const, label: t('marketplace.filters.statusOptions.ignored') },
+  { value: 'archived' as const, label: t('marketplace.filters.statusOptions.archived') }
 ]);
 
 const leadOutcomeOptions = computed(() => [
@@ -1100,6 +1458,15 @@ const queryParams = computed(() => ({
     leadKindView.value === 'full_time_job'
       ? leadKindView.value
       : undefined,
+  opportunity_lane:
+    opportunityView.value === 'remote_part_time' ||
+    opportunityView.value === 'project_outsourcing' ||
+    opportunityView.value === 'other'
+      ? opportunityView.value
+      : undefined,
+  communication_burden:
+    communicationFilter.value === 'all' ? undefined : communicationFilter.value,
+  preferred_only: opportunityView.value === 'preferred' ? true : undefined,
   budget_band: budgetBandFilter.value === 'all' ? undefined : budgetBandFilter.value,
   delivery_scope: deliveryScopeFilter.value === 'all' ? undefined : deliveryScopeFilter.value,
   tech_stack: techStackFilter.value === 'all' ? undefined : techStackFilter.value,
@@ -1124,6 +1491,14 @@ const detailsQuery = useQuery({
   queryKey: computed(() => ['marketplace-lead', selectedLeadId.value]),
   queryFn: () => fetchMarketplaceLead(selectedLeadId.value as number),
   enabled: computed(() => detailsVisible.value && selectedLeadId.value !== null),
+  staleTime: 30_000
+});
+
+const proposalQuery = useQuery({
+  queryKey: computed(() => ['marketplace-proposal', selectedLeadId.value]),
+  queryFn: () => fetchMarketplaceProposal(selectedLeadId.value as number),
+  enabled: computed(() => detailsVisible.value && selectedLeadId.value !== null),
+  retry: false,
   staleTime: 30_000
 });
 
@@ -1228,8 +1603,75 @@ const bulkOutcomeMutation = useMutation({
   }
 });
 
+const batchProposalMutation = useMutation({
+  mutationFn: () => prepareMarketplaceProposalDrafts(5, 65),
+  onSuccess: async (result) => {
+    ElMessage.success(
+      t('marketplace.proposal.feedback.prepared', {
+        created: result.created,
+        skipped: result.skipped
+      })
+    );
+    await leadsQuery.refetch();
+    if (selectedLeadId.value !== null) {
+      await proposalQuery.refetch();
+    }
+  },
+  onError: () => ElMessage.error(t('feedback.genericError'))
+});
+
+const proposalGenerateMutation = useMutation({
+  mutationFn: ({ leadId, force }: { leadId: number; force: boolean }) =>
+    generateMarketplaceProposal(leadId, force),
+  onSuccess: async () => {
+    ElMessage.success(t('marketplace.proposal.feedback.generated'));
+    await Promise.all([leadsQuery.refetch(), detailsQuery.refetch(), proposalQuery.refetch()]);
+  },
+  onError: () => ElMessage.error(t('feedback.genericError'))
+});
+
+const proposalContentMutation = useMutation({
+  mutationFn: ({ leadId }: { leadId: number }) =>
+    updateMarketplaceProposalContent(
+      leadId,
+      proposalTextDraft.value,
+      proposalPriceDraft.value,
+      proposalDaysDraft.value
+    ),
+  onSuccess: async () => {
+    ElMessage.success(t('marketplace.proposal.feedback.saved'));
+    await Promise.all([leadsQuery.refetch(), detailsQuery.refetch(), proposalQuery.refetch()]);
+  },
+  onError: () => ElMessage.error(t('feedback.genericError'))
+});
+
+const proposalStatusMutation = useMutation({
+  mutationFn: ({ leadId, status }: { leadId: number; status: MarketplaceProposalStatus }) =>
+    updateMarketplaceProposalStatus(leadId, status),
+  onSuccess: async () => {
+    ElMessage.success(t('marketplace.proposal.feedback.statusUpdated'));
+    await Promise.all([leadsQuery.refetch(), detailsQuery.refetch(), proposalQuery.refetch()]);
+  },
+  onError: () => ElMessage.error(t('feedback.genericError'))
+});
+
 const leads = computed(() => leadsQuery.data.value?.items ?? []);
 const selectedLead = computed(() => detailsQuery.data.value ?? null);
+const selectedProposal = computed(() => proposalQuery.data.value ?? null);
+const proposalEditable = computed(() =>
+  selectedProposal.value
+    ? ['draft_ready', 'approved', 'skipped'].includes(selectedProposal.value.status)
+    : false
+);
+const proposalDirty = computed(() => {
+  const proposal = selectedProposal.value;
+  if (!proposal) return false;
+  return (
+    proposalTextDraft.value !== proposal.proposal_text ||
+    proposalPriceDraft.value !== proposal.suggested_price ||
+    proposalDaysDraft.value !== proposal.delivery_days
+  );
+});
 const total = computed(() => leadsQuery.data.value?.total ?? 0);
 const sourceBreakdown = computed(() => leadsQuery.data.value?.source_breakdown ?? []);
 const sourceRecommendations = computed(() => leadsQuery.data.value?.source_recommendations ?? []);
@@ -1248,6 +1690,18 @@ const projectCount = computed(() => leadsQuery.data.value?.kind_breakdown?.proje
 const contractRoleCount = computed(() => leadsQuery.data.value?.kind_breakdown?.contract_role ?? 0);
 const reviewableCount = computed(() => projectCount.value + contractRoleCount.value);
 const fullTimeJobCount = computed(() => leadsQuery.data.value?.kind_breakdown?.full_time_job ?? 0);
+const remotePartTimeCount = computed(
+  () => leadsQuery.data.value?.opportunity_lane_breakdown?.remote_part_time ?? 0
+);
+const projectOutsourcingCount = computed(
+  () => leadsQuery.data.value?.opportunity_lane_breakdown?.project_outsourcing ?? 0
+);
+const lowCommunicationCount = computed(
+  () => leadsQuery.data.value?.communication_breakdown?.low ?? 0
+);
+const highCommunicationCount = computed(
+  () => leadsQuery.data.value?.communication_breakdown?.high ?? 0
+);
 const watchingCount = computed(() => leadsQuery.data.value?.status_breakdown?.watching ?? 0);
 const contactedCount = computed(() => leadsQuery.data.value?.status_breakdown?.contacted ?? 0);
 const wonCount = computed(() => leadsQuery.data.value?.outcome_breakdown?.won ?? 0);
@@ -1288,6 +1742,8 @@ watch(
     techStackFilter,
     regionFilter,
     timezoneFitFilter,
+    opportunityView,
+    communicationFilter,
     queueView,
     leadKindView
   ],
@@ -1304,6 +1760,16 @@ watch(
     outcomeReasonDraft.value = value?.outcome_reason_tags ?? [];
     followUpDraft.value = toDatetimeLocal(value?.next_follow_up_at ?? null);
     followUpReasonDraft.value = value?.follow_up_reason ?? '';
+  },
+  { immediate: true }
+);
+
+watch(
+  () => proposalQuery.data.value,
+  (value) => {
+    proposalTextDraft.value = value?.proposal_text ?? '';
+    proposalPriceDraft.value = value?.suggested_price ?? '';
+    proposalDaysDraft.value = value?.delivery_days ?? '';
   },
   { immediate: true }
 );
@@ -1330,7 +1796,7 @@ const sourceStatusTagType = (status: 'active' | 'paused' | 'disabled') => {
 const leadStatusTagType = (status: MarketplaceLead['lead_status']) => {
   if (status === 'contacted') return 'success';
   if (status === 'watching') return 'warning';
-  if (status === 'ignored') return 'info';
+  if (status === 'ignored' || status === 'archived') return 'info';
   return 'info';
 };
 
@@ -1359,6 +1825,51 @@ const leadOutcomeTagType = (outcome: NonNullable<MarketplaceLead['lead_outcome']
   return 'info';
 };
 
+const proposalStatusLabel = (status: MarketplaceProposalStatus) =>
+  t(`marketplace.proposal.status.${status}`);
+
+const proposalStatusTagType = (status: MarketplaceProposalStatus) => {
+  if (status === 'won') return 'success';
+  if (status === 'lost' || status === 'skipped') return 'danger';
+  if (status === 'submitted' || status === 'replied' || status === 'interview') return 'warning';
+  if (status === 'approved') return 'success';
+  return 'info';
+};
+
+const proposalRiskLabel = (risk: string) => {
+  const known = [
+    'high_compliance',
+    'sensitive_data',
+    'missing_source_link',
+    'low_budget',
+    'unclear_scope',
+    'low_value_manual',
+    'anti_bot_evasion',
+    'high_communication',
+    'live_interview',
+    'rights_circumvention'
+  ];
+  return known.includes(risk) ? t(`marketplace.proposal.risk.${risk}`) : risk;
+};
+
+const opportunityLaneLabel = (lane: MarketplaceLead['opportunity_lane']) =>
+  t(`marketplace.filters.opportunityOptions.${lane}`);
+
+const opportunityLaneTagType = (lane: MarketplaceLead['opportunity_lane']) => {
+  if (lane === 'remote_part_time') return 'warning';
+  if (lane === 'project_outsourcing') return 'success';
+  return 'info';
+};
+
+const communicationBurdenLabel = (burden: MarketplaceLead['communication_burden']) =>
+  t(`marketplace.filters.communicationOptions.${burden}`);
+
+const communicationBurdenTagType = (burden: MarketplaceLead['communication_burden']) => {
+  if (burden === 'low') return 'success';
+  if (burden === 'high') return 'danger';
+  return 'warning';
+};
+
 const formatLeadEvent = (event: MarketplaceLeadEvent) => {
   if (event.event_type === 'captured') {
     return t('marketplace.activity.captured');
@@ -1380,6 +1891,9 @@ const formatLeadEvent = (event: MarketplaceLeadEvent) => {
   }
   if (event.event_type === 'follow_up_scheduled') {
     return t('marketplace.activity.followUpScheduled');
+  }
+  if (['proposal_generated', 'proposal_regenerated', 'proposal_edited', 'proposal_status_changed'].includes(event.event_type)) {
+    return t(`marketplace.proposal.activity.${event.event_type}`);
   }
   return event.event_type;
 };
@@ -1474,6 +1988,31 @@ const saveLeadFollowUp = () => {
   });
 };
 
+const prepareTopProposalDrafts = () => {
+  batchProposalMutation.mutate();
+};
+
+const generateProposal = (force: boolean) => {
+  if (selectedLeadId.value === null) return;
+  proposalGenerateMutation.mutate({ leadId: selectedLeadId.value, force });
+};
+
+const saveProposalDraft = () => {
+  if (selectedLeadId.value === null || !proposalTextDraft.value.trim()) return;
+  proposalContentMutation.mutate({ leadId: selectedLeadId.value });
+};
+
+const setProposalStatus = (status: MarketplaceProposalStatus) => {
+  if (selectedLeadId.value === null || proposalDirty.value) return;
+  proposalStatusMutation.mutate({ leadId: selectedLeadId.value, status });
+};
+
+const copyProposalText = async () => {
+  if (!proposalTextDraft.value) return;
+  await navigator.clipboard.writeText(proposalTextDraft.value);
+  ElMessage.success(t('marketplace.proposal.feedback.copied'));
+};
+
 const openExternal = (link: string) => {
   window.open(link, '_blank', 'noopener,noreferrer');
 };
@@ -1543,6 +2082,28 @@ const formatPercent = (value: number) =>
   align-items: center;
   flex-wrap: wrap;
   gap: 0.75rem;
+  width: 100%;
+}
+
+.advanced-panel {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.advanced-panel > summary {
+  padding: 0.75rem 1rem;
+  color: #475569;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.advanced-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
 }
 
 .search-input {
@@ -1573,6 +2134,69 @@ const formatPercent = (value: number) =>
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.stats-panel .summary-grid {
+  padding: 0 1rem 1rem;
+}
+
+.priority-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.priority-preview {
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.priority-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.priority-preview-item {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.priority-preview-item:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.12);
+}
+
+.priority-preview-main {
+  min-width: 0;
+}
+
+.priority-preview-title {
+  margin-bottom: 0.45rem;
+  color: #0f172a;
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.priority-preview-action {
+  flex: 0 0 auto;
+  color: #2563eb;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .metric-label {
@@ -1897,6 +2521,48 @@ const formatPercent = (value: number) =>
   justify-content: flex-end;
 }
 
+.proposal-section {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.proposal-title-row,
+.proposal-metrics,
+.proposal-inputs {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.proposal-metrics,
+.proposal-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0.85rem 0;
+}
+
+.proposal-tags,
+.proposal-questions,
+.proposal-actions,
+.proposal-empty {
+  margin-top: 0.85rem;
+}
+
+.proposal-questions ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.proposal-actions {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .outcome-select {
   width: 240px;
 }
@@ -1961,6 +2627,17 @@ const formatPercent = (value: number) =>
 .profile-select,
   .reason-select {
     width: 100%;
+  }
+
+  .advanced-actions,
+  .priority-preview-item,
+  .priority-preview-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .priority-preview-action {
+    align-self: flex-start;
   }
 
   .details-grid {

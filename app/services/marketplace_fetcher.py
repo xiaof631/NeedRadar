@@ -252,6 +252,8 @@ def _parse_marketplace_page(source: RssSource, payload: str) -> list[ParsedMarke
         return _parse_remotive_api(payload, source=source, item_limit=item_limit)
     if adapter == "wwr_programming_rss":
         return _parse_wwr_programming_rss(payload, source=source, item_limit=item_limit)
+    if adapter == "v2ex_jobs_atom":
+        return _parse_v2ex_jobs_atom(payload, source=source, item_limit=item_limit)
     if adapter == "zbj_hall_scroll":
         return _parse_zbj_hall_scroll(payload, source=source, item_limit=item_limit)
     raise ValueError(f"unsupported marketplace adapter: {adapter or 'unknown'}")
@@ -794,6 +796,85 @@ def _parse_wwr_programming_rss(
             break
     if not items:
         raise ValueError("failed to parse weworkremotely rss feed")
+    return items
+
+
+def _parse_v2ex_jobs_atom(
+    payload: str,
+    *,
+    source: RssSource,
+    item_limit: int,
+) -> list[ParsedMarketplaceLead]:
+    try:
+        root = ET.fromstring(payload)
+    except ET.ParseError as exc:
+        raise ValueError("failed to parse v2ex jobs atom feed") from exc
+
+    namespace = {"atom": "http://www.w3.org/2005/Atom"}
+    items: list[ParsedMarketplaceLead] = []
+    for entry in root.findall("atom:entry", namespace):
+        title = _normalize_text(entry.findtext("atom:title", namespaces=namespace))
+        link_node = entry.find("atom:link[@rel='alternate']", namespace)
+        if link_node is None:
+            link_node = entry.find("atom:link", namespace)
+        link = _normalize_text(link_node.get("href") if link_node is not None else None)
+        guid = _normalize_text(entry.findtext("atom:id", namespaces=namespace)) or link
+        if not title or not link or not guid:
+            continue
+
+        content_html = entry.findtext("atom:content", default="", namespaces=namespace)
+        description = _strip_html_tags(content_html or "")
+        author = _normalize_text(
+            entry.findtext("atom:author/atom:name", namespaces=namespace)
+        )
+        haystack = f"{title} {description}".lower()
+        if any(marker in haystack for marker in ("兼职", "part-time", "part time")):
+            engagement = "part-time, non-permanent"
+        elif any(marker in haystack for marker in ("外包", "freelance", "contract")):
+            engagement = "contract"
+        else:
+            engagement = "remote"
+        location = "China / Remote" if any(
+            marker in haystack for marker in ("远程", "remote", "不限地点")
+        ) else "China"
+        tags = ["marketplace", "v2ex"]
+        if location == "China / Remote":
+            tags.append("remote")
+
+        items.append(
+            ParsedMarketplaceLead(
+                guid=guid,
+                title=title,
+                summary=_join_summary(
+                    title,
+                    budget=None,
+                    timeline=location,
+                    platform="V2EX 酷工作",
+                ),
+                description=description,
+                link=link,
+                published_at=_parse_datetime(
+                    entry.findtext("atom:published", namespaces=namespace)
+                ),
+                author=author,
+                tags=tags,
+                metadata={
+                    "platform": "V2EX 酷工作",
+                    "category": "remote-part-time",
+                    "budget": None,
+                    "timeline": location,
+                    "engagement": engagement,
+                    "location": location,
+                    "skills": [],
+                    "bids": None,
+                },
+            )
+        )
+        if len(items) >= item_limit:
+            break
+
+    if not items:
+        raise ValueError("failed to parse v2ex jobs atom feed")
     return items
 
 

@@ -97,7 +97,8 @@
       "pending": "待处理",
       "filtered": "已过滤",
       "promoted": "已晋升",
-      "ignored": "已忽略"
+      "ignored": "已忽略",
+      "archived": "已归档（陈旧）"
     },
     "table": {
       "title": "标题",
@@ -109,10 +110,14 @@
     }
   },
   "marketplace": {
-    "title": "外包项目线索",
-    "subtitle": "独立查看公开外包/自由职业平台上的真实项目需求",
+    "title": "远程兼职与外包机会",
+    "subtitle": "优先筛选中文友好、低沟通、可异步协作和能快速交付的真实机会",
     "metrics": {
       "total": "线索总数",
+      "remotePartTime": "远程兼职",
+      "projectOutsourcing": "项目外包",
+      "lowCommunication": "低沟通机会",
+      "highCommunication": "高沟通待过滤",
       "highPurity": "高纯度线索",
       "reviewable": "可跟进线索",
       "expanded": "扩展线索",
@@ -124,7 +129,14 @@
       "resolved": "已结案",
       "winRate": "成交率",
       "activeSources": "活跃项目源",
-      "pausedSources": "暂停项目源"
+      "pausedSources": "暂停项目源",
+      "fullStats": "查看完整统计"
+    },
+    "priorityPreview": {
+      "title": "当前机会",
+      "subtitle": "优先视图默认只显示低沟通、可快速承接且仍在有效期内的机会",
+      "empty": "当前没有符合优先条件的机会",
+      "view": "查看详情"
     },
     "sourceHealth": {
       "title": "项目源状态",
@@ -211,6 +223,12 @@
       "source": "数据源",
       "author": "发布方",
       "location": "地区",
+      "opportunityLane": "机会通道",
+      "communication": "沟通成本",
+      "weeklyHours": "每周工时",
+      "liveInterview": "实时面试/视频",
+      "quickFit": "可快速承接",
+      "decisionSummary": "中文决策摘要",
       "budget": "预算",
       "budgetBand": "预算分段",
       "timeline": "周期/时效",
@@ -261,6 +279,8 @@
       "searchPlaceholder": "输入标题或描述关键词",
       "source": "项目源",
       "leadKind": "线索类型",
+      "opportunity": "机会通道",
+      "communication": "沟通成本",
       "outcome": "跟进结果",
       "followUp": "跟进筛选",
       "budgetBand": "预算分段",
@@ -268,12 +288,26 @@
       "techStack": "技术栈",
       "region": "地区画像",
       "timezoneFit": "时区匹配",
+      "advancedToggle": "高级筛选与批量操作",
       "leadKindOptions": {
         "reviewable": "默认可跟进",
         "project": "项目型",
         "contract_role": "合同型角色",
         "full_time_job": "全职招聘",
         "all": "全部类型"
+      },
+      "opportunityOptions": {
+        "preferred": "优先机会",
+        "remote_part_time": "远程兼职",
+        "project_outsourcing": "项目外包",
+        "other": "其他机会",
+        "all": "全部通道"
+      },
+      "communicationOptions": {
+        "all": "全部沟通成本",
+        "low": "低沟通",
+        "medium": "中等沟通",
+        "high": "高沟通"
       },
       "queueOptions": {
         "high_purity": "高纯度",
@@ -286,7 +320,8 @@
         "new": "待查看",
         "watching": "已关注",
         "contacted": "已联系",
-        "ignored": "已忽略"
+        "ignored": "已忽略",
+        "archived": "已归档（陈旧）"
       },
       "outcomeOptions": {
         "all": "全部结果",
@@ -363,6 +398,11 @@
       "hasLink": "原始链接",
       "empty": "暂无外包项目线索"
     },
+    "profile": {
+      "quickFit": "可快速承接",
+      "yes": "是",
+      "no": "否"
+    },
     "bulk": {
       "outcomePlaceholder": "批量设置结果",
       "reasonPlaceholder": "批量添加结果原因标签",
@@ -375,9 +415,71 @@
       "notesUpdated": "备注已保存",
       "followUpUpdated": "跟进计划已保存"
     },
+    "proposal": {
+      "title": "半自动投递方案",
+      "tableTitle": "投递草稿",
+      "prepareTop": "准备前 5 条低沟通草稿",
+      "safetyNote": "系统负责匹配能力、生成草稿和记录漏斗；最终平台提交必须由你确认，当前不会自动登录或点击提交。",
+      "offer": "匹配交付方向",
+      "fit": "能力匹配分",
+      "fitScore": "匹配 {score}/100",
+      "price": "建议报价",
+      "deliveryDays": "预计工作日",
+      "questions": "投递前需要确认",
+      "textPlaceholder": "投递方案正文",
+      "empty": "这条线索还没有投递草稿。生成后可编辑、审核、复制并打开原平台。",
+      "unsaved": "草稿有未保存修改；保存后才能审核或标记已投递。",
+      "generate": "生成投递草稿",
+      "regenerate": "重新生成",
+      "save": "保存修改",
+      "copy": "复制方案",
+      "approve": "审核通过",
+      "markSubmitted": "我已在平台投递",
+      "openPlatform": "打开原平台",
+      "markReplied": "客户已回复",
+      "markInterview": "进入沟通/面试",
+      "markWon": "确认成交",
+      "markLost": "确认未成交",
+      "status": {
+        "draft_ready": "待审核",
+        "approved": "已审核",
+        "submitted": "已投递",
+        "replied": "已回复",
+        "interview": "沟通中",
+        "won": "已成交",
+        "lost": "未成交",
+        "skipped": "已跳过"
+      },
+      "risk": {
+        "high_compliance": "高合规风险",
+        "sensitive_data": "敏感数据",
+        "missing_source_link": "缺少原始链接",
+        "low_budget": "预算偏低",
+        "unclear_scope": "范围不清",
+        "low_value_manual": "低价值人工任务",
+        "anti_bot_evasion": "要求规避反爬",
+        "high_communication": "高英语/会议沟通",
+        "live_interview": "需要实时面试",
+        "rights_circumvention": "要求破解授权或私有代码"
+      },
+      "activity": {
+        "proposal_generated": "已生成投递草稿",
+        "proposal_regenerated": "已重新生成投递草稿",
+        "proposal_edited": "已编辑投递草稿",
+        "proposal_status_changed": "投递状态已变更"
+      },
+      "feedback": {
+        "prepared": "已生成 {created} 条草稿，跳过 {skipped} 条不适合或已有草稿的线索",
+        "generated": "投递草稿已生成",
+        "saved": "投递草稿已保存并回到待审核",
+        "statusUpdated": "投递状态已更新",
+        "copied": "投递方案已复制"
+      }
+    },
     "followUpReasons": {
       "watching_checkin": "关注后检查进展",
-      "contacted_follow_up": "联系后等待回复"
+      "contacted_follow_up": "联系后等待回复",
+      "proposal_sent": "投递后等待回复"
     }
   },
   "filterMonitor": {
@@ -723,7 +825,8 @@
       "approved": "已通过",
       "rejected": "已拒绝",
       "in_discovery": "探索中",
-      "completed": "已完成"
+      "completed": "已完成",
+      "archived": "已归档（陈旧）"
     },
     "syncState": {
       "synced": "已同步",

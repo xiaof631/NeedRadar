@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Any
+from typing import Any, overload
 
 from app.db.storage import db
 from app.models import RawEntry, SourceType
@@ -726,6 +726,14 @@ def _parse_datetime(value: Any) -> datetime | None:
         return _ensure_utc(datetime.fromisoformat(value))
     except ValueError:
         return None
+
+
+@overload
+def _ensure_utc(value: datetime) -> datetime: ...
+
+
+@overload
+def _ensure_utc(value: datetime | None) -> datetime | None: ...
 
 
 def _ensure_utc(value: datetime | None) -> datetime | None:

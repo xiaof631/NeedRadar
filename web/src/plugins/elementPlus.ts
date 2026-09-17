@@ -1,4 +1,5 @@
 import type { App } from 'vue';
+import { ElAlert } from 'element-plus/es/components/alert/index';
 import { ElButton } from 'element-plus/es/components/button/index';
 import { ElCard } from 'element-plus/es/components/card/index';
 import { ElCol } from 'element-plus/es/components/col/index';
@@ -23,6 +24,7 @@ import { ElTimeline, ElTimelineItem } from 'element-plus/es/components/timeline/
 import { ElTooltip } from 'element-plus/es/components/tooltip/index';
 
 import 'element-plus/es/components/button/style/css';
+import 'element-plus/es/components/alert/style/css';
 import 'element-plus/es/components/card/style/css';
 import 'element-plus/es/components/col/style/css';
 import 'element-plus/es/components/dialog/style/css';
@@ -54,6 +56,7 @@ import 'element-plus/es/components/timeline-item/style/css';
 import 'element-plus/es/components/tooltip/style/css';
 
 const components = [
+  ElAlert,
   ElButton,
   ElCard,
   ElCol,

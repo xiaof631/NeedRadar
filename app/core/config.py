@@ -43,6 +43,16 @@ class Settings(BaseSettings):
         description="调度器触发候选需求晋升任务的间隔（秒）",
         ge=60,
     )
+    stale_lead_after_days: int = Field(
+        default=7,
+        description="未处理线索超过该天数后自动归档",
+        ge=1,
+    )
+    scheduler_stale_archive_interval_seconds: int = Field(
+        default=3600,
+        description="调度器执行陈旧线索归档的间隔（秒）",
+        ge=60,
+    )
     scheduler_promotion_batch_size: int = Field(
         default=20,
         description="每次调度处理的原始条目数量上限",

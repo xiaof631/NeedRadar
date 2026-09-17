@@ -94,7 +94,8 @@
       "pending": "Pending",
       "filtered": "Filtered",
       "promoted": "Promoted",
-      "ignored": "Ignored"
+      "ignored": "Ignored",
+      "archived": "Archived (stale)"
     },
     "table": {
       "title": "Title",
@@ -106,10 +107,14 @@
     }
   },
   "marketplace": {
-    "title": "Marketplace Leads",
-    "subtitle": "Review real small-project demand from public outsourcing and freelance marketplaces",
+    "title": "Remote Part-time & Outsourcing",
+    "subtitle": "Prioritize real opportunities that support written, asynchronous communication and fast delivery",
     "metrics": {
       "total": "Total leads",
+      "remotePartTime": "Remote part-time",
+      "projectOutsourcing": "Project outsourcing",
+      "lowCommunication": "Low communication",
+      "highCommunication": "High communication",
       "highPurity": "High-purity leads",
       "reviewable": "Reviewable leads",
       "expanded": "Expanded leads",
@@ -121,7 +126,14 @@
       "resolved": "Resolved",
       "winRate": "Win rate",
       "activeSources": "Active sources",
-      "pausedSources": "Paused sources"
+      "pausedSources": "Paused sources",
+      "fullStats": "View full statistics"
+    },
+    "priorityPreview": {
+      "title": "Current opportunities",
+      "subtitle": "The preferred view only shows fresh, low-communication opportunities that are quick to take on",
+      "empty": "No opportunities currently match the preferred criteria",
+      "view": "View details"
     },
     "sourceHealth": {
       "title": "Source health",
@@ -208,6 +220,12 @@
       "source": "Source",
       "author": "Publisher",
       "location": "Location",
+      "opportunityLane": "Opportunity lane",
+      "communication": "Communication burden",
+      "weeklyHours": "Weekly hours",
+      "liveInterview": "Live interview / video",
+      "quickFit": "Quick to take on",
+      "decisionSummary": "Chinese decision summary",
       "budget": "Budget",
       "budgetBand": "Budget band",
       "timeline": "Timeline",
@@ -258,6 +276,8 @@
       "searchPlaceholder": "Search by title or description",
       "source": "Source",
       "leadKind": "Lead kind",
+      "opportunity": "Opportunity lane",
+      "communication": "Communication burden",
       "outcome": "Outcome",
       "followUp": "Follow-up filter",
       "budgetBand": "Budget band",
@@ -265,12 +285,26 @@
       "techStack": "Tech stack",
       "region": "Region profile",
       "timezoneFit": "Timezone fit",
+      "advancedToggle": "Advanced filters and bulk actions",
       "leadKindOptions": {
         "reviewable": "Default reviewable",
         "project": "Project",
         "contract_role": "Contract role",
         "full_time_job": "Full-time job",
         "all": "All kinds"
+      },
+      "opportunityOptions": {
+        "preferred": "Best-fit opportunities",
+        "remote_part_time": "Remote part-time",
+        "project_outsourcing": "Project outsourcing",
+        "other": "Other",
+        "all": "All lanes"
+      },
+      "communicationOptions": {
+        "all": "All communication levels",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
       },
       "queueOptions": {
         "high_purity": "High purity",
@@ -283,7 +317,8 @@
         "new": "New",
         "watching": "Watching",
         "contacted": "Contacted",
-        "ignored": "Ignored"
+        "ignored": "Ignored",
+        "archived": "Archived (stale)"
       },
       "outcomeOptions": {
         "all": "All outcomes",
@@ -360,6 +395,11 @@
       "hasLink": "Source link",
       "empty": "No marketplace leads"
     },
+    "profile": {
+      "quickFit": "Quick to take on",
+      "yes": "Yes",
+      "no": "No"
+    },
     "bulk": {
       "outcomePlaceholder": "Set outcome in bulk",
       "reasonPlaceholder": "Add bulk outcome reason tags",
@@ -372,9 +412,71 @@
       "notesUpdated": "Notes saved",
       "followUpUpdated": "Follow-up schedule saved"
     },
+    "proposal": {
+      "title": "Review-first proposal",
+      "tableTitle": "Proposal",
+      "prepareTop": "Prepare 5 low-communication drafts",
+      "safetyNote": "The system matches capabilities, drafts proposals, and tracks the funnel. Final platform submission always requires your confirmation; it never signs in or clicks submit automatically.",
+      "offer": "Matched offer",
+      "fit": "Capability fit",
+      "fitScore": "Fit {score}/100",
+      "price": "Suggested price",
+      "deliveryDays": "Business days",
+      "questions": "Confirm before submitting",
+      "textPlaceholder": "Proposal text",
+      "empty": "No proposal draft exists for this lead. Generate one to edit, review, copy, and open the source platform.",
+      "unsaved": "This draft has unsaved changes. Save it before approval or submission tracking.",
+      "generate": "Generate proposal",
+      "regenerate": "Regenerate",
+      "save": "Save changes",
+      "copy": "Copy proposal",
+      "approve": "Approve draft",
+      "markSubmitted": "I submitted it",
+      "openPlatform": "Open platform",
+      "markReplied": "Client replied",
+      "markInterview": "Move to discussion",
+      "markWon": "Mark won",
+      "markLost": "Mark lost",
+      "status": {
+        "draft_ready": "Needs review",
+        "approved": "Approved",
+        "submitted": "Submitted",
+        "replied": "Replied",
+        "interview": "In discussion",
+        "won": "Won",
+        "lost": "Lost",
+        "skipped": "Skipped"
+      },
+      "risk": {
+        "high_compliance": "High compliance risk",
+        "sensitive_data": "Sensitive data",
+        "missing_source_link": "Missing source link",
+        "low_budget": "Low budget",
+        "unclear_scope": "Unclear scope",
+        "low_value_manual": "Low-value manual task",
+        "anti_bot_evasion": "Anti-bot evasion requested",
+        "high_communication": "High English / meeting burden",
+        "live_interview": "Live interview required",
+        "rights_circumvention": "License or proprietary-code circumvention"
+      },
+      "activity": {
+        "proposal_generated": "Proposal draft generated",
+        "proposal_regenerated": "Proposal draft regenerated",
+        "proposal_edited": "Proposal draft edited",
+        "proposal_status_changed": "Proposal status changed"
+      },
+      "feedback": {
+        "prepared": "Prepared {created} drafts and skipped {skipped} unsuitable or existing leads",
+        "generated": "Proposal draft generated",
+        "saved": "Proposal saved and returned to review",
+        "statusUpdated": "Proposal status updated",
+        "copied": "Proposal copied"
+      }
+    },
     "followUpReasons": {
       "watching_checkin": "Check in after watching",
-      "contacted_follow_up": "Follow up after contact"
+      "contacted_follow_up": "Follow up after contact",
+      "proposal_sent": "Wait for reply after submission"
     }
   },
   "filterMonitor": {
@@ -723,7 +825,8 @@
       "approved": "Approved",
       "rejected": "Rejected",
       "in_discovery": "In discovery",
-      "completed": "Completed"
+      "completed": "Completed",
+      "archived": "Archived (stale)"
     },
     "syncState": {
       "synced": "Synced",

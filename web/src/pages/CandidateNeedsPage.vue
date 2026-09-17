@@ -496,6 +496,7 @@ const statusOptions = computed(() => [
   { label: t('candidates.statusLabels.rejected'), value: 'rejected' as const },
   { label: t('candidates.statusLabels.in_discovery'), value: 'in_discovery' as const },
   { label: t('candidates.statusLabels.completed'), value: 'completed' as const },
+  { label: t('candidates.statusLabels.archived'), value: 'archived' as const },
 ]);
 
 const syncOptions = computed(() => [
@@ -615,6 +616,8 @@ const statusLabel = (status: CandidateNeed['status']) => {
       return t('candidates.statusLabels.in_discovery');
     case 'completed':
       return t('candidates.statusLabels.completed');
+    case 'archived':
+      return t('candidates.statusLabels.archived');
     default:
       return t('candidates.statusLabels.pending_review');
   }
@@ -630,6 +633,8 @@ const statusTag = (status: CandidateNeed['status']) => {
       return 'info';
     case 'completed':
       return 'success';
+    case 'archived':
+      return 'info';
     default:
       return 'warning';
   }

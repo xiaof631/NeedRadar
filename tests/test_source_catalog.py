@@ -91,7 +91,7 @@ def test_seed_marketplace_catalog_pauses_freelancer_source_by_default() -> None:
     created, skipped = source_catalog.seed_catalog("marketplace-public-baseline")
 
     assert skipped == []
-    assert len(created) == 10
+    assert len(created) == 11
 
     by_name = {source.name: source for source in created}
     assert by_name["Freelancer Web Development Jobs"].status == SourceStatus.PAUSED
@@ -100,6 +100,7 @@ def test_seed_marketplace_catalog_pauses_freelancer_source_by_default() -> None:
     assert by_name["We Work Remotely Programming Contracts"].status == SourceStatus.ACTIVE
     assert by_name["Remotive Software Contracts"].status == SourceStatus.ACTIVE
     assert by_name["Jobicy Contract Developer Roles"].status == SourceStatus.ACTIVE
+    assert by_name["V2EX 远程兼职与外包"].status == SourceStatus.ACTIVE
     assert by_name["Remotive DevOps Contracts Pilot"].status == SourceStatus.PAUSED
     assert by_name["Jobicy JavaScript Contract Roles Pilot"].status == SourceStatus.PAUSED
     assert by_name["Contra Featured Remote Jobs"].status == SourceStatus.PAUSED
@@ -113,6 +114,8 @@ def test_seed_marketplace_catalog_pauses_freelancer_source_by_default() -> None:
     assert "recruiter" in by_name["Remotive Software Contracts"].config["exclude_keywords"]
     assert by_name["Jobicy Contract Developer Roles"].config["adapter"] == "jobicy_api"
     assert "talent acquisition" in by_name["Jobicy Contract Developer Roles"].config["exclude_keywords"]
+    assert by_name["V2EX 远程兼职与外包"].config["adapter"] == "v2ex_jobs_atom"
+    assert "兼职" in by_name["V2EX 远程兼职与外包"].config["include_keyword_groups"]
 
 
 def test_seed_docreview_customer_discovery_catalog_creates_targeted_sources() -> None:

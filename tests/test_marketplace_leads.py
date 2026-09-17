@@ -167,6 +167,109 @@ def test_marketplace_leads_support_profile_filters_and_priority(client: TestClie
     assert filtered_payload["items"][0]["title"] == "Python automation dashboard for APAC fulfillment team"
 
 
+def test_remote_part_time_lane_prioritizes_low_communication_work(
+    client: TestClient,
+) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Remotive Software Contracts",
+            "url": "https://remotive.com/remote-jobs/software-dev",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "remotive_contracts"},
+        }
+    )
+    low_communication = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "remote-part-time-async",
+            "title": "Part-time Python Automation Developer",
+            "summary": "Remote contract, 10-15 hours per week, flexible hours",
+            "content": (
+                "Build Python scripts and API integrations. Async written communication, "
+                "clear deliverables, and no meetings."
+            ),
+            "link": "https://example.com/remote-part-time-async",
+            "published_at": datetime.now(UTC),
+            "tags": ["marketplace", "remote"],
+            "metadata": {
+                "platform": "Remotive",
+                "engagement": "part-time contract",
+                "skills": ["Python", "FastAPI"],
+            },
+        }
+    )
+    high_communication = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "remote-part-time-live",
+            "title": "Client-facing Remote Integration Engineer",
+            "summary": "Remote contract, 15 hrs/wk",
+            "content": (
+                "Fluent English is required for daily meetings, a Zoom video interview, "
+                "and client-facing presentations."
+            ),
+            "link": "https://example.com/remote-part-time-live",
+            "published_at": datetime.now(UTC),
+            "tags": ["marketplace", "remote"],
+            "metadata": {
+                "platform": "Remotive",
+                "engagement": "part-time contract",
+                "skills": ["Python", "REST API"],
+            },
+        }
+    )
+
+    response = client.get("/api/v1/marketplace-leads/")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["opportunity_lane_breakdown"]["remote_part_time"] == 2
+    assert payload["communication_breakdown"]["low"] == 1
+    assert payload["communication_breakdown"]["high"] == 1
+
+    by_id = {item["id"]: item for item in payload["items"]}
+    preferred = by_id[low_communication.id]
+    assert preferred["opportunity_lane"] == "remote_part_time"
+    assert preferred["communication_burden"] == "low"
+    assert preferred["weekly_hours"] == "10-15 hours per week"
+    assert preferred["requires_live_interview"] is False
+    assert preferred["quick_delivery_fit"] is True
+    assert "建议优先查看" in preferred["decision_summary_zh"]
+
+    difficult = by_id[high_communication.id]
+    assert difficult["communication_burden"] == "high"
+    assert difficult["requires_live_interview"] is True
+    assert difficult["quick_delivery_fit"] is False
+    assert "不建议作为当前优先机会" in difficult["decision_summary_zh"]
+
+    filtered = client.get(
+        "/api/v1/marketplace-leads/",
+        params={
+            "opportunity_lane": "remote_part_time",
+            "communication_burden": "low",
+            "preferred_only": "true",
+        },
+    )
+    assert filtered.status_code == 200
+    assert filtered.json()["total"] == 1
+    assert filtered.json()["items"][0]["id"] == low_communication.id
+
+    prepared = client.post(
+        "/api/v1/marketplace-leads/proposal-drafts/prepare",
+        json={"limit": 5, "min_priority_score": 0},
+    )
+    assert prepared.status_code == 200
+    prepared_payload = prepared.json()
+    assert prepared_payload["created"] == 1
+    assert prepared_payload["items"][0]["lead_id"] == low_communication.id
+    assert prepared_payload["items"][0]["application_type"] == "remote_part_time_application"
+    assert prepared_payload["items"][0]["communication_burden"] == "low"
+    assert "远程兼职" in prepared_payload["items"][0]["chinese_brief"]
+    assert client.get(
+        f"/api/v1/marketplace-leads/{high_communication.id}/proposal"
+    ).json() is None
+
+
 def test_marketplace_leads_returns_todo_queue(client: TestClient) -> None:
     source = rss_sources.create_source(
         {
@@ -1984,3 +2087,199 @@ def test_todo_sort_api(client: TestClient) -> None:
         resp = client.get("/api/v1/marketplace-leads/", params={"todo_sort": sort_mode})
         assert resp.status_code == 200
         assert resp.json()["todo_queue"]
+
+
+def test_generate_proposal_is_review_first_and_idempotent(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Freelancer Data Projects",
+            "url": "https://www.freelancer.com/jobs/data-processing/",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "freelancer_jobs"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "proposal-pdf-1",
+            "title": "Batch Extract PDF Tables to Excel",
+            "summary": "Extract repeated numeric PDF tables into one clean Excel sheet.",
+            "content": "Use Python and preserve numeric types. Deliver a reusable script.",
+            "link": "https://example.com/proposal-pdf-1",
+            "tags": ["marketplace", "pdf", "excel"],
+            "metadata": {"platform": "Freelancer", "budget": "$300", "timeline": "2 days"},
+        }
+    )
+
+    response = client.post(
+        f"/api/v1/marketplace-leads/{lead.id}/proposal",
+        json={"force": False},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "draft_ready"
+    assert payload["offer_id"] == "document_data_automation"
+    assert payload["can_auto_submit"] is False
+    assert payload["requires_manual_confirmation"] is True
+    assert "PDF/Excel extraction" in payload["matched_capabilities"]
+
+    repeated = client.post(
+        f"/api/v1/marketplace-leads/{lead.id}/proposal",
+        json={"force": False},
+    )
+    assert repeated.status_code == 200
+    assert repeated.json()["generated_at"] == payload["generated_at"]
+
+    lead_response = client.get(f"/api/v1/marketplace-leads/{lead.id}")
+    assert lead_response.status_code == 200
+    assert lead_response.json()["lead_status"] == "new"
+    assert lead_response.json()["proposal_status"] == "draft_ready"
+    assert lead_response.json()["capability_fit_score"] == payload["fit_score"]
+
+
+def test_proposal_submission_requires_explicit_approval(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Freelancer API Projects",
+            "url": "https://www.freelancer.com/jobs/api/",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "freelancer_jobs"},
+        }
+    )
+    lead = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "proposal-api-1",
+            "title": "REST API to XML middleware connector",
+            "content": "Fetch sales data from REST and send XML to another API.",
+            "link": "https://example.com/proposal-api-1",
+            "tags": ["marketplace", "api"],
+            "metadata": {"platform": "Freelancer", "budget": "$900"},
+        }
+    )
+    generated = client.post(
+        f"/api/v1/marketplace-leads/{lead.id}/proposal",
+        json={"force": False},
+    )
+    assert generated.status_code == 200
+
+    direct_submit = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/proposal/status",
+        json={"status": "submitted"},
+    )
+    assert direct_submit.status_code == 409
+
+    approved = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/proposal/status",
+        json={"status": "approved"},
+    )
+    assert approved.status_code == 200
+
+    edited = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/proposal",
+        json={
+            "proposal_text": "Reviewed and tailored proposal body.",
+            "suggested_price": "$800",
+            "delivery_days": "6",
+        },
+    )
+    assert edited.status_code == 200
+    assert edited.json()["status"] == "draft_ready"
+    assert edited.json()["suggested_price"] == "$800"
+
+    reapproved = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/proposal/status",
+        json={"status": "approved"},
+    )
+    assert reapproved.status_code == 200
+
+    submitted = client.put(
+        f"/api/v1/marketplace-leads/{lead.id}/proposal/status",
+        json={"status": "submitted"},
+    )
+    assert submitted.status_code == 200
+    assert submitted.json()["submitted_at"] is not None
+
+    lead_response = client.get(f"/api/v1/marketplace-leads/{lead.id}")
+    assert lead_response.status_code == 200
+    lead_payload = lead_response.json()
+    assert lead_payload["lead_status"] == "contacted"
+    assert lead_payload["follow_up_reason"] == "proposal_sent"
+    assert lead_payload["next_follow_up_at"] is not None
+    assert any(
+        event["event_type"] == "proposal_status_changed"
+        for event in lead_payload["lead_events"]
+    )
+
+
+def test_prepare_proposal_drafts_skips_high_compliance_projects(client: TestClient) -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "Freelancer Data Projects",
+            "url": "https://www.freelancer.com/jobs/data-processing/",
+            "frequency": 3600,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {"adapter": "freelancer_jobs"},
+        }
+    )
+    safe = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "prepare-safe-1",
+            "title": "Extract PDF Tables to Excel",
+            "content": "Convert a PDF table to a clean Excel workbook using Python.",
+            "link": "https://example.com/prepare-safe-1",
+            "tags": ["marketplace", "pdf", "excel"],
+            "metadata": {"platform": "Freelancer", "budget": "$500"},
+        }
+    )
+    risky = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "prepare-risky-1",
+            "title": "HIPAA patient PDF renaming",
+            "content": "Process PHI under a BAA and rename patient documents.",
+            "link": "https://example.com/prepare-risky-1",
+            "tags": ["marketplace", "pdf"],
+            "metadata": {"platform": "Freelancer", "budget": "$1500"},
+        }
+    )
+    stale = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "prepare-stale-1",
+            "title": "Legacy Angular frontend fix",
+            "content": "Fix an Angular page.",
+            "link": "https://example.com/prepare-stale-1",
+            "created_at": datetime.now(UTC) - timedelta(days=30),
+            "tags": ["marketplace", "angular"],
+            "metadata": {"platform": "Freelancer", "budget": "$800"},
+        }
+    )
+    evasive = raw_entries.create_entry(
+        {
+            "source_id": source.id,
+            "guid": "prepare-evasive-1",
+            "title": "Product scraper with rotating fingerprints",
+            "content": "Evade basic bot protection using proxy pools and rotating fingerprints.",
+            "link": "https://example.com/prepare-evasive-1",
+            "tags": ["marketplace", "scraping"],
+            "metadata": {"platform": "Freelancer", "budget": "$900"},
+        }
+    )
+
+    response = client.post(
+        "/api/v1/marketplace-leads/proposal-drafts/prepare",
+        json={"limit": 5, "min_priority_score": 0},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["created"] == 1
+    assert payload["items"][0]["lead_id"] == safe.id
+    assert client.get(f"/api/v1/marketplace-leads/{risky.id}/proposal").json() is None
+    assert client.get(f"/api/v1/marketplace-leads/{stale.id}/proposal").json() is None
+    assert client.get(f"/api/v1/marketplace-leads/{evasive.id}/proposal").json() is None

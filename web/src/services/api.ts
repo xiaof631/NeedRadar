@@ -90,7 +90,7 @@ export async function fetchRssSources(
   return response.data;
 }
 
-export type RawEntryStatus = 'pending' | 'filtered' | 'promoted' | 'ignored';
+export type RawEntryStatus = 'pending' | 'filtered' | 'promoted' | 'ignored' | 'archived';
 
 export interface RawEntry {
   id: number;
@@ -254,7 +254,8 @@ export type CandidateNeedStatus =
   | 'approved'
   | 'rejected'
   | 'in_discovery'
-  | 'completed';
+  | 'completed'
+  | 'archived';
 
 export type CandidateNeedSourceType =
   | SourceType;
@@ -295,10 +296,19 @@ export interface MarketplaceLead {
   skills: string[];
   link: string | null;
   lead_kind: 'project' | 'contract_role' | 'full_time_job';
+  opportunity_lane: 'project_outsourcing' | 'remote_part_time' | 'other';
+  communication_burden: 'low' | 'medium' | 'high';
+  communication_reasons: string[];
+  weekly_hours: string | null;
+  requires_live_interview: boolean;
+  quick_delivery_fit: boolean;
+  decision_summary_zh: string;
   lead_tier: 'high_purity' | 'expanded';
   tier_reason: string;
-  lead_status: 'new' | 'watching' | 'contacted' | 'ignored';
+  lead_status: 'new' | 'watching' | 'contacted' | 'ignored' | 'archived';
   lead_outcome: 'won' | 'lost' | 'no_response' | 'not_fit' | null;
+  proposal_status: MarketplaceProposalStatus | null;
+  capability_fit_score: number | null;
   outcome_reason_tags: string[];
   notes: string | null;
   next_follow_up_at: string | null;
@@ -367,6 +377,8 @@ export interface MarketplaceLeadListResponse {
   total: number;
   tier_breakdown: Record<string, number>;
   kind_breakdown: Record<string, number>;
+  opportunity_lane_breakdown: Record<string, number>;
+  communication_breakdown: Record<string, number>;
   status_breakdown: Record<string, number>;
   outcome_breakdown: Record<string, number>;
   outcome_reason_breakdown: Record<string, number>;
@@ -379,6 +391,48 @@ export interface MarketplaceLeadListResponse {
   items: MarketplaceLead[];
 }
 
+export type MarketplaceProposalStatus =
+  | 'draft_ready'
+  | 'approved'
+  | 'submitted'
+  | 'replied'
+  | 'interview'
+  | 'won'
+  | 'lost'
+  | 'skipped';
+
+export interface MarketplaceProposal {
+  lead_id: number;
+  status: MarketplaceProposalStatus;
+  offer_id: string;
+  offer_name: string;
+  language: 'zh' | 'en';
+  application_type: 'project_proposal' | 'remote_part_time_application' | string;
+  chinese_brief: string;
+  communication_burden: 'low' | 'medium' | 'high' | 'unknown';
+  communication_reasons: string[];
+  fit_score: number;
+  matched_capabilities: string[];
+  risk_flags: string[];
+  suggested_price: string;
+  delivery_days: string;
+  proposal_text: string;
+  questions: string[];
+  source_url: string | null;
+  submission_mode: 'manual_platform' | 'manual_review' | string;
+  can_auto_submit: boolean;
+  requires_manual_confirmation: boolean;
+  generated_at: string;
+  updated_at: string;
+  submitted_at: string | null;
+}
+
+export interface MarketplaceProposalPrepareResult {
+  created: number;
+  skipped: number;
+  items: MarketplaceProposal[];
+}
+
 export interface MarketplaceLeadQueryParams {
   skip?: number;
   limit?: number;
@@ -386,6 +440,9 @@ export interface MarketplaceLeadQueryParams {
   search?: string;
   tier?: 'high_purity' | 'expanded';
   lead_kind?: 'project' | 'contract_role' | 'full_time_job';
+  opportunity_lane?: 'project_outsourcing' | 'remote_part_time' | 'other';
+  communication_burden?: 'low' | 'medium' | 'high';
+  preferred_only?: boolean;
   budget_band?: 'lt_1k' | '1k_5k' | '5k_20k' | 'gt_20k' | 'negotiable';
   delivery_scope?: 'website' | 'app' | 'backend' | 'plugin' | 'automation' | 'data_tool' | 'embedded';
   tech_stack?: string;
@@ -393,7 +450,7 @@ export interface MarketplaceLeadQueryParams {
   timezone_fit?: boolean;
   reviewable_only?: boolean;
   overdue_only?: boolean;
-  lead_status?: 'new' | 'watching' | 'contacted' | 'ignored';
+  lead_status?: 'new' | 'watching' | 'contacted' | 'ignored' | 'archived';
   lead_outcome?: 'won' | 'lost' | 'no_response' | 'not_fit';
   todo_sort?: 'default' | 'newest_first' | 'oldest_first' | 'priority';
 }
@@ -419,6 +476,59 @@ export async function updateMarketplaceLeadStatus(
 
 export async function fetchMarketplaceLead(leadId: number): Promise<MarketplaceLead> {
   const response = await apiClient.get(`/api/v1/marketplace-leads/${leadId}`);
+  return response.data;
+}
+
+export async function fetchMarketplaceProposal(
+  leadId: number
+): Promise<MarketplaceProposal | null> {
+  const response = await apiClient.get(`/api/v1/marketplace-leads/${leadId}/proposal`);
+  return response.data;
+}
+
+export async function generateMarketplaceProposal(
+  leadId: number,
+  force = false
+): Promise<MarketplaceProposal> {
+  const response = await apiClient.post(`/api/v1/marketplace-leads/${leadId}/proposal`, {
+    force
+  });
+  return response.data;
+}
+
+export async function updateMarketplaceProposalContent(
+  leadId: number,
+  proposalText: string,
+  suggestedPrice: string,
+  deliveryDays: string
+): Promise<MarketplaceProposal> {
+  const response = await apiClient.put(`/api/v1/marketplace-leads/${leadId}/proposal`, {
+    proposal_text: proposalText,
+    suggested_price: suggestedPrice,
+    delivery_days: deliveryDays
+  });
+  return response.data;
+}
+
+export async function prepareMarketplaceProposalDrafts(
+  limit = 5,
+  minPriorityScore = 65
+): Promise<MarketplaceProposalPrepareResult> {
+  const response = await apiClient.post('/api/v1/marketplace-leads/proposal-drafts/prepare', {
+    limit,
+    min_priority_score: minPriorityScore
+  });
+  return response.data;
+}
+
+export async function updateMarketplaceProposalStatus(
+  leadId: number,
+  status: MarketplaceProposalStatus
+): Promise<MarketplaceProposal> {
+  const response = await apiClient.put(
+    `/api/v1/marketplace-leads/${leadId}/proposal/status`,
+    { status }
+  );
   return response.data;
 }
 

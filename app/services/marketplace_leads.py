@@ -11,7 +11,7 @@ from enum import StrEnum
 from urllib.parse import urlsplit
 
 from app.db.storage import db
-from app.models import RawEntry, SourceType
+from app.models import RawEntry, RawEntryStatus, SourceType
 from app.services import raw_entries, rss_sources
 
 _NON_WORD_RE = re.compile(r"[^a-z0-9\u4e00-\u9fff]+")
@@ -22,7 +22,11 @@ _CNY_UPPER_RE = re.compile(r"^(?P<value>\d+)千以下$")
 _CNY_SINGLE_RE = re.compile(r"^￥(?P<value>\d[\d,]*)$")
 _CN_DAY_RE = re.compile(r"(?P<days>\d+)\s*天")
 _EN_DAY_RE = re.compile(r"(?P<days>\d+)\s*days?", re.IGNORECASE)
-_HOURS_PER_WEEK_RE = re.compile(r"(?P<hours>\d+\s*hrs/wk)", re.IGNORECASE)
+_HOURS_PER_WEEK_RE = re.compile(
+    r"(?P<hours>\d{1,2}(?:\s*(?:-|–|~|to)\s*\d{1,2})?\s*(?:hours?|hrs?)"
+    r"(?:\s*/\s*(?:week|wk)|\s+per\s+week))",
+    re.IGNORECASE,
+)
 
 
 class MarketplaceLeadTier(StrEnum):
@@ -36,11 +40,24 @@ class MarketplaceLeadKind(StrEnum):
     FULL_TIME_JOB = "full_time_job"
 
 
+class MarketplaceOpportunityLane(StrEnum):
+    PROJECT_OUTSOURCING = "project_outsourcing"
+    REMOTE_PART_TIME = "remote_part_time"
+    OTHER = "other"
+
+
+class MarketplaceCommunicationBurden(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 class MarketplaceLeadStatus(StrEnum):
     NEW = "new"
     WATCHING = "watching"
     CONTACTED = "contacted"
     IGNORED = "ignored"
+    ARCHIVED = "archived"
 
 
 class MarketplaceLeadOutcome(StrEnum):
@@ -113,10 +130,19 @@ class MarketplaceLead:
     skills: list[str]
     link: str | None
     lead_kind: MarketplaceLeadKind
+    opportunity_lane: MarketplaceOpportunityLane
+    communication_burden: MarketplaceCommunicationBurden
+    communication_reasons: list[str]
+    weekly_hours: str | None
+    requires_live_interview: bool
+    quick_delivery_fit: bool
+    decision_summary_zh: str
     lead_tier: MarketplaceLeadTier
     tier_reason: str
     lead_status: MarketplaceLeadStatus
     lead_outcome: MarketplaceLeadOutcome | None
+    proposal_status: str | None
+    capability_fit_score: int | None
     outcome_reason_tags: list[str]
     notes: str | None
     next_follow_up_at: datetime | None
@@ -197,6 +223,8 @@ class MarketplaceLeadQueryResult:
     items: list[MarketplaceLead]
     tier_breakdown: dict[str, int]
     kind_breakdown: dict[str, int]
+    opportunity_lane_breakdown: dict[str, int]
+    communication_breakdown: dict[str, int]
     status_breakdown: dict[str, int]
     outcome_breakdown: dict[str, int]
     outcome_reason_breakdown: dict[str, int]
@@ -222,6 +250,9 @@ def list_leads(
     source_id: int | None = None,
     tier: MarketplaceLeadTier | None = None,
     lead_kind: MarketplaceLeadKind | None = None,
+    opportunity_lane: MarketplaceOpportunityLane | None = None,
+    communication_burden: MarketplaceCommunicationBurden | None = None,
+    preferred_only: bool = False,
     budget_band: MarketplaceBudgetBand | None = None,
     delivery_scope: MarketplaceDeliveryScope | None = None,
     tech_stack: str | None = None,
@@ -246,6 +277,9 @@ def list_leads(
         source_id=source_id,
         tier=tier,
         lead_kind=lead_kind,
+        opportunity_lane=opportunity_lane,
+        communication_burden=communication_burden,
+        preferred_only=preferred_only,
         budget_band=budget_band,
         delivery_scope=delivery_scope,
         tech_stack=tech_stack,
@@ -274,6 +308,9 @@ def query_leads(
     source_id: int | None = None,
     tier: MarketplaceLeadTier | None = None,
     lead_kind: MarketplaceLeadKind | None = None,
+    opportunity_lane: MarketplaceOpportunityLane | None = None,
+    communication_burden: MarketplaceCommunicationBurden | None = None,
+    preferred_only: bool = False,
     budget_band: MarketplaceBudgetBand | None = None,
     delivery_scope: MarketplaceDeliveryScope | None = None,
     tech_stack: str | None = None,
@@ -290,6 +327,11 @@ def query_leads(
     _, items = raw_entries.list_entries(
         source_id=source_id,
         source_type=SourceType.FREELANCE_MARKETPLACE,
+        status=(
+            RawEntryStatus.ARCHIVED
+            if lead_status == MarketplaceLeadStatus.ARCHIVED
+            else None
+        ),
         search=search,
         skip=0,
         limit=None,
@@ -297,6 +339,8 @@ def query_leads(
     leads = _merge_duplicate_leads([_to_marketplace_lead(item) for item in items])
     tier_breakdown = _count_tiers(leads)
     kind_breakdown = _count_kinds(leads)
+    opportunity_lane_breakdown = _count_opportunity_lanes(leads)
+    communication_breakdown = _count_communication_burdens(leads)
     status_breakdown = _count_statuses(leads)
     outcome_breakdown = _count_outcomes(leads)
     outcome_reason_breakdown = _count_outcome_reasons(leads)
@@ -313,6 +357,28 @@ def query_leads(
         leads = [lead for lead in leads if lead.lead_tier == tier]
     if lead_kind is not None:
         leads = [lead for lead in leads if lead.lead_kind == lead_kind]
+    if opportunity_lane is not None:
+        leads = [lead for lead in leads if lead.opportunity_lane == opportunity_lane]
+    if communication_burden is not None:
+        leads = [lead for lead in leads if lead.communication_burden == communication_burden]
+    if preferred_only:
+        freshness_cutoff = priority_context.now - timedelta(days=14)
+        leads = [
+            lead
+            for lead in leads
+            if lead.opportunity_lane
+            in {
+                MarketplaceOpportunityLane.PROJECT_OUTSOURCING,
+                MarketplaceOpportunityLane.REMOTE_PART_TIME,
+            }
+            and lead.communication_burden != MarketplaceCommunicationBurden.HIGH
+            and lead.quick_delivery_fit
+            and lead.lead_outcome is None
+            and lead.lead_status
+            in {MarketplaceLeadStatus.NEW, MarketplaceLeadStatus.WATCHING}
+            and lead.link is not None
+            and _ensure_utc(lead.latest_seen_at) >= freshness_cutoff
+        ]
     if budget_band is not None:
         leads = [lead for lead in leads if lead.budget_band == budget_band]
     if delivery_scope is not None:
@@ -345,6 +411,8 @@ def query_leads(
         items=leads,
         tier_breakdown=tier_breakdown,
         kind_breakdown=kind_breakdown,
+        opportunity_lane_breakdown=opportunity_lane_breakdown,
+        communication_breakdown=communication_breakdown,
         status_breakdown=status_breakdown,
         outcome_breakdown=outcome_breakdown,
         outcome_reason_breakdown=outcome_reason_breakdown,
@@ -450,7 +518,11 @@ def update_lead_status(entry_id: int, status: MarketplaceLeadStatus) -> Marketpl
 
     def _apply(model: RawEntry) -> None:
         metadata = dict(model.metadata or {})
-        previous_status = _to_lead_status(metadata.get("lead_status"))
+        previous_status = (
+            MarketplaceLeadStatus.ARCHIVED
+            if model.status == RawEntryStatus.ARCHIVED
+            else _to_lead_status(metadata.get("lead_status"))
+        )
         metadata["lead_status"] = status.value
         if previous_status != status:
             metadata["lead_events"] = _append_lead_event(
@@ -460,6 +532,10 @@ def update_lead_status(entry_id: int, status: MarketplaceLeadStatus) -> Marketpl
                 status_to=status.value,
             )
         model.metadata = metadata
+        if status == MarketplaceLeadStatus.ARCHIVED:
+            model.status = RawEntryStatus.ARCHIVED
+        elif model.status == RawEntryStatus.ARCHIVED:
+            model.status = RawEntryStatus.PENDING
 
     updated = db.update_raw_entry(entry_id, _apply)
     return _to_marketplace_lead(updated)
@@ -620,6 +696,35 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
     delivery_scope = _resolve_delivery_scope(item, metadata)
     tech_stack_normalized = _normalize_tech_stack(item, metadata)
     region = _resolve_region(item, metadata)
+    profile_haystack = _opportunity_haystack(item, metadata)
+    weekly_hours = _extract_weekly_hours(profile_haystack, metadata)
+    opportunity_lane = _classify_opportunity_lane(
+        lead_kind,
+        profile_haystack,
+        weekly_hours,
+    )
+    requires_live_interview = _requires_live_interview(profile_haystack)
+    communication_burden, communication_reasons = _classify_communication_burden(
+        lead_kind,
+        profile_haystack,
+        requires_live_interview=requires_live_interview,
+    )
+    quick_delivery_fit = _resolve_quick_delivery_fit(
+        opportunity_lane=opportunity_lane,
+        communication_burden=communication_burden,
+        requires_live_interview=requires_live_interview,
+        weekly_hours=weekly_hours,
+        delivery_scope=delivery_scope,
+        haystack=profile_haystack,
+    )
+    decision_summary_zh = _build_decision_summary_zh(
+        opportunity_lane=opportunity_lane,
+        communication_burden=communication_burden,
+        communication_reasons=communication_reasons,
+        weekly_hours=weekly_hours,
+        requires_live_interview=requires_live_interview,
+        quick_delivery_fit=quick_delivery_fit,
+    )
     lead_events = _to_lead_events(item, metadata)
     last_action_at = max(
         [event.created_at for event in lead_events],
@@ -629,8 +734,28 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         lead_events,
         fallback=_ensure_utc(item.created_at),
     )
-    lead_status = _to_lead_status(metadata.get("lead_status"))
+    lead_status = (
+        MarketplaceLeadStatus.ARCHIVED
+        if item.status == RawEntryStatus.ARCHIVED
+        else _to_lead_status(metadata.get("lead_status"))
+    )
     lead_outcome = _to_lead_outcome(metadata.get("lead_outcome"))
+    proposal_metadata = metadata.get("proposal_submission")
+    proposal_status = (
+        _to_string(proposal_metadata.get("status"))
+        if isinstance(proposal_metadata, dict)
+        else None
+    )
+    raw_fit_score = (
+        proposal_metadata.get("fit_score")
+        if isinstance(proposal_metadata, dict)
+        else None
+    )
+    capability_fit_score = (
+        int(raw_fit_score)
+        if isinstance(raw_fit_score, (int, float, str)) and str(raw_fit_score).isdigit()
+        else None
+    )
     next_follow_up_at = _resolve_next_follow_up_at(
         lead_status=lead_status,
         lead_outcome=lead_outcome,
@@ -668,10 +793,19 @@ def _to_marketplace_lead(item: RawEntry) -> MarketplaceLead:
         skills=_to_string_list(metadata.get("skills")),
         link=item.link,
         lead_kind=lead_kind,
+        opportunity_lane=opportunity_lane,
+        communication_burden=communication_burden,
+        communication_reasons=communication_reasons,
+        weekly_hours=weekly_hours,
+        requires_live_interview=requires_live_interview,
+        quick_delivery_fit=quick_delivery_fit,
+        decision_summary_zh=decision_summary_zh,
         lead_tier=lead_tier,
         tier_reason=tier_reason,
         lead_status=lead_status,
         lead_outcome=lead_outcome,
+        proposal_status=proposal_status,
+        capability_fit_score=capability_fit_score,
         outcome_reason_tags=_normalize_reason_tags(metadata.get("lead_outcome_reason_tags")),
         notes=_to_string(metadata.get("lead_notes")),
         next_follow_up_at=next_follow_up_at,
@@ -798,6 +932,7 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
     if _lead_sort_key(right) > _lead_sort_key(left):
         representative, alternate = right, left
     status = max(left.lead_status, right.lead_status, key=_lead_status_rank)
+    proposal_source = representative if representative.proposal_status else alternate
     duplicate_sources = list(dict.fromkeys([*left.duplicate_sources, *right.duplicate_sources]))
     next_follow_up_at = _merge_follow_up_at(left.next_follow_up_at, right.next_follow_up_at)
     lead_outcome = representative.lead_outcome or alternate.lead_outcome
@@ -831,10 +966,34 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
         skills=list(dict.fromkeys([*representative.skills, *alternate.skills])),
         link=representative.link or alternate.link,
         lead_kind=representative.lead_kind,
+        opportunity_lane=representative.opportunity_lane,
+        communication_burden=min(
+            representative.communication_burden,
+            alternate.communication_burden,
+            key=_communication_burden_rank,
+        ),
+        communication_reasons=list(
+            dict.fromkeys(
+                [
+                    *representative.communication_reasons,
+                    *alternate.communication_reasons,
+                ]
+            )
+        ),
+        weekly_hours=representative.weekly_hours or alternate.weekly_hours,
+        requires_live_interview=(
+            representative.requires_live_interview or alternate.requires_live_interview
+        ),
+        quick_delivery_fit=(
+            representative.quick_delivery_fit or alternate.quick_delivery_fit
+        ),
+        decision_summary_zh=representative.decision_summary_zh,
         lead_tier=representative.lead_tier,
         tier_reason=representative.tier_reason,
         lead_status=status,
         lead_outcome=lead_outcome,
+        proposal_status=proposal_source.proposal_status,
+        capability_fit_score=proposal_source.capability_fit_score,
         outcome_reason_tags=list(
             dict.fromkeys([*representative.outcome_reason_tags, *alternate.outcome_reason_tags])
         ),
@@ -860,9 +1019,11 @@ def _merge_lead_pair(left: MarketplaceLead, right: MarketplaceLead) -> Marketpla
     )
 
 
-def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, int, int, datetime]:
+def _lead_sort_key(lead: MarketplaceLead) -> tuple[int, int, int, int, int, int, datetime]:
     return (
         lead.priority_score,
+        1 if lead.communication_burden == MarketplaceCommunicationBurden.LOW else 0,
+        1 if lead.quick_delivery_fit else 0,
         1 if lead.lead_kind in _REVIEWABLE_LEAD_KINDS else 0,
         1 if lead.lead_tier == MarketplaceLeadTier.HIGH_PURITY else 0,
         _lead_status_rank(lead.lead_status),
@@ -895,6 +1056,30 @@ def _calculate_priority(lead: MarketplaceLead, context: MarketplacePriorityConte
     else:
         score -= 18
         reasons.append("全职招聘降权")
+
+    if lead.opportunity_lane == MarketplaceOpportunityLane.REMOTE_PART_TIME:
+        score += 12
+        reasons.append("远程兼职现金流")
+    elif lead.opportunity_lane == MarketplaceOpportunityLane.PROJECT_OUTSOURCING:
+        score += 6
+        reasons.append("项目外包通道")
+
+    if lead.communication_burden == MarketplaceCommunicationBurden.LOW:
+        score += 14
+        reasons.append("低沟通成本")
+    elif lead.communication_burden == MarketplaceCommunicationBurden.MEDIUM:
+        score += 3
+        reasons.append("中等沟通成本")
+    else:
+        score -= 26
+        reasons.append("高英语/实时沟通降权")
+
+    if lead.requires_live_interview:
+        score -= 12
+        reasons.append("需要实时面试")
+    if lead.quick_delivery_fit:
+        score += 8
+        reasons.append("可快速承接")
 
     if lead.lead_status == MarketplaceLeadStatus.NEW:
         score += 12
@@ -1008,6 +1193,7 @@ def _ensure_utc(value: datetime) -> datetime:
 
 def _lead_status_rank(status: MarketplaceLeadStatus) -> int:
     return {
+        MarketplaceLeadStatus.ARCHIVED: -1,
         MarketplaceLeadStatus.IGNORED: 0,
         MarketplaceLeadStatus.NEW: 1,
         MarketplaceLeadStatus.WATCHING: 2,
@@ -1076,6 +1262,20 @@ def _count_kinds(leads: list[MarketplaceLead]) -> dict[str, int]:
     return {
         kind.value: sum(1 for lead in leads if lead.lead_kind == kind)
         for kind in MarketplaceLeadKind
+    }
+
+
+def _count_opportunity_lanes(leads: list[MarketplaceLead]) -> dict[str, int]:
+    return {
+        lane.value: sum(1 for lead in leads if lead.opportunity_lane == lane)
+        for lane in MarketplaceOpportunityLane
+    }
+
+
+def _count_communication_burdens(leads: list[MarketplaceLead]) -> dict[str, int]:
+    return {
+        burden.value: sum(1 for lead in leads if lead.communication_burden == burden)
+        for burden in MarketplaceCommunicationBurden
     }
 
 
@@ -1372,7 +1572,8 @@ def _build_todo_queue(leads: list[MarketplaceLead], now: datetime, todo_sort: st
     for lead in leads:
         if (
             lead.lead_kind not in _REVIEWABLE_LEAD_KINDS
-            or lead.lead_status == MarketplaceLeadStatus.IGNORED
+            or lead.lead_status
+            in {MarketplaceLeadStatus.IGNORED, MarketplaceLeadStatus.ARCHIVED}
             or lead.lead_outcome is not None
         ):
             continue
@@ -2025,6 +2226,168 @@ def _diversify_by_source(items: list[MarketplaceLead]) -> list[MarketplaceLead]:
     return diversified
 
 
+def _opportunity_haystack(item: RawEntry, metadata: dict[str, object]) -> str:
+    return " ".join(
+        filter(
+            None,
+            [
+                item.title,
+                item.summary or "",
+                item.content or "",
+                _to_string(metadata.get("category")),
+                _to_string(metadata.get("engagement")),
+                _to_string(metadata.get("location")),
+                " ".join(_to_string_list(metadata.get("skills"))),
+                " ".join(item.tags),
+            ],
+        )
+    ).lower()
+
+
+def _extract_weekly_hours(
+    haystack: str,
+    metadata: dict[str, object],
+) -> str | None:
+    explicit = _to_string(metadata.get("weekly_hours"))
+    if explicit:
+        return explicit
+    match = _HOURS_PER_WEEK_RE.search(haystack)
+    if not match:
+        return None
+    return re.sub(r"\s+", " ", match.group("hours")).strip()
+
+
+def _weekly_hours_upper_bound(value: str | None) -> int | None:
+    if not value:
+        return None
+    hours = [int(item) for item in re.findall(r"\d{1,2}", value)]
+    return max(hours) if hours else None
+
+
+def _classify_opportunity_lane(
+    lead_kind: MarketplaceLeadKind,
+    haystack: str,
+    weekly_hours: str | None,
+) -> MarketplaceOpportunityLane:
+    if lead_kind == MarketplaceLeadKind.PROJECT:
+        return MarketplaceOpportunityLane.PROJECT_OUTSOURCING
+    if lead_kind != MarketplaceLeadKind.CONTRACT_ROLE:
+        return MarketplaceOpportunityLane.OTHER
+
+    weekly_upper = _weekly_hours_upper_bound(weekly_hours)
+    if weekly_upper is not None and weekly_upper > 25 and not any(
+        marker in haystack for marker in ("part-time", "part time", "兼职")
+    ):
+        return MarketplaceOpportunityLane.OTHER
+    if any(marker in haystack for marker in _REMOTE_PART_TIME_MARKERS):
+        return MarketplaceOpportunityLane.REMOTE_PART_TIME
+    return MarketplaceOpportunityLane.OTHER
+
+
+def _requires_live_interview(haystack: str) -> bool:
+    return any(marker in haystack for marker in _LIVE_INTERVIEW_MARKERS)
+
+
+def _classify_communication_burden(
+    lead_kind: MarketplaceLeadKind,
+    haystack: str,
+    *,
+    requires_live_interview: bool,
+) -> tuple[MarketplaceCommunicationBurden, list[str]]:
+    high_matches = [marker for marker in _HIGH_COMMUNICATION_MARKERS if marker in haystack]
+    if requires_live_interview or high_matches:
+        reasons = ["要求实时面试或视频沟通"] if requires_live_interview else []
+        if high_matches:
+            reasons.append("要求高频英语、客户或会议沟通")
+        return MarketplaceCommunicationBurden.HIGH, reasons
+
+    medium_matches = [marker for marker in _MEDIUM_COMMUNICATION_MARKERS if marker in haystack]
+    low_matches = [marker for marker in _LOW_COMMUNICATION_MARKERS if marker in haystack]
+    chinese_count = len(re.findall(r"[\u4e00-\u9fff]", haystack))
+    if chinese_count >= 8:
+        return MarketplaceCommunicationBurden.LOW, ["中文需求，可直接文字沟通"]
+    if low_matches and not medium_matches:
+        return MarketplaceCommunicationBurden.LOW, ["范围清晰，支持异步或按交付物沟通"]
+    if medium_matches:
+        return MarketplaceCommunicationBurden.MEDIUM, ["可能需要定期协作或时区重叠"]
+    if lead_kind == MarketplaceLeadKind.PROJECT:
+        return MarketplaceCommunicationBurden.LOW, ["一次性交付为主，默认可文字确认范围"]
+    return MarketplaceCommunicationBurden.MEDIUM, ["英文角色型机会，沟通要求尚未完全明确"]
+
+
+def _resolve_quick_delivery_fit(
+    *,
+    opportunity_lane: MarketplaceOpportunityLane,
+    communication_burden: MarketplaceCommunicationBurden,
+    requires_live_interview: bool,
+    weekly_hours: str | None,
+    delivery_scope: MarketplaceDeliveryScope | None,
+    haystack: str,
+) -> bool:
+    if any(
+        marker in haystack
+        for marker in (*_DISALLOWED_SCOPE_MARKERS, *_LOW_VALUE_OR_RISKY_MARKERS)
+    ):
+        return False
+    if (
+        communication_burden == MarketplaceCommunicationBurden.HIGH
+        or requires_live_interview
+    ):
+        return False
+    if opportunity_lane == MarketplaceOpportunityLane.REMOTE_PART_TIME:
+        weekly_upper = _weekly_hours_upper_bound(weekly_hours)
+        return weekly_upper is None or weekly_upper <= 20
+    if opportunity_lane != MarketplaceOpportunityLane.PROJECT_OUTSOURCING:
+        return False
+    if delivery_scope in {
+        MarketplaceDeliveryScope.AUTOMATION,
+        MarketplaceDeliveryScope.DATA_TOOL,
+        MarketplaceDeliveryScope.BACKEND,
+        MarketplaceDeliveryScope.PLUGIN,
+    }:
+        return True
+    return any(marker in haystack for marker in _QUICK_DELIVERY_MARKERS)
+
+
+def _build_decision_summary_zh(
+    *,
+    opportunity_lane: MarketplaceOpportunityLane,
+    communication_burden: MarketplaceCommunicationBurden,
+    communication_reasons: list[str],
+    weekly_hours: str | None,
+    requires_live_interview: bool,
+    quick_delivery_fit: bool,
+) -> str:
+    lane_label = {
+        MarketplaceOpportunityLane.PROJECT_OUTSOURCING: "项目外包",
+        MarketplaceOpportunityLane.REMOTE_PART_TIME: "远程兼职",
+        MarketplaceOpportunityLane.OTHER: "其他机会",
+    }[opportunity_lane]
+    burden_label = {
+        MarketplaceCommunicationBurden.LOW: "低沟通",
+        MarketplaceCommunicationBurden.MEDIUM: "中等沟通",
+        MarketplaceCommunicationBurden.HIGH: "高沟通",
+    }[communication_burden]
+    workload = f"每周 {weekly_hours}" if weekly_hours else "工时未明确"
+    action = (
+        "建议优先查看"
+        if quick_delivery_fit and communication_burden != MarketplaceCommunicationBurden.HIGH
+        else "建议谨慎评估"
+    )
+    if communication_burden == MarketplaceCommunicationBurden.HIGH or requires_live_interview:
+        action = "不建议作为当前优先机会"
+    reason = "；".join(communication_reasons[:2]) or "沟通要求未明确"
+    return f"{lane_label}｜{burden_label}｜{workload}。{reason}；{action}。"
+
+
+def _communication_burden_rank(value: MarketplaceCommunicationBurden) -> int:
+    return {
+        MarketplaceCommunicationBurden.LOW: 0,
+        MarketplaceCommunicationBurden.MEDIUM: 1,
+        MarketplaceCommunicationBurden.HIGH: 2,
+    }[value]
+
+
 def _classify_lead_kind(
     source_name: str,
     item: RawEntry,
@@ -2148,6 +2511,10 @@ _CONTRACT_ROLE_MARKERS = (
     "non-permanent projects",
     "hours per week",
     "hour equivalent",
+    "兼职",
+    "远程兼职",
+    "小时/周",
+    "每周工时",
 )
 
 _FULL_TIME_MARKERS = (
@@ -2166,6 +2533,140 @@ _PROJECT_MARKERS = (
     "deliverable",
     "交付",
     "选标中",
+    "外包",
+)
+
+_REMOTE_PART_TIME_MARKERS = (
+    "remote",
+    "part-time",
+    "part time",
+    "兼职",
+    "freelance",
+    "contract",
+    "hours per week",
+    "hrs/wk",
+    "flexible hours",
+    "async",
+    "asynchronous",
+)
+
+_LIVE_INTERVIEW_MARKERS = (
+    "video interview",
+    "zoom interview",
+    "technical interview",
+    "live coding",
+    "phone interview",
+    "video call",
+    "zoom call",
+    "面试",
+    "视频会议",
+    "电话沟通",
+)
+
+_HIGH_COMMUNICATION_MARKERS = (
+    "fluent english",
+    "native english",
+    "excellent english",
+    "english proficiency",
+    "b2+",
+    "submit your cv in english",
+    "client-facing",
+    "customer-facing",
+    "daily standup",
+    "daily meeting",
+    "phone support",
+    "sales calls",
+    "presentations",
+    "stakeholder management",
+    "real-time collaboration",
+    "流利英语",
+    "英语口语",
+    "客户会议",
+    "每日站会",
+)
+
+_MEDIUM_COMMUNICATION_MARKERS = (
+    "weekly meeting",
+    "regular meetings",
+    "overlap hours",
+    "timezone overlap",
+    "team collaboration",
+    "long-term",
+    "ongoing",
+    "定期会议",
+    "长期合作",
+    "团队协作",
+)
+
+_LOW_COMMUNICATION_MARKERS = (
+    "async",
+    "asynchronous",
+    "written communication",
+    "flexible hours",
+    "fixed-price",
+    "one-off",
+    "deliverable",
+    "sample input",
+    "sample output",
+    "batch",
+    "script",
+    "no meetings",
+    "异步",
+    "按成果",
+    "交付物",
+    "样例",
+    "脚本",
+    "批处理",
+)
+
+_QUICK_DELIVERY_MARKERS = (
+    "bug fix",
+    "small task",
+    "one-off",
+    "template",
+    "script",
+    "data extraction",
+    "pdf",
+    "excel",
+    "修复",
+    "模板",
+    "脚本",
+    "提取",
+    "批处理",
+)
+
+_DISALLOWED_SCOPE_MARKERS = (
+    "cracking protected",
+    "crack protected",
+    "invite-only script",
+    "hidden source",
+    "retrieve the unobfuscated code",
+    "bypass licensing",
+    "decompile proprietary",
+    "破解受保护",
+    "绕过授权",
+    "破解私有",
+)
+
+_LOW_VALUE_OR_RISKY_MARKERS = (
+    "copy-paste",
+    "copy paste",
+    "data entry",
+    "typing job",
+    "captcha",
+    "rotating fingerprints",
+    "proxy pools",
+    "evade bot",
+    "bypass bot",
+    "no strong bot protection",
+    "randomly generated",
+    "hipaa",
+    "patient data",
+    "复制粘贴",
+    "数据录入",
+    "绕过验证码",
+    "规避反爬",
+    "敏感数据",
 )
 
 _REVIEWABLE_LEAD_KINDS = (

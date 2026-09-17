@@ -24,6 +24,7 @@ class CandidateNeedStatusEnum(str, Enum):
     REJECTED = CandidateNeedStatus.REJECTED.value
     IN_DISCOVERY = CandidateNeedStatus.IN_DISCOVERY.value
     COMPLETED = CandidateNeedStatus.COMPLETED.value
+    ARCHIVED = CandidateNeedStatus.ARCHIVED.value
 
 
 class CandidateNeedTypeEnum(str, Enum):

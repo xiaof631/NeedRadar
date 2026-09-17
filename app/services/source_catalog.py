@@ -186,6 +186,20 @@ _MARKETPLACE_PUBLIC_BASELINE: tuple[CatalogEntry, ...] = (
         },
     },
     {
+        "name": "V2EX 远程兼职与外包",
+        "url": "https://www.v2ex.com/feed/jobs.xml",
+        "category": "freelance-marketplace",
+        "frequency": 7200,
+        "source_type": SourceType.FREELANCE_MARKETPLACE,
+        "config": {
+            "adapter": "v2ex_jobs_atom",
+            "item_limit": 20,
+            "topic": "cn-remote-part-time",
+            "include_keyword_groups": "兼职,外包,part-time,part time,freelance,contract,按小时,每周;开发,工程师,程序员,python,java,go,react,vue,ios,android,flutter,后端,前端,全栈,自动化,爬虫,数据,api,小程序",
+            "exclude_keywords": "求职,找工作,交流,全职,现场,坐班,驻场,博彩,支付,无薪,实习,招聘代理,猎头,telegram,tg",
+        },
+    },
+    {
         "name": "Remotive DevOps Contracts Pilot",
         "url": "https://remotive.com/api/remote-jobs?category=devops-sysadmin&limit=40",
         "category": "freelance-marketplace",

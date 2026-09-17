@@ -21,6 +21,7 @@ from app.services import (
     raw_entries,
     rss_fetcher,
     rss_sources,
+    stale_leads,
 )
 from app.services.export_jobs import ExportJobNotFoundError
 from app.services.pipeline import CandidateAlreadyExistsError, EntryNotQualifiedError
@@ -227,6 +228,26 @@ def enqueue_promotions(*, batch_size: int | None = None, min_score: float | None
     return count
 
 
+@celery_app.task(name="jobs.archive_stale_leads")
+def archive_stale_leads_task(stale_after_days: int | None = None) -> dict[str, Any]:
+    """归档超过时效且仍未处理的线索。"""
+
+    result = stale_leads.archive_stale_leads(
+        stale_after_days=stale_after_days or settings.stale_lead_after_days,
+    )
+    logger.info(
+        "tasks.archive_stale_leads.completed",
+        cutoff=result.cutoff.isoformat(),
+        raw_entries=result.raw_entries_archived,
+        candidate_needs=result.candidate_needs_archived,
+    )
+    return {
+        "cutoff": result.cutoff.isoformat(),
+        "raw_entries_archived": result.raw_entries_archived,
+        "candidate_needs_archived": result.candidate_needs_archived,
+    }
+
+
 def enqueue_sync_tasks(
     *,
     webhook_url: str | None = None,
@@ -376,6 +397,7 @@ __all__ = [
     "enqueue_promotions",
     "enqueue_sync_tasks",
     "enqueue_export_job",
+    "archive_stale_leads_task",
     "fetch_rss_source_task",
     "promote_entry_task",
     "sync_candidate_need_task",

@@ -47,6 +47,30 @@ SAMPLE_RSS = """<?xml version=\"1.0\"?>
 </rss>
 """
 
+SAMPLE_V2EX_JOBS_ATOM = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
+<feed xmlns=\"http://www.w3.org/2005/Atom\">
+  <title>酷工作</title>
+  <entry>
+    <title>远程兼职 Python 自动化开发，每周 10 小时</title>
+    <link rel=\"alternate\" href=\"https://www.v2ex.com/t/1001\" />
+    <id>tag:www.v2ex.com,2026-08-08:/t/1001</id>
+    <published>2026-08-08T08:00:00Z</published>
+    <author><name>client-a</name></author>
+    <content type=\"html\"><![CDATA[
+      <p>寻找 Python/FastAPI 开发，远程兼职，每周 10 小时，文字异步沟通，按任务交付。</p>
+    ]]></content>
+  </entry>
+  <entry>
+    <title>北京全职 Java 工程师</title>
+    <link rel=\"alternate\" href=\"https://www.v2ex.com/t/1002\" />
+    <id>tag:www.v2ex.com,2026-08-08:/t/1002</id>
+    <published>2026-08-08T07:00:00Z</published>
+    <author><name>company-b</name></author>
+    <content type=\"html\"><![CDATA[<p>要求现场坐班，全职招聘。</p>]]></content>
+  </entry>
+</feed>
+"""
+
 DUPLICATE_CONTENT_RSS = """<?xml version=\"1.0\"?>
 <rss version=\"2.0\">
   <channel>
@@ -499,6 +523,37 @@ def test_parse_jobicy_api_contract_jobs() -> None:
     assert item.metadata["budget"] == "$24,000+/yearly"
     assert item.metadata["location"] == "Philippines"
     assert "python" in item.metadata["skills"]
+
+
+def test_parse_v2ex_remote_part_time_jobs() -> None:
+    source = rss_sources.create_source(
+        {
+            "name": "V2EX 远程兼职与外包",
+            "url": "https://www.v2ex.com/feed/jobs.xml",
+            "frequency": 7200,
+            "source_type": SourceType.FREELANCE_MARKETPLACE,
+            "config": {
+                "adapter": "v2ex_jobs_atom",
+                "item_limit": 20,
+                "include_keyword_groups": "兼职,外包,part-time,远程;开发,工程师,python,java,api",
+                "exclude_keywords": "全职,现场,坐班,驻场,求职",
+            },
+        }
+    )
+
+    items = marketplace_fetcher._filter_marketplace_items(
+        source,
+        marketplace_fetcher._parse_marketplace_page(source, SAMPLE_V2EX_JOBS_ATOM),
+    )
+
+    assert len(items) == 1
+    item = items[0]
+    assert item.title == "远程兼职 Python 自动化开发，每周 10 小时"
+    assert item.author == "client-a"
+    assert item.link == "https://www.v2ex.com/t/1001"
+    assert item.metadata["platform"] == "V2EX 酷工作"
+    assert item.metadata["engagement"] == "part-time, non-permanent"
+    assert item.metadata["location"] == "China / Remote"
 
 
 def test_fetch_rss_source_http_failure() -> None:

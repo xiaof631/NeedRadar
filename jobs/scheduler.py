@@ -56,6 +56,17 @@ def _run_promote_job(
     logger.info("scheduler.promote.completed", queued=queued)
 
 
+def _run_stale_archive_job(*, stale_after_days: int) -> None:
+    """派发陈旧线索归档任务。"""
+
+    try:
+        task_queue.archive_stale_leads_task.delay(stale_after_days)
+    except Exception as exc:  # pragma: no cover - 调度器异常记录
+        logger.error("scheduler.archive_stale.failed", error=str(exc))
+        return
+    logger.info("scheduler.archive_stale.queued", stale_after_days=stale_after_days)
+
+
 async def _run_sync_job(
     *,
     webhook_url: str | None,
@@ -101,6 +112,16 @@ async def main() -> None:
         max_instances=1,
         coalesce=True,
     )
+    scheduler.add_job(
+        _run_stale_archive_job,
+        trigger=IntervalTrigger(
+            seconds=settings.scheduler_stale_archive_interval_seconds
+        ),
+        id="archive-stale-leads",
+        kwargs={"stale_after_days": settings.stale_lead_after_days},
+        max_instances=1,
+        coalesce=True,
+    )
     if (
         settings.downstream_webhook_url
         or settings.downstream_mq_enabled
@@ -123,6 +144,8 @@ async def main() -> None:
         "scheduler.started",
         fetch_interval=settings.scheduler_fetch_interval_seconds,
         promote_interval=settings.scheduler_promote_interval_seconds,
+        stale_archive_interval=settings.scheduler_stale_archive_interval_seconds,
+        stale_after_days=settings.stale_lead_after_days,
         downstream_interval=settings.scheduler_downstream_interval_seconds
         if (
             settings.downstream_webhook_url

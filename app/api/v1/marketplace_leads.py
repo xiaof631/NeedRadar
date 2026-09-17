@@ -17,8 +17,16 @@ from app.schemas import (
     MarketplaceLeadSourceMetricRead,
     MarketplaceLeadStatusUpdate,
 )
-from app.schemas.marketplace_leads import MarketplaceSourceRecommendationRead
-from app.services import marketplace_leads
+from app.schemas.marketplace_leads import (
+    MarketplaceProposalContentUpdate,
+    MarketplaceProposalGenerate,
+    MarketplaceProposalPrepare,
+    MarketplaceProposalPrepareResult,
+    MarketplaceProposalRead,
+    MarketplaceProposalStatusUpdate,
+    MarketplaceSourceRecommendationRead,
+)
+from app.services import marketplace_leads, proposal_submissions
 from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(prefix="/marketplace-leads", tags=["Marketplace Leads"])
@@ -35,6 +43,15 @@ async def list_marketplace_leads(
     ),
     lead_kind: marketplace_leads.MarketplaceLeadKind | None = Query(
         default=None, description="按线索类型过滤"
+    ),
+    opportunity_lane: marketplace_leads.MarketplaceOpportunityLane | None = Query(
+        default=None, description="按远程兼职/项目外包通道过滤"
+    ),
+    communication_burden: marketplace_leads.MarketplaceCommunicationBurden | None = Query(
+        default=None, description="按沟通成本过滤"
+    ),
+    preferred_only: bool = Query(
+        default=False, description="仅保留低/中沟通且可快速承接的优先机会"
     ),
     budget_band: marketplace_leads.MarketplaceBudgetBand | None = Query(
         default=None, description="按预算分段过滤"
@@ -67,6 +84,9 @@ async def list_marketplace_leads(
         search=search,
         tier=tier,
         lead_kind=lead_kind,
+        opportunity_lane=opportunity_lane,
+        communication_burden=communication_burden,
+        preferred_only=preferred_only,
         budget_band=budget_band,
         delivery_scope=delivery_scope,
         tech_stack=tech_stack,
@@ -82,6 +102,8 @@ async def list_marketplace_leads(
         total=result.total,
         tier_breakdown=result.tier_breakdown,
         kind_breakdown=result.kind_breakdown,
+        opportunity_lane_breakdown=result.opportunity_lane_breakdown,
+        communication_breakdown=result.communication_breakdown,
         status_breakdown=result.status_breakdown,
         outcome_breakdown=result.outcome_breakdown,
         outcome_reason_breakdown=result.outcome_reason_breakdown,
@@ -169,6 +191,103 @@ async def bulk_update_marketplace_lead_outcome(
     except Exception as exc:
         raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
     return [_to_marketplace_lead_read(item) for item in items]
+
+
+@router.post(
+    "/proposal-drafts/prepare",
+    response_model=MarketplaceProposalPrepareResult,
+    summary="为高优先级线索批量准备投递草稿",
+)
+async def prepare_marketplace_proposal_drafts(
+    payload: MarketplaceProposalPrepare,
+) -> MarketplaceProposalPrepareResult:
+    result = proposal_submissions.prepare_proposals(
+        limit=payload.limit,
+        min_priority_score=payload.min_priority_score,
+    )
+    return MarketplaceProposalPrepareResult(
+        created=result.created,
+        skipped=result.skipped,
+        items=[MarketplaceProposalRead.model_validate(item) for item in result.items],
+    )
+
+
+@router.get(
+    "/{lead_id}/proposal",
+    response_model=MarketplaceProposalRead | None,
+    summary="获取线索投递草稿",
+)
+async def get_marketplace_proposal(lead_id: int) -> MarketplaceProposalRead | None:
+    try:
+        proposal = proposal_submissions.get_proposal(lead_id)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
+    return MarketplaceProposalRead.model_validate(proposal) if proposal is not None else None
+
+
+@router.post(
+    "/{lead_id}/proposal",
+    response_model=MarketplaceProposalRead,
+    summary="生成或重新生成线索投递草稿",
+)
+async def generate_marketplace_proposal(
+    lead_id: int,
+    payload: MarketplaceProposalGenerate,
+) -> MarketplaceProposalRead:
+    try:
+        proposal = proposal_submissions.generate_proposal(lead_id, force=payload.force)
+    except proposal_submissions.InvalidProposalTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="marketplace lead not found") from exc
+    return MarketplaceProposalRead.model_validate(proposal)
+
+
+@router.put(
+    "/{lead_id}/proposal",
+    response_model=MarketplaceProposalRead,
+    summary="编辑线索投递草稿",
+)
+async def edit_marketplace_proposal(
+    lead_id: int,
+    payload: MarketplaceProposalContentUpdate,
+) -> MarketplaceProposalRead:
+    try:
+        proposal = proposal_submissions.update_proposal_content(
+            lead_id,
+            proposal_text=payload.proposal_text,
+            suggested_price=payload.suggested_price,
+            delivery_days=payload.delivery_days,
+        )
+    except proposal_submissions.InvalidProposalTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="proposal not found") from exc
+    return MarketplaceProposalRead.model_validate(proposal)
+
+
+@router.put(
+    "/{lead_id}/proposal/status",
+    response_model=MarketplaceProposalRead,
+    summary="更新投递草稿状态",
+)
+async def update_marketplace_proposal_status(
+    lead_id: int,
+    payload: MarketplaceProposalStatusUpdate,
+) -> MarketplaceProposalRead:
+    try:
+        status = proposal_submissions.ProposalStatus(payload.status)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="unsupported proposal status") from exc
+    try:
+        proposal = proposal_submissions.update_proposal_status(lead_id, status)
+    except proposal_submissions.InvalidProposalTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="proposal not found") from exc
+    return MarketplaceProposalRead.model_validate(proposal)
 
 
 @router.get("/{lead_id}", response_model=MarketplaceLeadRead, summary="获取单条外包项目线索详情")

@@ -50,6 +50,11 @@ celery_app.conf.beat_schedule = {
         "schedule": timedelta(seconds=settings.scheduler_promote_interval_seconds),
         "args": [settings.scheduler_promotion_batch_size, settings.scheduler_min_rule_score],
     },
+    "archive-stale-leads": {
+        "task": "jobs.archive_stale_leads",
+        "schedule": timedelta(seconds=settings.scheduler_stale_archive_interval_seconds),
+        "args": [settings.stale_lead_after_days],
+    },
 }
 
 if settings.downstream_webhook_url:

@@ -15,6 +15,7 @@ class CandidateNeedStatus(str, Enum):
     REJECTED = "rejected"
     IN_DISCOVERY = "in_discovery"
     COMPLETED = "completed"
+    ARCHIVED = "archived"
 
 
 class CandidateNeedType(str, Enum):

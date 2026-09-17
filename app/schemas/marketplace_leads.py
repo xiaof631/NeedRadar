@@ -70,10 +70,19 @@ class MarketplaceLeadRead(BaseModel):
     skills: list[str] = Field(default_factory=list)
     link: str | None = None
     lead_kind: str
+    opportunity_lane: str
+    communication_burden: str
+    communication_reasons: list[str] = Field(default_factory=list)
+    weekly_hours: str | None = None
+    requires_live_interview: bool = False
+    quick_delivery_fit: bool = False
+    decision_summary_zh: str
     lead_tier: str
     tier_reason: str
     lead_status: str
     lead_outcome: str | None = None
+    proposal_status: str | None = None
+    capability_fit_score: int | None = None
     outcome_reason_tags: list[str] = Field(default_factory=list)
     notes: str | None = None
     next_follow_up_at: datetime | None = None
@@ -127,6 +136,8 @@ class MarketplaceLeadList(BaseModel):
     total: int
     tier_breakdown: dict[str, int] = Field(default_factory=dict)
     kind_breakdown: dict[str, int] = Field(default_factory=dict)
+    opportunity_lane_breakdown: dict[str, int] = Field(default_factory=dict)
+    communication_breakdown: dict[str, int] = Field(default_factory=dict)
     status_breakdown: dict[str, int] = Field(default_factory=dict)
     outcome_breakdown: dict[str, int] = Field(default_factory=dict)
     outcome_reason_breakdown: dict[str, int] = Field(default_factory=dict)
@@ -165,3 +176,56 @@ class MarketplaceLeadNotesUpdate(BaseModel):
 class MarketplaceLeadFollowUpUpdate(BaseModel):
     next_follow_up_at: str | None = None
     follow_up_reason: str | None = None
+
+
+class MarketplaceProposalRead(BaseModel):
+    lead_id: int
+    status: str
+    offer_id: str
+    offer_name: str
+    language: str
+    application_type: str
+    chinese_brief: str
+    communication_burden: str
+    communication_reasons: list[str] = Field(default_factory=list)
+    fit_score: int
+    matched_capabilities: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
+    suggested_price: str
+    delivery_days: str
+    proposal_text: str
+    questions: list[str] = Field(default_factory=list)
+    source_url: str | None = None
+    submission_mode: str
+    can_auto_submit: bool = False
+    requires_manual_confirmation: bool = True
+    generated_at: datetime
+    updated_at: datetime
+    submitted_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MarketplaceProposalGenerate(BaseModel):
+    force: bool = False
+
+
+class MarketplaceProposalStatusUpdate(BaseModel):
+    status: str
+
+
+class MarketplaceProposalContentUpdate(BaseModel):
+    proposal_text: str = Field(min_length=1, max_length=12000)
+    suggested_price: str | None = Field(default=None, max_length=120)
+    delivery_days: str | None = Field(default=None, max_length=80)
+
+
+class MarketplaceProposalPrepare(BaseModel):
+    limit: int = Field(default=5, ge=1, le=20)
+    min_priority_score: int = Field(default=65, ge=0, le=100)
+
+
+class MarketplaceProposalPrepareResult(BaseModel):
+    created: int
+    skipped: int
+    items: list[MarketplaceProposalRead] = Field(default_factory=list)

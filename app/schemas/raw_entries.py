@@ -17,6 +17,7 @@ class RawEntryStatusEnum(str, Enum):
     FILTERED = RawEntryStatus.FILTERED.value
     PROMOTED = RawEntryStatus.PROMOTED.value
     IGNORED = RawEntryStatus.IGNORED.value
+    ARCHIVED = RawEntryStatus.ARCHIVED.value
 
 
 class RawEntryRead(BaseModel):
