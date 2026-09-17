@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import random
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -42,6 +44,11 @@ _ALTERNATIVE_PATTERNS = (
     "recommend",
 )
 _SUBREDDIT_RE = re.compile(r"/r/([^/]+)")
+# 匿名访问 Reddit 按 IP 限流且偶发连接重置，多个源并发抓取时首个请求之后的请求
+# 大概率 429。退避总时长须小于 Celery 任务软超时（默认 60s）。
+_REDDIT_RATE_LIMIT_RETRIES = 2
+_REDDIT_RETRY_BASE_SECONDS = 12.0
+_REDDIT_RETRY_JITTER_SECONDS = 6.0
 
 
 async def fetch_reddit_source(
@@ -68,9 +75,14 @@ async def fetch_reddit_source(
         params = _build_query_params(source.config, include_raw_json=use_json_api)
         target_url = _normalize_listing_url(source.url) if use_json_api else _normalize_rss_url(source.url)
         try:
-            response = await client.get(target_url, params=params, headers=headers)
+            response = await _request_with_rate_limit_retry(
+                client,
+                target_url,
+                params=params,
+                headers=headers,
+            )
         except httpx.HTTPError as exc:
-            message = str(exc)
+            message = f"{type(exc).__name__}: {exc}".strip(": ")
             return _failure_result(source.id, error_message=message)
 
         if response.status_code >= 400:
@@ -121,6 +133,31 @@ def _normalize_listing_url(url: str) -> str:
     if normalized.endswith(".json"):
         return normalized
     return f"{normalized}.json"
+
+
+async def _request_with_rate_limit_retry(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    params: dict[str, str | int],
+    headers: dict[str, str],
+) -> httpx.Response:
+    """对 429 限流与传输层连接错误做带随机抖动的退避重试。"""
+
+    attempt = 0
+    while True:
+        try:
+            response = await client.get(url, params=params, headers=headers)
+        except httpx.TransportError:
+            if attempt >= _REDDIT_RATE_LIMIT_RETRIES:
+                raise
+        else:
+            if response.status_code != 429 or attempt >= _REDDIT_RATE_LIMIT_RETRIES:
+                return response
+        attempt += 1
+        await asyncio.sleep(
+            _REDDIT_RETRY_BASE_SECONDS + random.uniform(0, _REDDIT_RETRY_JITTER_SECONDS)
+        )
 
 
 def _normalize_rss_url(url: str) -> str:

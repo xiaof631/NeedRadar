@@ -1056,6 +1056,186 @@ def test_fetch_reddit_source_success() -> None:
     asyncio.run(_run())
 
 
+def test_fetch_reddit_source_retries_on_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _run() -> None:
+        source = rss_sources.create_source(
+            {
+                "name": "r/SaaS new",
+                "url": "https://www.reddit.com/r/SaaS/new",
+                "frequency": 1200,
+                "source_type": SourceType.REDDIT,
+                "config": {"item_limit": 1},
+            }
+        )
+
+        request_count = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal request_count
+            request_count += 1
+            if request_count == 1:
+                return httpx.Response(429, text="Too Many Requests")
+            return httpx.Response(
+                200,
+                text="""<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>t3_retry1</id>
+    <title>Invoice processing eats our week</title>
+    <updated>2024-03-21T10:00:00Z</updated>
+    <author><name>saasowner</name></author>
+    <link href="https://www.reddit.com/r/SaaS/comments/retry1/" />
+  </entry>
+</feed>""",
+            )
+
+        waits: list[float] = []
+
+        async def _fake_sleep(seconds: float) -> None:
+            waits.append(seconds)
+
+        monkeypatch.setattr("app.services.reddit_fetcher.asyncio.sleep", _fake_sleep)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert request_count == 2
+        assert len(waits) == 1
+        assert waits[0] > 0
+        assert result.status == FetchStatus.SUCCESS
+        assert result.fetched_entries == 1
+        assert result.new_entries == 1
+
+        logs = db.list_fetch_logs(source_id=source.id)
+        assert len(logs) == 1
+        assert logs[0].status == FetchStatus.SUCCESS
+
+    asyncio.run(_run())
+
+
+def test_fetch_reddit_source_gives_up_after_rate_limit_retries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _run() -> None:
+        source = rss_sources.create_source(
+            {
+                "name": "r/startups comments",
+                "url": "https://www.reddit.com/r/startups/comments",
+                "frequency": 1200,
+                "source_type": SourceType.REDDIT,
+                "config": {"item_limit": 1},
+            }
+        )
+
+        request_count = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal request_count
+            request_count += 1
+            return httpx.Response(429, text="Too Many Requests")
+
+        async def _fake_sleep(seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr("app.services.reddit_fetcher.asyncio.sleep", _fake_sleep)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert request_count == 3
+        assert result.status == FetchStatus.FAILURE
+        assert result.error_message == "unexpected status code 429"
+
+        logs = db.list_fetch_logs(source_id=source.id)
+        assert len(logs) == 1
+        assert logs[0].status == FetchStatus.FAILURE
+
+    asyncio.run(_run())
+
+
+def test_fetch_reddit_source_retries_on_transport_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _run() -> None:
+        source = rss_sources.create_source(
+            {
+                "name": "r/startups new transport",
+                "url": "https://www.reddit.com/r/startups/new",
+                "frequency": 1200,
+                "source_type": SourceType.REDDIT,
+                "config": {"item_limit": 1},
+            }
+        )
+
+        request_count = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal request_count
+            request_count += 1
+            if request_count == 1:
+                raise httpx.ConnectError("")
+            return httpx.Response(
+                200,
+                text="""<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>t3_retry2</id>
+    <title>Manual reporting is killing us</title>
+    <updated>2024-03-22T10:00:00Z</updated>
+    <author><name>opslead</name></author>
+    <link href="https://www.reddit.com/r/startups/comments/retry2/" />
+  </entry>
+</feed>""",
+            )
+
+        async def _fake_sleep(seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr("app.services.reddit_fetcher.asyncio.sleep", _fake_sleep)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert request_count == 2
+        assert result.status == FetchStatus.SUCCESS
+        assert result.fetched_entries == 1
+        assert result.new_entries == 1
+
+    asyncio.run(_run())
+
+
+def test_fetch_reddit_source_transport_error_message_contains_exception_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _run() -> None:
+        source = rss_sources.create_source(
+            {
+                "name": "r/startups comments transport",
+                "url": "https://www.reddit.com/r/startups/comments",
+                "frequency": 1200,
+                "source_type": SourceType.REDDIT,
+                "config": {"item_limit": 1},
+            }
+        )
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("")
+
+        async def _fake_sleep(seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr("app.services.reddit_fetcher.asyncio.sleep", _fake_sleep)
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            result = await rss_fetcher.fetch_rss_source(source.id, client=client)
+
+        assert result.status == FetchStatus.FAILURE
+        assert result.error_message == "ConnectError"
+        assert "unexpected status code" not in (result.error_message or "")
+
+    asyncio.run(_run())
+
+
 def test_fetch_reddit_comments_source_with_signal_tags() -> None:
     async def _run() -> None:
         source = rss_sources.create_source(
