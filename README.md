@@ -15,7 +15,7 @@ NeedRadar 持续抓取自由职业平台、RSS 和公开 API 中的项目机会�
 ```
 ┌─────────────┐    ┌──────────────┐    ┌───────────────┐
 │  Vue 3 Web   │───▶│  FastAPI      │───▶│  PostgreSQL    │
-│  (Vite:5206) │    │  (uvicorn)    │    │  (:5406)       │
+│  (Vite:5207) │    │  (uvicorn)    │    │  (:5406)       │
 └─────────────┘    └──────┬───────┘    └───────────────┘
                           │
         ┌─────────────────┼─────────────────┐
@@ -65,7 +65,7 @@ NeedRadar 持续抓取自由职业平台、RSS 和公开 API 中的项目机会�
 3. 启动 API：
 
    ```bash
-   uvicorn app.main:app --reload --port 3106
+   uvicorn app.main:app --reload --port 3107
    ```
 
    也可以直接使用仓库自带的本地编排脚本统一启动/停止服务：
@@ -127,12 +127,12 @@ NeedRadar 持续抓取自由职业平台、RSS 和公开 API 中的项目机会�
    ```bash
    cd web
    pnpm install
-   pnpm dev # 本地调试，默认 http://localhost:5206
+   pnpm dev # 本地调试，默认 http://localhost:5207
    pnpm build # 产出 dist/ 静态资源
    pnpm test # 运行 Vitest + Vue Test Utils
    ```
 
-   > 前端默认从 `VITE_API_BASE_URL` 指向的 NeedRadar API 读取数据，若未设置则回落至 `http://localhost:3106`。
+   > 前端默认从 `VITE_API_BASE_URL` 指向的 NeedRadar API 读取数据，若未设置则回落至 `http://localhost:3107`。
 
 ## 目录结构
 
@@ -170,7 +170,7 @@ cp .env.example .env
 
 前端 `.env` 中可配置：
 
-- `VITE_API_BASE_URL`：NeedRadar API 根地址，默认 `http://localhost:3106`。
+- `VITE_API_BASE_URL`：NeedRadar API 根地址，默认 `http://localhost:3107`。
 
 ## Docker 与 PostgreSQL
 
@@ -180,7 +180,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-默认推荐仅用该编排启动基础设施服务：PostgreSQL 暴露到 `localhost:5406`，Redis 暴露到 `localhost:6406`。`api`、`worker`、`scheduler`、`prometheus` 已被放入 `fullstack` profile，只有显式声明时才会启动。若需要完整容器化运行，可执行 `docker compose --profile fullstack up --build`。Prometheus 容器会抓取本机 `3106` 端口上的本地 API `/metrics`。
+默认推荐仅用该编排启动基础设施服务：PostgreSQL 暴露到 `localhost:5406`，Redis 暴露到 `localhost:6406`。`api`、`worker`、`scheduler`、`prometheus` 已被放入 `fullstack` profile，只有显式声明时才会启动。若需要完整容器化运行，可执行 `docker compose --profile fullstack up --build`。Prometheus 容器会抓取本机 `3107` 端口上的本地 API `/metrics`。
 
 如需脱离 PostgreSQL 做轻量本地验证，仍可在 `.env` 中手动改回 SQLite：
 

@@ -4,15 +4,15 @@ import vue from '@vitejs/plugin-vue';
 export default defineConfig({
   plugins: [vue()],
   server: {
-    port: 5206,
+    port: 5207,
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3106',
+        target: 'http://127.0.0.1:3107',
         changeOrigin: true
       },
       '/health': {
-        target: 'http://127.0.0.1:3106',
+        target: 'http://127.0.0.1:3107',
         changeOrigin: true
       }
     }

@@ -41,7 +41,7 @@ resolve_services() {
 service_command() {
   case "$1" in
     api)
-      printf '%s\n' "uvicorn app.main:app --host 0.0.0.0 --port 3106"
+      printf '%s\n' "uvicorn app.main:app --host 0.0.0.0 --port 3107"
       ;;
     worker)
       printf '%s\n' "celery -A jobs.celery_app worker --loglevel=info --pool=\${NEEDRADAR_CELERY_WORKER_POOL:-threads} --concurrency=\${NEEDRADAR_CELERY_WORKER_CONCURRENCY:-4}"
@@ -50,7 +50,7 @@ service_command() {
       printf '%s\n' "python -m jobs.scheduler"
       ;;
     web)
-      printf '%s\n' "pnpm --dir web dev --host 0.0.0.0 --port 5206"
+      printf '%s\n' "pnpm --dir web dev --host 0.0.0.0 --port 5207"
       ;;
   esac
 }
@@ -58,7 +58,7 @@ service_command() {
 service_pattern() {
   case "$1" in
     api)
-      printf '%s\n' "uvicorn app.main:app --host 0.0.0.0 --port 3106"
+      printf '%s\n' "uvicorn app.main:app --host 0.0.0.0 --port 3107"
       ;;
     worker)
       printf '%s\n' "celery -A jobs.celery_app worker --loglevel=info"
@@ -67,7 +67,7 @@ service_pattern() {
       printf '%s\n' "python3? -m jobs\\.scheduler"
       ;;
     web)
-      printf '%s\n' "vite.*--host 0.0.0.0 --port 5206"
+      printf '%s\n' "vite.*--host 0.0.0.0 --port 5207"
       ;;
   esac
 }
@@ -75,10 +75,10 @@ service_pattern() {
 service_url() {
   case "$1" in
     api)
-      printf '%s\n' "http://localhost:3106/health"
+      printf '%s\n' "http://localhost:3107/health"
       ;;
     web)
-      printf '%s\n' "http://localhost:5206/"
+      printf '%s\n' "http://localhost:5207/"
       ;;
     *)
       printf '%s\n' "-"

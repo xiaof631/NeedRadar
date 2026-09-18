@@ -23,7 +23,7 @@ services:
   api:
     profiles: ["fullstack"]
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 3106 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 3107 --reload
     depends_on:
       - postgres
       - redis
@@ -35,7 +35,7 @@ services:
     volumes:
       - ./:/app
     ports:
-      - "3106:3106"
+      - "3107:3107"
 
   worker:
     profiles: ["fullstack"]
