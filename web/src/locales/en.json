@@ -4,6 +4,7 @@
     "sources": "Sources",
     "marketplace": "Marketplace Leads",
     "customerRadar": "Customer Radar",
+    "keywordSeeds": "Keyword Seeds",
     "documentOps": "Document Ops",
     "emailFollowups": "Email Follow-ups",
     "entries": "Raw Entries",
@@ -975,6 +976,76 @@
         "failed": "Failed",
         "completed": "Completed"
       }
+    }
+  },
+  "keywordSeeds": {
+    "title": "Keyword Seeds",
+    "subtitle": "Extract long-tail tool keywords from candidate needs and validate search volume to pick the next tool site",
+    "metrics": {
+      "total": "Total seeds",
+      "new": "Pending validation",
+      "validated": "Validated",
+      "shortlisted": "Shortlisted",
+      "noVolume": "No volume"
+    },
+    "filters": {
+      "searchPlaceholder": "Search phrases",
+      "status": "Status",
+      "all": "All",
+      "minScore": "Min opportunity score"
+    },
+    "table": {
+      "empty": "No keyword seeds yet. Run extraction first",
+      "phrase": "Keyword phrase",
+      "pattern": "Pattern",
+      "occurrences": "Occurrences",
+      "volume": "Monthly volume",
+      "difficulty": "Difficulty",
+      "cpc": "CPC",
+      "score": "Opportunity score",
+      "status": "Status",
+      "validatedAt": "Validated at",
+      "actions": "Actions"
+    },
+    "actions": {
+      "extract": "Extract seeds",
+      "validatePending": "Validate batch",
+      "validateOne": "Validate",
+      "shortlist": "Shortlist",
+      "dismiss": "Dismiss",
+      "restore": "Restore to pending"
+    },
+    "status": {
+      "new": "Pending",
+      "validated": "Validated",
+      "no_volume": "No volume",
+      "error": "Error",
+      "dismissed": "Dismissed",
+      "shortlisted": "Shortlisted"
+    },
+    "pattern": {
+      "convert_to": "Pattern: convert X to Y",
+      "to_converter": "Pattern: X to Y converter",
+      "extract_from": "Pattern: extract X from Y",
+      "extractor": "Pattern: X extractor",
+      "scrape_target": "Pattern: scrape X",
+      "zh_convert_to": "Pattern: X 转成 Y",
+      "zh_extract_from": "Pattern: 从 X 提取 Y"
+    },
+    "details": {
+      "title": "Seed details",
+      "metrics": "Search metrics",
+      "evidence": "Source leads",
+      "notValidated": "Search volume not validated yet",
+      "validationError": "Validation error",
+      "confirmedBySuggest": "Real search term"
+    },
+    "messages": {
+      "extractDone": "Extraction done: scanned {scanned}, created {created}, merged {merged}",
+      "validateDone": "Validation done: {validated} valid, {noVolume} no volume, {errors} failed",
+      "validateSkipped": "Keyword provider not configured. Set DataForSEO credentials first",
+      "statusUpdated": "Status updated",
+      "error": "Operation failed, please retry"
     }
   }
 }

@@ -167,10 +167,32 @@ cp .env.example .env
 - `NEEDRADAR_TELEMETRY_SAMPLE_RATIO`：0-1 之间的采样率，默认为 `0.1`。
 - `NEEDRADAR_TELEMETRY_EXCLUDED_URLS`：无需采样的 URL（逗号分隔），默认排除 `/metrics` 与 `/health`。
 - `NEEDRADAR_DOWNSTREAM_FILESYSTEM_ENABLED` / `NEEDRADAR_DOWNSTREAM_FILESYSTEM_DIR` / `NEEDRADAR_DOWNSTREAM_FILESYSTEM_FORMAT`：启用基于文件系统的同步通道时需要的开关、输出目录与格式（支持 `jsonl`、`json`）。
+- `NEEDRADAR_DATAFORSEO_API_LOGIN` / `NEEDRADAR_DATAFORSEO_API_PASSWORD`：可选，DataForSEO 凭据；配置后启用关键词种子的搜索量验证，未配置时降级为纯抽取模式。
+- `NEEDRADAR_DATAFORSEO_SANDBOX`：DataForSEO 是否走沙箱环境，默认 `false`，可先用沙箱验证联调。
+- `NEEDRADAR_KEYWORD_PROVIDER`：关键词验证数据源，`auto`（默认：有 DataForSEO 凭据用真实搜索量，否则退到免费的 Google suggest 存在性校验）/ `dataforseo` / `autocomplete` / `none`。
+- `NEEDRADAR_KEYWORD_AUTOCOMPLETE_INTERVAL_MS`：免费 suggest 校验相邻请求的间隔（毫秒），默认 `800`，避免被限流。
+- `NEEDRADAR_KEYWORD_VALIDATION_BATCH_SIZE`：单次批量验证的关键词种子数量上限，默认 `50`。
+- `NEEDRADAR_SCHEDULER_KEYWORD_EXTRACT_INTERVAL_SECONDS` / `NEEDRADAR_SCHEDULER_KEYWORD_VALIDATE_INTERVAL_SECONDS`：关键词种子抽取（默认 6 小时）与搜索量验证（默认 24 小时）的调度间隔。
 
 前端 `.env` 中可配置：
 
 - `VITE_API_BASE_URL`：NeedRadar API 根地址，默认 `http://localhost:3107`。
+
+## 关键词种子（关键词反选闭环）
+
+从已挖掘的候选需求文本中自动抽取工具型长尾关键词（覆盖 `convert X to Y`、`X to Y converter`、`extract X from Y`、`X extractor`、`scrape X` 及中文 `X转成Y`、`从X提取Y` 等句式），按短语去重聚合出现次数并回链原始线索作为证据；结合搜索验证计算 0-100 机会分，用于反选下一个工具站方向。
+
+验证分两档，默认全部免费可用：
+
+- **免费档（默认，无需任何凭据）**：调用 Google suggest 公开端点做存在性校验——短语出现在自身联想列表（含前缀扩展）即标记为"真实搜索词"（`validated` + `confirmed_by_suggest`），并获得机会分加成；没有任何联想命中则标记 `no_volume`。原话常是复数形式而标准搜索词多为单数，未确认时会自动回查至多两个单数变体（如 `convert pdfs to excel` → `convert pdf to excel`）。请求间默认限速 1.5 秒、被限流时退避重试，中文短语自动切换 `hl=zh-CN`（并强制 `oe=utf-8` 避免该端点的 GBK 编码坑）。
+- **数据档（可选升级）**：配置 DataForSEO 凭据后自动切换为真实月搜索量 / 关键词难度 / CPC 验证（按量付费，约 $0.09/次请求，单次可带千词）。
+
+建议的免费工作流：批量验证筛出 `validated` 种子 → 按"出现次数 + 机会分"排序取 top 30 → 人工到 Google Keyword Planner 网页版核对真实搜索量后再立项。
+
+- Web 端在"关键词种子"页面查看与操作：手动抽取、批量/单条验证、入围（shortlist）与忽略（dismiss），证据抽屉可直接跳转原始帖子。
+- API 位于 `/api/v1/keyword-seeds/`（列表 / `extract` / `validate-pending` / `{id}/validate` / `{id}` PATCH）。
+- 调度任务 `jobs.extract_keyword_seeds`（6h）与 `jobs.validate_keyword_seeds`（24h）已同时注册进 Celery beat 与 APScheduler。
+- Prometheus 指标：`needradar_keyword_seeds_extracted_total{result}` 与 `needradar_keyword_validations_total{status}`。
 
 ## Docker 与 PostgreSQL
 

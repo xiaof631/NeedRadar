@@ -67,6 +67,28 @@ def _run_stale_archive_job(*, stale_after_days: int) -> None:
     logger.info("scheduler.archive_stale.queued", stale_after_days=stale_after_days)
 
 
+def _run_keyword_extract_job() -> None:
+    """派发关键词种子抽取任务。"""
+
+    try:
+        task_queue.extract_keyword_seeds_task.delay()
+    except Exception as exc:  # pragma: no cover - 调度器异常记录
+        logger.error("scheduler.keyword_extract.failed", error=str(exc))
+        return
+    logger.info("scheduler.keyword_extract.queued")
+
+
+def _run_keyword_validate_job(*, batch_size: int) -> None:
+    """派发关键词搜索量验证任务。"""
+
+    try:
+        task_queue.validate_keyword_seeds_task.delay(batch_size)
+    except Exception as exc:  # pragma: no cover - 调度器异常记录
+        logger.error("scheduler.keyword_validate.failed", error=str(exc))
+        return
+    logger.info("scheduler.keyword_validate.queued", batch_size=batch_size)
+
+
 async def _run_sync_job(
     *,
     webhook_url: str | None,
@@ -122,6 +144,25 @@ async def main() -> None:
         max_instances=1,
         coalesce=True,
     )
+    scheduler.add_job(
+        _run_keyword_extract_job,
+        trigger=IntervalTrigger(
+            seconds=settings.scheduler_keyword_extract_interval_seconds
+        ),
+        id="extract-keyword-seeds",
+        max_instances=1,
+        coalesce=True,
+    )
+    scheduler.add_job(
+        _run_keyword_validate_job,
+        trigger=IntervalTrigger(
+            seconds=settings.scheduler_keyword_validate_interval_seconds
+        ),
+        id="validate-keyword-seeds",
+        kwargs={"batch_size": settings.keyword_validation_batch_size},
+        max_instances=1,
+        coalesce=True,
+    )
     if (
         settings.downstream_webhook_url
         or settings.downstream_mq_enabled
@@ -146,6 +187,8 @@ async def main() -> None:
         promote_interval=settings.scheduler_promote_interval_seconds,
         stale_archive_interval=settings.scheduler_stale_archive_interval_seconds,
         stale_after_days=settings.stale_lead_after_days,
+        keyword_extract_interval=settings.scheduler_keyword_extract_interval_seconds,
+        keyword_validate_interval=settings.scheduler_keyword_validate_interval_seconds,
         downstream_interval=settings.scheduler_downstream_interval_seconds
         if (
             settings.downstream_webhook_url

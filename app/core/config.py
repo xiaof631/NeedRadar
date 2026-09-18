@@ -70,6 +70,49 @@ class Settings(BaseSettings):
         description="调度器触发下游同步的间隔（秒）",
         ge=60,
     )
+    scheduler_keyword_extract_interval_seconds: int = Field(
+        default=21600,
+        description="调度器抽取关键词种子的间隔（秒）",
+        ge=60,
+    )
+    scheduler_keyword_validate_interval_seconds: int = Field(
+        default=86400,
+        description="调度器验证关键词搜索量的间隔（秒）",
+        ge=60,
+    )
+    keyword_provider: str = Field(
+        default="auto",
+        description="关键词验证数据源：auto/dataforseo/autocomplete/none；auto 时 DataForSEO 优先、免费 suggest 校验兜底",
+    )
+    keyword_provider_timeout_seconds: float = Field(
+        default=30.0,
+        description="关键词数据源请求超时时间（秒）",
+        gt=0,
+    )
+    keyword_autocomplete_interval_ms: int = Field(
+        default=1500,
+        description="Google suggest 校验相邻请求的间隔（毫秒），避免限流",
+        ge=0,
+        le=10_000,
+    )
+    keyword_validation_batch_size: int = Field(
+        default=50,
+        description="单次关键词验证的最大种子数量",
+        ge=1,
+        le=1000,
+    )
+    dataforseo_api_login: str | None = Field(
+        default=None,
+        description="可选，DataForSEO API 登录名；配置后启用搜索量验证",
+    )
+    dataforseo_api_password: str | None = Field(
+        default=None,
+        description="可选，DataForSEO API 密码",
+    )
+    dataforseo_sandbox: bool = Field(
+        default=False,
+        description="DataForSEO 是否走沙箱环境",
+    )
     downstream_webhook_url: str | None = Field(
         default=None,
         description="候选需求同步的 Webhook 地址，为空则不执行",

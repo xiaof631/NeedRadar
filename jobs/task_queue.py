@@ -17,6 +17,7 @@ from app.models import CandidateNeedStatus, RawEntryStatus, SourceStatus, SyncCh
 from app.services import (
     candidate_needs,
     downstream,
+    keyword_seeds,
     pipeline,
     raw_entries,
     rss_fetcher,
@@ -245,6 +246,57 @@ def archive_stale_leads_task(stale_after_days: int | None = None) -> dict[str, A
         "cutoff": result.cutoff.isoformat(),
         "raw_entries_archived": result.raw_entries_archived,
         "candidate_needs_archived": result.candidate_needs_archived,
+    }
+
+
+@celery_app.task(name="jobs.extract_keyword_seeds")
+def extract_keyword_seeds_task() -> dict[str, Any]:
+    """扫描候选需求并抽取关键词种子。"""
+
+    logger.info("tasks.keyword_seeds.extract.started")
+    with tracer.start_as_current_span("extract_keyword_seeds_task"):
+        result = keyword_seeds.extract_seeds()
+    logger.info(
+        "tasks.keyword_seeds.extract.completed",
+        scanned=result.scanned,
+        created=result.created,
+        merged=result.merged,
+    )
+    return {
+        "scanned": result.scanned,
+        "created": result.created,
+        "merged": result.merged,
+    }
+
+
+@celery_app.task(
+    name="jobs.validate_keyword_seeds",
+    # suggest 校验带限速间隔，批量可能远超全局软超时，单独放宽。
+    soft_time_limit=900,
+    time_limit=960,
+)
+def validate_keyword_seeds_task(batch_size: int | None = None) -> dict[str, Any]:
+    """批量验证关键词种子的搜索量。"""
+
+    with tracer.start_as_current_span("validate_keyword_seeds_task"):
+        result = asyncio.run(
+            keyword_seeds.validate_pending(
+                batch_size=batch_size or settings.keyword_validation_batch_size,
+            )
+        )
+    logger.info(
+        "tasks.keyword_seeds.validate.completed",
+        validated=result.validated,
+        no_volume=result.no_volume,
+        errors=result.errors,
+        reason=result.reason,
+    )
+    return {
+        "skipped": result.skipped,
+        "validated": result.validated,
+        "no_volume": result.no_volume,
+        "errors": result.errors,
+        "reason": result.reason,
     }
 
 

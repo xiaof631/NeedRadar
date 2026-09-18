@@ -7,6 +7,7 @@ const router = createRouter({
     { path: '/sources', component: () => import('../pages/RssSourcesPage.vue') },
     { path: '/marketplace', component: () => import('../pages/MarketplaceLeadsPage.vue') },
     { path: '/customer-radar', component: () => import('../pages/CustomerRadarPage.vue') },
+    { path: '/keyword-seeds', component: () => import('../pages/KeywordSeedsPage.vue') },
     { path: '/document-ops', component: () => import('../pages/DocumentOpsSpikePage.vue') },
     { path: '/email-followups', component: () => import('../pages/EmailFollowupsPage.vue') },
     { path: '/entries', component: () => import('../pages/RawEntriesPage.vue') },

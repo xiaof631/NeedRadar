@@ -81,6 +81,18 @@ _task_queue_enqueued = Counter(
     ("kind",),
     registry=REGISTRY,
 )
+_keyword_seeds_extracted = Counter(
+    "needradar_keyword_seeds_extracted_total",
+    "关键词种子抽取结果数量（新建/合并）",
+    ("result",),
+    registry=REGISTRY,
+)
+_keyword_validations = Counter(
+    "needradar_keyword_validations_total",
+    "关键词搜索量验证结果数量",
+    ("status",),
+    registry=REGISTRY,
+)
 
 
 metrics_router = APIRouter()
@@ -134,6 +146,22 @@ def record_task_enqueue(kind: str, *, count: int) -> None:
     if count <= 0:
         return
     _task_queue_enqueued.labels(kind=kind).inc(count)
+
+
+def record_keyword_seed_extraction(result: str, *, count: int = 1) -> None:
+    """记录关键词种子抽取结果。"""
+
+    if count <= 0:
+        return
+    _keyword_seeds_extracted.labels(result=result).inc(count)
+
+
+def record_keyword_validation(status: str, *, count: int = 1) -> None:
+    """记录关键词验证结果。"""
+
+    if count <= 0:
+        return
+    _keyword_validations.labels(status=status).inc(count)
 
 
 def instrument_fastapi_app(app: Any) -> None:
@@ -211,5 +239,7 @@ __all__ = [
     "record_file_drop_duration",
     "record_export_job_result",
     "record_task_enqueue",
+    "record_keyword_seed_extraction",
+    "record_keyword_validation",
     "REGISTRY",
 ]

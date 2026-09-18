@@ -55,6 +55,15 @@ celery_app.conf.beat_schedule = {
         "schedule": timedelta(seconds=settings.scheduler_stale_archive_interval_seconds),
         "args": [settings.stale_lead_after_days],
     },
+    "extract-keyword-seeds": {
+        "task": "jobs.extract_keyword_seeds",
+        "schedule": timedelta(seconds=settings.scheduler_keyword_extract_interval_seconds),
+    },
+    "validate-keyword-seeds": {
+        "task": "jobs.validate_keyword_seeds",
+        "schedule": timedelta(seconds=settings.scheduler_keyword_validate_interval_seconds),
+        "args": [settings.keyword_validation_batch_size],
+    },
 }
 
 if settings.downstream_webhook_url:

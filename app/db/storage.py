@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
@@ -17,6 +17,7 @@ from app.db.entities import (
     ExportJobEntity,
     FetchLogEntity,
     FilterRuleEntity,
+    KeywordSeedEntity,
     RawEntryEntity,
     RssSourceEntity,
 )
@@ -32,6 +33,8 @@ from app.models import (
     FetchLog,
     FetchStatus,
     FilterRule,
+    KeywordSeed,
+    KeywordSeedStatus,
     RawEntry,
     RawEntryStatus,
     RssSource,
@@ -875,6 +878,121 @@ class SQLDatabase:
                 )
             return session.execute(stmt).scalar_one()
 
+    # 关键词种子
+    def create_keyword_seed(self, data: dict) -> KeywordSeed:
+        payload = {**data}
+        status = payload.get("status", KeywordSeedStatus.NEW)
+        if isinstance(status, KeywordSeedStatus):
+            payload["status"] = status.value
+        payload["evidence"] = list(payload.get("evidence", ()) or ())
+        with self._session() as session:
+            entity = KeywordSeedEntity(**payload)
+            session.add(entity)
+            session.flush()
+            session.refresh(entity)
+            return _to_keyword_seed(entity)
+
+    def update_keyword_seed(
+        self, seed_id: int, updater: Callable[[KeywordSeed], None]
+    ) -> KeywordSeed:
+        with self._session() as session:
+            entity = session.get(KeywordSeedEntity, seed_id)
+            if entity is None:
+                raise KeyError(seed_id)
+            model = _to_keyword_seed(entity)
+            updater(model)
+            _apply_keyword_seed(entity, model)
+            session.add(entity)
+            session.flush()
+            session.refresh(entity)
+            return _to_keyword_seed(entity)
+
+    def get_keyword_seed(self, seed_id: int) -> KeywordSeed | None:
+        with self._session() as session:
+            entity = session.get(KeywordSeedEntity, seed_id)
+            return _to_keyword_seed(entity) if entity else None
+
+    def get_keyword_seed_by_key(self, phrase_key: str) -> KeywordSeed | None:
+        with self._session() as session:
+            stmt = select(KeywordSeedEntity).where(KeywordSeedEntity.phrase_key == phrase_key)
+            entity = session.execute(stmt).scalars().first()
+            return _to_keyword_seed(entity) if entity else None
+
+    def list_keyword_seeds(
+        self,
+        *,
+        status: KeywordSeedStatus | None = None,
+        statuses: Sequence[KeywordSeedStatus] | None = None,
+        search: str | None = None,
+        min_volume: int | None = None,
+        min_score: int | None = None,
+        unvalidated_only: bool = False,
+        skip: int = 0,
+        limit: int | None = None,
+    ) -> list[KeywordSeed]:
+        with self._session() as session:
+            stmt = select(KeywordSeedEntity)
+            if status is not None:
+                stmt = stmt.where(KeywordSeedEntity.status == status.value)
+            if statuses:
+                values = [item.value for item in statuses]
+                stmt = stmt.where(KeywordSeedEntity.status.in_(values))
+            if search:
+                keyword = f"%{search.lower()}%"
+                stmt = stmt.where(func.lower(KeywordSeedEntity.phrase).like(keyword))
+            if min_volume is not None:
+                stmt = stmt.where(KeywordSeedEntity.search_volume >= min_volume)
+            if min_score is not None:
+                stmt = stmt.where(KeywordSeedEntity.opportunity_score >= min_score)
+            if unvalidated_only:
+                stmt = stmt.where(KeywordSeedEntity.validated_at.is_(None))
+            stmt = stmt.order_by(
+                KeywordSeedEntity.opportunity_score.desc(),
+                KeywordSeedEntity.occurrence_count.desc(),
+                KeywordSeedEntity.created_at.desc(),
+            )
+            if skip:
+                stmt = stmt.offset(skip)
+            if limit is not None:
+                stmt = stmt.limit(limit)
+            return [_to_keyword_seed(row) for row in session.execute(stmt).scalars().all()]
+
+    def count_keyword_seeds(
+        self,
+        *,
+        status: KeywordSeedStatus | None = None,
+        statuses: Sequence[KeywordSeedStatus] | None = None,
+        search: str | None = None,
+        min_volume: int | None = None,
+        min_score: int | None = None,
+        unvalidated_only: bool = False,
+    ) -> int:
+        with self._session() as session:
+            stmt = select(func.count(KeywordSeedEntity.id))
+            if status is not None:
+                stmt = stmt.where(KeywordSeedEntity.status == status.value)
+            if statuses:
+                values = [item.value for item in statuses]
+                stmt = stmt.where(KeywordSeedEntity.status.in_(values))
+            if search:
+                keyword = f"%{search.lower()}%"
+                stmt = stmt.where(func.lower(KeywordSeedEntity.phrase).like(keyword))
+            if min_volume is not None:
+                stmt = stmt.where(KeywordSeedEntity.search_volume >= min_volume)
+            if min_score is not None:
+                stmt = stmt.where(KeywordSeedEntity.opportunity_score >= min_score)
+            if unvalidated_only:
+                stmt = stmt.where(KeywordSeedEntity.validated_at.is_(None))
+            return session.execute(stmt).scalar_one()
+
+    def keyword_seed_status_breakdown(self) -> dict[str, int]:
+        with self._session() as session:
+            stmt = (
+                select(KeywordSeedEntity.status, func.count(KeywordSeedEntity.id))
+                .group_by(KeywordSeedEntity.status)
+            )
+            return {status: count for status, count in session.execute(stmt).all()}
+
 
 def _to_rss_source(entity: RssSourceEntity) -> RssSource:
     return RssSource(
@@ -1084,6 +1202,49 @@ def _apply_filter_rule(entity: FilterRuleEntity, model: FilterRule) -> None:
     entity.min_score = model.min_score
     entity.weight = model.weight
     entity.enabled = model.enabled
+    entity.updated_at = datetime.now(UTC)
+
+
+def _to_keyword_seed(entity: KeywordSeedEntity) -> KeywordSeed:
+    return KeywordSeed(
+        id=entity.id,
+        phrase=entity.phrase,
+        phrase_key=entity.phrase_key,
+        pattern_kind=entity.pattern_kind,
+        occurrence_count=entity.occurrence_count,
+        first_seen_at=entity.first_seen_at,
+        last_seen_at=entity.last_seen_at,
+        status=KeywordSeedStatus(entity.status),
+        search_volume=entity.search_volume,
+        keyword_difficulty=entity.keyword_difficulty,
+        cpc=entity.cpc,
+        competition=entity.competition,
+        validated_at=entity.validated_at,
+        validation_error=entity.validation_error,
+        opportunity_score=entity.opportunity_score,
+        evidence=list(entity.evidence or []),
+        created_at=entity.created_at,
+        updated_at=entity.updated_at,
+    )
+
+
+def _apply_keyword_seed(entity: KeywordSeedEntity, model: KeywordSeed) -> None:
+    entity.phrase = model.phrase
+    entity.phrase_key = model.phrase_key
+    entity.pattern_kind = model.pattern_kind
+    entity.occurrence_count = model.occurrence_count
+    entity.first_seen_at = model.first_seen_at
+    entity.last_seen_at = model.last_seen_at
+    status = model.status
+    entity.status = status.value if isinstance(status, KeywordSeedStatus) else str(status)
+    entity.search_volume = model.search_volume
+    entity.keyword_difficulty = model.keyword_difficulty
+    entity.cpc = model.cpc
+    entity.competition = model.competition
+    entity.validated_at = model.validated_at
+    entity.validation_error = model.validation_error
+    entity.opportunity_score = model.opportunity_score
+    entity.evidence = list(model.evidence)
     entity.updated_at = datetime.now(UTC)
 
 

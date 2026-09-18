@@ -9,6 +9,7 @@ from app.models.candidate_need import (
 from app.models.downstream import DownstreamSyncLog, SyncChannel
 from app.models.export_job import ExportJob, ExportJobStatus
 from app.models.filter_rule import FilterRule
+from app.models.keyword_seed import KeywordSeed, KeywordSeedStatus
 from app.models.rss import (
     FetchLog,
     FetchStatus,
@@ -29,6 +30,8 @@ __all__ = [
     "ExportJob",
     "ExportJobStatus",
     "FilterRule",
+    "KeywordSeed",
+    "KeywordSeedStatus",
     "FetchLog",
     "FetchStatus",
     "RawEntry",

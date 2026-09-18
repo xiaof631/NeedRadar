@@ -68,6 +68,13 @@ from app.schemas.filter_rules import (
     FilterRuleRead,
     FilterRuleUpdate,
 )
+from app.schemas.keyword_seeds import (
+    KeywordExtractionResult,
+    KeywordSeedList,
+    KeywordSeedRead,
+    KeywordSeedStatusUpdate,
+    KeywordValidationResult,
+)
 from app.schemas.marketplace_leads import (
     MarketplaceLeadBulkOutcomeUpdate,
     MarketplaceLeadConversionMetricRead,
@@ -156,6 +163,11 @@ __all__ = [
     "FilterRuleList",
     "FilterRuleRead",
     "FilterRuleUpdate",
+    "KeywordExtractionResult",
+    "KeywordSeedList",
+    "KeywordSeedRead",
+    "KeywordSeedStatusUpdate",
+    "KeywordValidationResult",
     "MarketplaceLeadBulkOutcomeUpdate",
     "MarketplaceLeadConversionMetricRead",
     "MarketplaceLeadEventRead",

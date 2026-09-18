@@ -9,6 +9,7 @@ from app.api.v1 import (
     fetch_logs,
     filter_metrics,
     filter_rules,
+    keyword_seeds,
     marketplace_leads,
     raw_entries,
     rss_sources,
@@ -27,6 +28,7 @@ router.include_router(document_ops.router)
 router.include_router(email_followups.router)
 router.include_router(fetch_logs.router)
 router.include_router(dashboard.router)
+router.include_router(keyword_seeds.router)
 
 
 @router.get("/ping", summary="基础连通性测试")

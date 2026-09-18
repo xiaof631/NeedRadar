@@ -653,6 +653,108 @@ export async function fetchCustomerOpportunities(
   return response.data;
 }
 
+export type KeywordSeedStatus =
+  | 'new'
+  | 'validated'
+  | 'no_volume'
+  | 'error'
+  | 'dismissed'
+  | 'shortlisted';
+
+export interface KeywordSeedEvidence {
+  raw_entry_id: number;
+  candidate_need_id: number;
+  title: string;
+  link: string | null;
+  source_name: string;
+  published_at: string | null;
+}
+
+export interface KeywordSeed {
+  id: number;
+  phrase: string;
+  pattern_kind: string;
+  occurrence_count: number;
+  status: KeywordSeedStatus;
+  search_volume: number | null;
+  keyword_difficulty: number | null;
+  cpc: number | null;
+  competition: string | null;
+  validated_at: string | null;
+  validation_error: string | null;
+  opportunity_score: number;
+  evidence: KeywordSeedEvidence[];
+  first_seen_at: string;
+  last_seen_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KeywordSeedListResponse {
+  total: number;
+  status_breakdown: Record<string, number>;
+  items: KeywordSeed[];
+}
+
+export interface KeywordSeedsQueryParams {
+  skip?: number;
+  limit?: number;
+  status?: KeywordSeedStatus;
+  search?: string;
+  min_volume?: number;
+  min_score?: number;
+}
+
+export interface KeywordExtractionResponse {
+  scanned: number;
+  created: number;
+  merged: number;
+}
+
+export interface KeywordValidationResponse {
+  skipped: number;
+  validated: number;
+  no_volume: number;
+  errors: number;
+  reason: string | null;
+}
+
+export async function fetchKeywordSeeds(
+  params: KeywordSeedsQueryParams = {}
+): Promise<KeywordSeedListResponse> {
+  const response = await apiClient.get('/api/v1/keyword-seeds/', { params });
+  return response.data;
+}
+
+export async function triggerKeywordSeedExtraction(): Promise<KeywordExtractionResponse> {
+  const response = await apiClient.post('/api/v1/keyword-seeds/extract');
+  return response.data;
+}
+
+export async function validatePendingKeywordSeeds(
+  batchSize?: number
+): Promise<KeywordValidationResponse> {
+  // suggest 免费校验带限速间隔，批量验证可能耗时数十秒，单独放宽超时。
+  const response = await apiClient.post('/api/v1/keyword-seeds/validate-pending', null, {
+    params: batchSize ? { batch_size: batchSize } : undefined,
+    timeout: 300000
+  });
+  return response.data;
+}
+
+export async function validateKeywordSeed(seedId: number): Promise<KeywordSeed> {
+  const response = await apiClient.post(`/api/v1/keyword-seeds/${seedId}/validate`);
+  return response.data;
+}
+
+export async function updateKeywordSeedStatus(
+  seedId: number,
+  status: KeywordSeedStatus
+): Promise<KeywordSeed> {
+  const response = await apiClient.patch(`/api/v1/keyword-seeds/${seedId}`, { status });
+  return response.data;
+}
+
 export type EmailFollowUpSource = 'all' | 'marketplace' | 'customer_radar';
 export type EmailFollowUpTaskSource = Exclude<EmailFollowUpSource, 'all'>;
 export type EmailFollowUpStatus =

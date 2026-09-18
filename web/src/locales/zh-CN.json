@@ -4,6 +4,7 @@
     "sources": "RSS 源管理",
     "marketplace": "外包项目线索",
     "customerRadar": "客户雷达",
+    "keywordSeeds": "关键词种子",
     "documentOps": "文档核对",
     "emailFollowups": "邮件跟进",
     "entries": "原始内容",
@@ -975,6 +976,76 @@
         "failed": "失败",
         "completed": "已完成"
       }
+    }
+  },
+  "keywordSeeds": {
+    "title": "关键词种子",
+    "subtitle": "从候选需求中抽取工具型长尾关键词，结合搜索量验证反选工具站方向",
+    "metrics": {
+      "total": "种子总数",
+      "new": "待验证",
+      "validated": "已验证",
+      "shortlisted": "已入围",
+      "noVolume": "无搜索量"
+    },
+    "filters": {
+      "searchPlaceholder": "搜索短语",
+      "status": "状态",
+      "all": "全部",
+      "minScore": "最低机会分"
+    },
+    "table": {
+      "empty": "暂无关键词种子，先执行抽取",
+      "phrase": "关键词短语",
+      "pattern": "句式",
+      "occurrences": "出现次数",
+      "volume": "月搜索量",
+      "difficulty": "难度",
+      "cpc": "CPC",
+      "score": "机会分",
+      "status": "状态",
+      "validatedAt": "验证时间",
+      "actions": "操作"
+    },
+    "actions": {
+      "extract": "抽取种子",
+      "validatePending": "批量验证",
+      "validateOne": "验证",
+      "shortlist": "入围",
+      "dismiss": "忽略",
+      "restore": "恢复待验证"
+    },
+    "status": {
+      "new": "待验证",
+      "validated": "已验证",
+      "no_volume": "无搜索量",
+      "error": "验证失败",
+      "dismissed": "已忽略",
+      "shortlisted": "已入围"
+    },
+    "pattern": {
+      "convert_to": "句式：convert X to Y",
+      "to_converter": "句式：X to Y converter",
+      "extract_from": "句式：extract X from Y",
+      "extractor": "句式：X extractor",
+      "scrape_target": "句式：scrape X",
+      "zh_convert_to": "句式：X 转成 Y",
+      "zh_extract_from": "句式：从 X 提取 Y"
+    },
+    "details": {
+      "title": "种子详情",
+      "metrics": "搜索指标",
+      "evidence": "来源线索",
+      "notValidated": "尚未验证搜索量",
+      "validationError": "验证错误",
+      "confirmedBySuggest": "真实搜索词"
+    },
+    "messages": {
+      "extractDone": "抽取完成：扫描 {scanned} 条，新建 {created} 个，合并 {merged} 次",
+      "validateDone": "验证完成：{validated} 个有效，{noVolume} 个无量，{errors} 个失败",
+      "validateSkipped": "未配置关键词数据源，请先设置 DataForSEO 凭据",
+      "statusUpdated": "状态已更新",
+      "error": "操作失败，请稍后重试"
     }
   }
 }

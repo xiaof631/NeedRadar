@@ -24,6 +24,7 @@ from app.models import (
     CandidateNeedType,
     ExportJobStatus,
     FetchStatus,
+    KeywordSeedStatus,
     RawEntryStatus,
     SourceStatus,
     SourceType,
@@ -200,6 +201,31 @@ class ExportJobEntity(TimestampMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class KeywordSeedEntity(TimestampMixin, Base):
+    __tablename__ = "keyword_seeds"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    phrase: Mapped[str] = mapped_column(String(200), nullable=False)
+    phrase_key: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    pattern_kind: Mapped[str] = mapped_column(String(32), default="convert_to")
+    occurrence_count: Mapped[int] = mapped_column(Integer, default=1)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(32), default=KeywordSeedStatus.NEW.value)
+    search_volume: Mapped[int | None] = mapped_column(Integer)
+    keyword_difficulty: Mapped[int | None] = mapped_column(Integer)
+    cpc: Mapped[float | None] = mapped_column(Float)
+    competition: Mapped[str | None] = mapped_column(String(32))
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    validation_error: Mapped[str | None] = mapped_column(Text)
+    opportunity_score: Mapped[int] = mapped_column(Integer, default=0)
+    evidence: Mapped[list] = mapped_column(JSON, default=list)
+
+
 __all__ = [
     "RssSourceEntity",
     "FetchLogEntity",
@@ -209,4 +235,5 @@ __all__ = [
     "CandidateNeedStatusLogEntity",
     "DownstreamSyncLogEntity",
     "ExportJobEntity",
+    "KeywordSeedEntity",
 ]
